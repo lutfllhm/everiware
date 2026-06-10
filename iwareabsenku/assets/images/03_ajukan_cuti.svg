@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" width="160" height="160"><style>
+  .float{animation:float 3.2s ease-in-out infinite}
+  .float2{animation:float 3.8s ease-in-out infinite}
+  .float3{animation:float 4.2s ease-in-out infinite}
+  @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
+  .spin-slow{transform-box:view-box;transform-origin:80px 70px;animation:spin 12s linear infinite}
+  .hand-sec{transform-box:view-box;transform-origin:80px 72px;animation:spin 6s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .pulse{transform-box:fill-box;transform-origin:center;animation:pulse 1.6s ease-in-out infinite}
+  @keyframes pulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.18);opacity:.85}}
+  .bounce{animation:bounce 1.9s cubic-bezier(.5,.05,.3,1) infinite}
+  @keyframes bounce{0%,100%{transform:translateY(0)}30%{transform:translateY(-12px)}55%{transform:translateY(0)}70%{transform:translateY(-4px)}85%{transform:translateY(0)}}
+  .nudge{animation:nudge 1.5s ease-in-out infinite}
+  @keyframes nudge{0%,100%{transform:translateX(0)}50%{transform:translateX(7px)}}
+  .slideout{animation:slideout 1.8s ease-in-out infinite}
+  @keyframes slideout{0%{transform:translateX(0);opacity:.4}40%{opacity:1}100%{transform:translateX(12px);opacity:0}}
+  .grow1{transform-box:fill-box;transform-origin:bottom;animation:grow 2.6s ease-in-out infinite}
+  .grow2{transform-box:fill-box;transform-origin:bottom;animation:grow 2.6s ease-in-out infinite .25s}
+  .grow3{transform-box:fill-box;transform-origin:bottom;animation:grow 2.6s ease-in-out infinite .5s}
+  @keyframes grow{0%,100%{transform:scaleY(.78)}50%{transform:scaleY(1)}}
+  .twinkle{transform-box:fill-box;transform-origin:center;animation:twinkle 2.2s ease-in-out infinite}
+  .twinkle.b{animation-delay:.6s}.twinkle.c{animation-delay:1.1s}.twinkle.d{animation-delay:1.6s}
+  @keyframes twinkle{0%,100%{opacity:.25;transform:scale(.7)}50%{opacity:1;transform:scale(1.1)}}
+  @media (prefers-reduced-motion:reduce){*{animation:none!important}}
+</style>
+  <defs>
+    <radialGradient id="sunG3" cx=".36" cy=".3" r=".85"><stop offset="0" stop-color="#fff3a8"/><stop offset=".5" stop-color="#ffd34e"/><stop offset="1" stop-color="#ff9e2e"/></radialGradient>
+    <linearGradient id="rayG3" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffd34e"/><stop offset="1" stop-color="#ff9e2e"/></linearGradient>
+  </defs>
+  <ellipse cx="80" cy="136" rx="34" ry="8" fill="#c97a12" opacity=".2"/>
+  <g class="float">
+    <g fill="url(#rayG3)">
+      <animateTransform 
+        attributeName="transform" 
+        type="rotate" 
+        from="0 80 70" 
+        to="360 80 70" 
+        dur="12s" 
+        repeatCount="indefinite" />
+      <rect x="75" y="18" width="10" height="22" rx="5"/><rect x="75" y="100" width="10" height="22" rx="5"/>
+      <rect x="18" y="65" width="22" height="10" rx="5"/><rect x="120" y="65" width="22" height="10" rx="5"/>
+      <rect x="33" y="33" width="10" height="20" rx="5" transform="rotate(-45 38 43)"/>
+      <rect x="117" y="33" width="10" height="20" rx="5" transform="rotate(45 122 43)"/>
+      <rect x="33" y="87" width="10" height="20" rx="5" transform="rotate(45 38 97)"/>
+      <rect x="117" y="87" width="10" height="20" rx="5" transform="rotate(-45 122 97)"/>
+    </g>
+    <circle cx="80" cy="70" r="30" fill="url(#sunG3)"/>
+    <ellipse cx="70" cy="58" rx="13" ry="8" fill="#fff" opacity=".55"/>
+  </g>
+</svg>
