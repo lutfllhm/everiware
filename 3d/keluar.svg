@@ -1,0 +1,92 @@
+<svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="k_top" x1="20%" y1="0%" x2="80%" y2="100%">
+      <stop offset="0%" stop-color="#9a2327"/>
+      <stop offset="50%" stop-color="#671418"/>
+      <stop offset="100%" stop-color="#3c0a0d"/>
+    </linearGradient>
+    <linearGradient id="k_side" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#360809"/>
+      <stop offset="100%" stop-color="#1f0405"/>
+    </linearGradient>
+    <radialGradient id="k_panel" cx="36%" cy="26%" r="95%">
+      <stop offset="0%" stop-color="#6f1519"/>
+      <stop offset="60%" stop-color="#4a0e11"/>
+      <stop offset="100%" stop-color="#2c070a"/>
+    </radialGradient>
+    <radialGradient id="k_skin" cx="34%" cy="28%" r="85%">
+      <stop offset="0%" stop-color="#fff0e0"/>
+      <stop offset="45%" stop-color="#ffcc9c"/>
+      <stop offset="100%" stop-color="#e08f53"/>
+    </radialGradient>
+    <linearGradient id="k_brk" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffd86b"/>
+      <stop offset="100%" stop-color="#e29a16"/>
+    </linearGradient>
+    <radialGradient id="k_badge" cx="32%" cy="26%" r="90%">
+      <stop offset="0%" stop-color="#ffd089"/>
+      <stop offset="35%" stop-color="#ff9a23"/>
+      <stop offset="100%" stop-color="#d2730a"/>
+    </radialGradient>
+    <linearGradient id="k_gloss" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="k_blur1" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="12"/></filter>
+    <filter id="k_blur2" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="6"/></filter>
+  </defs>
+
+  <ellipse cx="260" cy="456" rx="168" ry="30" fill="#1a0304" opacity="0.4" filter="url(#k_blur1)"/>
+
+  <!-- extrusion -->
+  <rect x="96" y="86" width="320" height="318" rx="70" fill="url(#k_side)"/>
+  <!-- top face -->
+  <rect x="96" y="70" width="320" height="318" rx="70" fill="url(#k_top)"/>
+  <rect x="96" y="70" width="320" height="318" rx="70" fill="none" stroke="#c8595c" stroke-opacity="0.45" stroke-width="4"/>
+
+  <!-- recessed panel -->
+  <rect x="120" y="94" width="272" height="272" rx="50" fill="#2c070a"/>
+  <rect x="124" y="96" width="264" height="266" rx="46" fill="url(#k_panel)"/>
+  <path d="M124 142 q0 -46 46 -46 h172 q46 0 46 46 v6 q-130 -34 -264 0 z" fill="#1a0304" opacity="0.3" filter="url(#k_blur2)"/>
+
+  <!-- corner brackets gold -->
+  <g fill="none" stroke-linecap="round">
+    <g stroke="#1a0304" stroke-width="14" opacity="0.5" transform="translate(0,3)">
+      <path d="M158 190 v-20 a16 16 0 0 1 16 -16 h20"/>
+      <path d="M354 190 v-20 a16 16 0 0 0 -16 -16 h-20"/>
+      <path d="M158 274 v20 a16 16 0 0 0 16 16 h20"/>
+      <path d="M354 274 v20 a16 16 0 0 1 -16 16 h-20"/>
+    </g>
+    <g stroke="url(#k_brk)" stroke-width="13">
+      <path d="M158 190 v-20 a16 16 0 0 1 16 -16 h20"/>
+      <path d="M354 190 v-20 a16 16 0 0 0 -16 -16 h-20"/>
+      <path d="M158 274 v20 a16 16 0 0 0 16 16 h20"/>
+      <path d="M354 274 v20 a16 16 0 0 1 -16 16 h-20"/>
+    </g>
+  </g>
+
+  <!-- face -->
+  <ellipse cx="258" cy="300" rx="60" ry="18" fill="#1a0304" opacity="0.35" filter="url(#k_blur2)"/>
+  <circle cx="256" cy="230" r="70" fill="url(#k_skin)"/>
+  <path d="M196 252 a70 70 0 0 0 120 8" fill="none" stroke="#ffe6cd" stroke-width="6" stroke-opacity="0.6" stroke-linecap="round"/>
+  <ellipse cx="230" cy="204" rx="22" ry="13" fill="#ffffff" opacity="0.6"/>
+  <circle cx="234" cy="226" r="8" fill="#6b3f1e"/>
+  <circle cx="278" cy="226" r="8" fill="#6b3f1e"/>
+  <path d="M232 256 q24 22 48 0" fill="none" stroke="#6b3f1e" stroke-width="8" stroke-linecap="round"/>
+
+  <!-- top gloss -->
+  <path d="M96 140 q0 -70 70 -70 h180 q70 0 70 70 v14 q-160 -52 -320 0 z" fill="url(#k_gloss)" opacity="0.28"/>
+
+  <!-- IN badge -->
+  <g>
+    <ellipse cx="378" cy="404" rx="58" ry="14" fill="#1a0304" opacity="0.4" filter="url(#k_blur2)"/>
+    <circle cx="376" cy="354" r="66" fill="url(#k_badge)"/>
+    <circle cx="376" cy="354" r="66" fill="none" stroke="#ffe6c2" stroke-opacity="0.5" stroke-width="3"/>
+    <ellipse cx="356" cy="328" rx="34" ry="19" fill="#ffffff" opacity="0.5"/>
+    <g stroke="#ffffff" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" fill="none">
+      <path d="M354 322 v64"/>
+      <line x1="356" y1="354" x2="410" y2="354"/>
+      <polyline points="388,336 410,354 388,372"/>
+    </g>
+  </g>
+</svg>
