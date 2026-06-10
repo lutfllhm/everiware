@@ -586,10 +586,10 @@ class _CameraScreenState extends State<CameraScreen> {
       final cachedStr = prefs.getString(cachedKey);
       final cachedAvatar = prefs.getString(cachedAvatarKey);
       
-      // Prioritize facePhoto over avatar and handle empty/blank strings
+      // Use facePhoto only for face verification; profile photo (avatar) should not affect it
       final currentReference = (user.facePhoto != null && user.facePhoto!.trim().isNotEmpty)
           ? user.facePhoto!.trim()
-          : (user.avatar != null && user.avatar!.trim().isNotEmpty ? user.avatar!.trim() : '');
+          : '';
 
       if (cachedStr != null && cachedAvatar == currentReference && currentReference.isNotEmpty) {
         try {

@@ -182,12 +182,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         if (data['user'] != null) {
           final updatedUser = UserModel.fromJson(data['user']);
           context.read<AuthProvider>().updateUser(updatedUser);
-
-          // Invalidate cached face embedding so it re-generates from new avatar
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.remove('face_embedding_${updatedUser.id}');
-          await prefs.remove('face_embedding_avatar_${updatedUser.id}');
-          print('[Profile] Face embedding cache invalidated after avatar change.');
         }
         _snack('Foto profil berhasil diperbarui ✓');
       } else {

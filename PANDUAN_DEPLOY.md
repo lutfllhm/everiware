@@ -22,8 +22,9 @@ Panduan ini telah disesuaikan agar **tidak terjadi bentrok nama kontainer maupun
 7. [Langkah 5: Penyesuaian Port Docker Compose](#langkah-5-penyesuaian-port-docker-compose)
 8. [Langkah 6: Build dan Jalankan Container Docker](#langkah-6-build-dan-jalankan-container-docker)
 9. [Langkah 7: Konfigurasi SSL (HTTPS) via Nginx Host & Certbot](#langkah-7-konfigurasi-ssl-https-via-nginx-host--certbot)
-10. [🛠️ Troubleshooting (Penyelesaian Masalah Umum)](#️-troubleshooting-penyelesaian-masalah-umum)
-11. [💾 Operasi Harian & Perawatan (Maintenance)](#-operasi-harian--perawatan-maintenance)
+10. [Langkah 8: Build & Distribusi Aplikasi Mobile (APK)](#langkah-8-build--distribusi-aplikasi-mobile-apk)
+11. [🛠️ Troubleshooting (Penyelesaian Masalah Umum)](#️-troubleshooting-penyelesaian-masalah-umum)
+12. [💾 Operasi Harian & Perawatan (Maintenance)](#-operasi-harian--perawatan-maintenance)
 
 ---
 
@@ -133,7 +134,10 @@ Jika Anda tidak menggunakan Git, Anda bisa menggunakan SCP via Terminal atau apl
 4. **Konfigurasikan variabel wajib berikut:**
    *   `DB_ROOT_PASSWORD`: Ganti dengan password root database MySQL Anda yang kuat.
    *   `DB_PASSWORD`: Ganti dengan password user MySQL Anda.
-   *   `JWT_SECRET`: Buat string acak yang panjang untuk mengamankan enkripsi token autentikasi login.
+   *   `JWT_SECRET`: Buat string acak yang panjang untuk mengamankan enkripsi token autentikasi login. Anda bisa membuat string acak yang kuat dengan menjalankan perintah berikut di terminal VPS:
+        ```bash
+        openssl rand -base64 32
+        ```
    *   `FRONTEND_URL` & `WEB_URL`: Masukkan URL domain lengkap Anda menggunakan awalan `https://` yaitu **`https://everiware.iwareid.com`**.
    *   `GOOGLE_CALLBACK_URL`: Masukkan URL callback Google OAuth Anda yaitu **`https://everiware.iwareid.com/api/auth/google/callback`**.
    *   `EMAIL_USER` & `EMAIL_PASS`: Masukkan akun Gmail dan **App Password** Gmail Anda (bukan password akun biasa) agar fitur verifikasi OTP email dapat berjalan lancar.
@@ -236,6 +240,50 @@ sudo certbot --nginx -d everiware.iwareid.com
    ```
 
 Aplikasi Anda kini sudah dapat diakses dengan aman di **`https://everiware.iwareid.com`**!
+
+---
+
+## Langkah 8: Build & Distribusi Aplikasi Mobile (APK)
+
+Agar karyawan dapat menggunakan aplikasi mobile Everiware, Anda perlu membuat file APK dan menyediakannya agar dapat diunduh. Berikut adalah langkah-langkah lengkapnya:
+
+### 1. Konfigurasi Endpoint Backend di Flutter
+Sebelum membuild aplikasi, pastikan konfigurasi API URL pada aplikasi Flutter sudah mengarah ke backend production VPS Anda.
+* Buka file [constants.dart](file:///d:/project/Everiware/iwareabsenku/lib/utils/constants.dart) di komputer lokal Anda.
+* Pastikan variabel `baseUrl`, `uploadsUrl`, dan `webUrl` diset seperti berikut:
+  ```dart
+  static const String baseUrl = 'https://everiware.iwareid.com/api';
+  static const String uploadsUrl = 'https://everiware.iwareid.com/uploads';
+  static const String webUrl = 'https://everiware.iwareid.com';
+  ```
+
+### 2. Build Release APK di Komputer Lokal
+Jalankan perintah berikut pada terminal komputer lokal Anda di dalam direktori `iwareabsenku`:
+```bash
+cd iwareabsenku
+flutter build apk --release
+```
+Setelah proses selesai, file installer APK akan tersimpan di lokasi:
+`build/app/outputs/flutter-apk/app-release.apk`
+
+### 3. Menyediakan Link Download di Server VPS (Hosting Mandiri)
+Agar karyawan dapat mengunduh APK langsung dari domain web Anda, lakukan langkah berikut:
+1. Ganti nama file `app-release.apk` menjadi `everiware.apk` di komputer lokal Anda.
+2. Salin/unggah file `everiware.apk` tersebut ke direktori `frontend/public/` di VPS Anda (menggunakan SFTP/FileZilla atau diunggah langsung ke folder repositori Anda sebelum melakukan build Docker).
+3. Jalankan rebuild container frontend di VPS Anda agar file APK baru ikut ter-copy dan disajikan oleh web server:
+   ```bash
+   cd /var/www/everiware
+   docker compose up -d --build frontend
+   ```
+4. Karyawan kini dapat mengunduh aplikasi mobile secara langsung melalui browser handphone mereka dengan mengakses tautan:
+   **`https://everiware.iwareid.com/everiware.apk`**
+
+### 4. Cara Install APK di Handphone Karyawan
+Karena aplikasi tidak didistribusikan melalui Google Play Store, karyawan perlu melakukan instalasi manual:
+1. Unduh file `everiware.apk` melalui link di atas menggunakan browser handphone.
+2. Buka file yang selesai diunduh. Jika muncul peringatan keamanan *"Blocked by Play Protect"* atau *"Install unknown apps"*, pilih **Settings/Setelan** lalu aktifkan **"Allow from this source"** (Izinkan dari sumber ini).
+3. Tekan **Install/Pasang** dan tunggu hingga selesai.
+4. Buka aplikasi, lalu masuk menggunakan email dan password akun karyawan Anda.
 
 ---
 

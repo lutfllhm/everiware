@@ -183,10 +183,6 @@ class _AdminProfileTabState extends State<AdminProfileTab> {
         if (data['user'] != null) {
           final updatedUser = UserModel.fromJson(data['user']);
           context.read<AuthProvider>().updateUser(updatedUser);
-
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.remove('face_embedding_${updatedUser.id}');
-          await prefs.remove('face_embedding_avatar_${updatedUser.id}');
         }
         _snack('Foto profil berhasil diperbarui ✓');
       } else {

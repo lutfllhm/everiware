@@ -152,7 +152,7 @@ async function verifyFace(selfieFilename, avatarFilename, selfieBbox = null) {
 
     // Pastikan kedua file ada
     if (!fs.existsSync(avatarPath)) {
-      return { match: false, similarity: 0, message: 'Foto referensi wajah (avatar) tidak ditemukan' };
+      return { match: false, similarity: 0, message: 'Foto referensi wajah tidak ditemukan' };
     }
     if (!fs.existsSync(selfiePath)) {
       return { match: false, similarity: 0, message: 'File selfie tidak ditemukan' };

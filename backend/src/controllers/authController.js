@@ -20,7 +20,7 @@ const formatUser = (user) => ({
   join_date: user.join_date,
   is_active: user.is_active,
   is_verified: user.is_verified,
-  face_registered: user.face_registered === 1 || user.face_registered === true || false,
+   face_registered: (user.face_registered === 1 || user.face_registered === true) && (user.face_photo && user.face_photo.trim() !== '') ? true : false,
   location_id: user.location_id,
   location_name: user.location_name,
 });
