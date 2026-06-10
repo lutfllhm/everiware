@@ -247,12 +247,12 @@ const updateProfile = async (req, res) => {
 
     // Jika hanya upload avatar (name/phone boleh kosong, ambil dari DB)
     if (avatar && !name) {
-      await pool.query('UPDATE users SET avatar = ?, face_registered = TRUE WHERE id = ?', [avatar, req.user.id]);
+      await pool.query('UPDATE users SET avatar = ? WHERE id = ?', [avatar, req.user.id]);
     } else {
       let query = 'UPDATE users SET name = ?, phone = ?';
       const params = [name || req.user.name, phone ?? req.user.phone];
 
-      if (avatar) { query += ', avatar = ?, face_registered = TRUE'; params.push(avatar); }
+      if (avatar) { query += ', avatar = ?'; params.push(avatar); }
       query += ' WHERE id = ?';
       params.push(req.user.id);
 

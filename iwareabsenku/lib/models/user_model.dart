@@ -46,7 +46,8 @@ class UserModel {
     employeeId: json['employee_id'],
     isActive: json['is_active'] == true || json['is_active'] == 1,
     isVerified: json['is_verified'] == true || json['is_verified'] == 1,
-    faceRegistered: json['face_registered'] == true || json['face_registered'] == 1,
+    faceRegistered: (json['face_registered'] == true || json['face_registered'] == 1) &&
+                    (json['face_photo'] != null && json['face_photo'].toString().trim().isNotEmpty),
     locationId: json['location_id'],
     locationName: json['location_name'],
   );

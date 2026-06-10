@@ -300,7 +300,7 @@ class _IntroScreenState extends State<IntroScreen> with TickerProviderStateMixin
         // Save face embedding locally
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('face_embedding_${user.id}', jsonEncode(embedding));
-        await prefs.setString('face_embedding_avatar_${user.id}', updatedUser.facePhoto ?? updatedUser.avatar ?? '');
+        await prefs.setString('face_embedding_avatar_${user.id}', updatedUser.facePhoto ?? '');
         // Update user state di AuthProvider
         auth.updateUser(updatedUser);
 
