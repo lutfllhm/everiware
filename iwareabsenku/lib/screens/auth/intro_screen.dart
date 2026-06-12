@@ -46,12 +46,12 @@ class _IntroScreenState extends State<IntroScreen> with TickerProviderStateMixin
   late final FaceDetector _faceDetector;
 
   // iOS FaceID Biometric Scan State
-  bool _isScanning = false;
   double _scanProgress = 0.0;
   XFile? _straightPhoto;
   Rect? _straightFaceBbox;
   String? _statusText = 'Posisikan wajah Anda di dalam lingkaran';
   int _scanState = 0; // 0 = Idle/Repositioning, 1 = Scanning, 2 = Success, 3 = Error
+  int _scanPhase = 0; // 0 = Hadap Depan, 1 = Kiri, 2 = Kanan, 3 = Atas, 4 = Bawah, 5 = Selesai
 
   bool _autoCaptureRunning = false;
 
@@ -66,22 +66,21 @@ class _IntroScreenState extends State<IntroScreen> with TickerProviderStateMixin
 
   void _triggerAutoCaptureLoop() {
     if (_autoCaptureRunning) return;
-    if (_currentPage == 2 && _cameraInitialized && _photo == null && !_detectingFace && !_submitting && _scanState == 0) {
+    if (_currentPage == 2 && _cameraInitialized && _photo == null && !_detectingFace && !_submitting && _scanState <= 1) {
       _startAutoCaptureLoop();
     }
   }
 
   Future<void> _startAutoCaptureLoop() async {
     _autoCaptureRunning = true;
-    while (mounted && _currentPage == 2 && _photo == null && _scanState == 0) {
+    while (mounted && _currentPage == 2 && _photo == null && _scanState <= 1) {
       if (_cameraController != null && 
           _cameraController!.value.isInitialized && 
           !_detectingFace && 
-          !_submitting &&
-          !_isScanning) {
-        await _captureAndDetect();
+          !_submitting) {
+        await _captureAndDetectInteractive();
       }
-      await Future.delayed(const Duration(milliseconds: 1200));
+      await Future.delayed(const Duration(milliseconds: 600));
     }
     _autoCaptureRunning = false;
   }
@@ -89,6 +88,7 @@ class _IntroScreenState extends State<IntroScreen> with TickerProviderStateMixin
   void _resetScan() {
     setState(() {
       _scanState = 0;
+      _scanPhase = 0;
       _isScanning = false;
       _scanProgress = 0.0;
       _straightPhoto = null;
@@ -193,14 +193,13 @@ class _IntroScreenState extends State<IntroScreen> with TickerProviderStateMixin
     }
   }
 
-  Future<void> _captureAndDetect() async {
+  Future<void> _captureAndDetectInteractive() async {
     if (_cameraController == null || !_cameraController!.value.isInitialized) return;
-    if (_detectingFace || _isScanning || _scanState != 0) return;
+    if (_detectingFace || _submitting || _scanState >= 2) return;
 
     setState(() {
       _detectingFace = true;
       _faceError = null;
-      _faceDetected = false;
     });
 
     try {
@@ -212,62 +211,110 @@ class _IntroScreenState extends State<IntroScreen> with TickerProviderStateMixin
       if (faces.isEmpty) {
         _safeDeleteFile(photo.path);
         setState(() {
-          _photo = null;
           _faceDetected = false;
-          _faceError = 'Wajahmu nggak kelihatan nih. 🧐 Yuk, pas-in posisi wajahmu di dalam lingkaran!';
+          _faceError = 'Wajah tidak terdeteksi. Posisikan wajah Anda di dalam lingkaran.';
           _detectingFace = false;
         });
         return;
       }
+
       final face = faces.first;
-      
-      // Trigger haptic feedback
-      HapticFeedback.lightImpact();
+      final double yaw = face.headEulerAngleY ?? 0.0;
+      final double pitch = face.headEulerAngleX ?? 0.0;
 
       setState(() {
-        _isScanning = true;
-        _scanState = 1; // Scanning
         _faceDetected = true;
-        _faceError = null;
         _detectingFace = false;
+        _faceError = null;
+      });
+
+      // Interactive Biometric Scanning Flow
+      if (_scanState == 0) {
+        setState(() {
+          _scanState = 1;
+          _scanPhase = 0;
+          _scanProgress = 0.0;
+          _statusText = '1. Posisikan wajah tegak hadap depan';
+        });
+      }
+
+      if (_scanPhase == 0 && yaw.abs() < 8 && pitch.abs() < 8) {
+        // Simpan foto lurus utama sebagai referensi final
         _straightPhoto = photo;
         _straightFaceBbox = face.boundingBox;
-        _statusText = 'Memindai wajah tampan/cantikmu... 📸 Tetap diam ya!';
-      });
-
-      // Animate progress from 0 to 1
-      _progressController.reset();
-      _progressController.addListener(() {
-        if (mounted) {
+        
+        HapticFeedback.mediumImpact();
+        setState(() {
+          _scanPhase = 1;
+          _scanProgress = 0.2;
+          _statusText = '2. Perlahan menoleh ke KIRI';
+        });
+      } else if (_scanPhase == 1) {
+        // Menoleh ke Kiri (yaw > 12)
+        if (yaw > 12) {
+          HapticFeedback.mediumImpact();
           setState(() {
-            _scanProgress = _progressController.value;
+            _scanPhase = 2;
+            _scanProgress = 0.4;
+            _statusText = '3. Perlahan menoleh ke KANAN';
           });
         }
-      });
+        _safeDeleteFile(photo.path);
+      } else if (_scanPhase == 2) {
+        // Menoleh ke Kanan (yaw < -12)
+        if (yaw < -12) {
+          HapticFeedback.mediumImpact();
+          setState(() {
+            _scanPhase = 3;
+            _scanProgress = 0.6;
+            _statusText = '4. Perlahan dongak ke ATAS';
+          });
+        }
+        _safeDeleteFile(photo.path);
+      } else if (_scanPhase == 3) {
+        // Dongak ke Atas (pitch > 10)
+        if (pitch > 10) {
+          HapticFeedback.mediumImpact();
+          setState(() {
+            _scanPhase = 4;
+            _scanProgress = 0.8;
+            _statusText = '5. Perlahan tunduk ke BAWAH';
+          });
+        }
+        _safeDeleteFile(photo.path);
+      } else if (_scanPhase == 4) {
+        // Tunduk ke Bawah (pitch < -10)
+        if (pitch < -10) {
+          HapticFeedback.mediumImpact();
+          setState(() {
+            _scanPhase = 5;
+            _scanProgress = 1.0;
+            _scanState = 2; // Success
+            _statusText = 'Pemindaian selesai! Mantap! 🎉';
+          });
+          _safeDeleteFile(photo.path);
 
-      await _progressController.forward();
-
-      if (!mounted) return;
-
-      // Scanning completed successfully!
-      HapticFeedback.mediumImpact();
-      setState(() {
-        _scanState = 2; // Success
-        _statusText = 'Pemindaian selesai! Mantap! 🎉';
-      });
-
-      // Wait 1 second to display the successful scan checkmark
-      await Future.delayed(const Duration(milliseconds: 1000));
-      
-      if (!mounted) return;
-      await _submitFaceReference();
+          HapticFeedback.heavyImpact();
+          await Future.delayed(const Duration(milliseconds: 1000));
+          if (mounted) {
+            await _submitFaceReference();
+          }
+        } else {
+          _safeDeleteFile(photo.path);
+        }
+      } else {
+        if (_straightPhoto?.path != photo.path) {
+          _safeDeleteFile(photo.path);
+        }
+      }
 
     } catch (e) {
+      print('[FaceID Scan] Error during interactive scanning: $e');
       if (mounted) {
         setState(() {
-          _faceError = 'Waduh, gagal mendeteksi wajahmu: $e 🥺';
           _detectingFace = false;
           _scanState = 3; // Error
+          _faceError = 'Gagal memproses gerakan wajah: $e';
         });
       }
     }
@@ -1125,8 +1172,6 @@ class _IntroScreenState extends State<IntroScreen> with TickerProviderStateMixin
 
   Widget _buildFaceStatusWidget() {
     if (_faceError == null && _scanState == 0) return const SizedBox.shrink();
-    
-    final isSuccess = _scanState == 2 || _scanState == 1;
     final isError = _scanState == 3;
     
     Color statusColor = const Color(0xFF00E5FF); // Blue for scanning

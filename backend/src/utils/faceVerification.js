@@ -246,5 +246,70 @@ async function verifyFace(selfieFilename, avatarFilename, selfieBbox = null) {
   }
 }
 
-module.exports = { verifyFace };
+/**
+ * Memvalidasi apakah foto registrasi/referensi wajah berisi tepat 1 wajah
+ * Menggunakan Python AI Microservice (InsightFace) dengan fallback ke Sharp jika offline.
+ * 
+ * @param {string} faceFilename - nama file foto di uploads/avatar/
+ * @returns {Promise<{ success: boolean, message: string }>}
+ */
+async function validateRegistrationFace(faceFilename) {
+  const avatarPath = path.join(UPLOADS_DIR, 'avatar', faceFilename);
+
+  if (!fs.existsSync(avatarPath)) {
+    return { success: false, message: 'File foto wajah tidak ditemukan' };
+  }
+
+  try {
+    const aiUrl = (process.env.AI_SERVICE_URL || 'http://localhost:5006/verify').replace('/verify', '/detect');
+    console.log(`[FaceVerification] Attempting AI face detection via ${aiUrl}`);
+
+    const avatarBuffer = fs.readFileSync(avatarPath);
+
+    // Memanfaatkan native global FormData & Blob pada Node.js v20
+    const formData = new FormData();
+    const photoBlob = new Blob([avatarBuffer], { type: 'image/jpeg' });
+    formData.append('photo', photoBlob, 'photo.jpg');
+
+    // Timeout controller untuk fetch agar tidak menunggu terlalu lama jika AI service hang
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 detik timeout
+
+    const response = await fetch(aiUrl, {
+      method: 'POST',
+      body: formData,
+      signal: controller.signal
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      throw new Error(`AI Service returned HTTP status ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log(`[FaceVerification] AI Service registration detection result: success=${data.success}, message="${data.message}"`);
+    return {
+      success: !!data.success,
+      message: data.message || (data.success ? 'Wajah valid' : 'Wajah tidak valid')
+    };
+  } catch (err) {
+    console.warn(`[FaceVerification] AI Service error/offline during registration: ${err.message}. Falling back to local Sharp-based detection.`);
+
+    // --- FALLBACK TO LOCAL SHARP DETECTION ---
+    try {
+      const faceBuffer = await extractFaceRegion(avatarPath, null);
+      if (!faceBuffer) {
+        return { success: false, message: 'Wajah tidak terdeteksi pada foto (Local Fallback)' };
+      }
+      return { success: true, message: 'Wajah terdeteksi dan valid (Local Fallback)' };
+    } catch (fallbackErr) {
+      console.error('[FaceVerification] Fallback detectFace error:', fallbackErr.message);
+      return { success: false, message: 'Terjadi kesalahan sistem saat mendeteksi wajah' };
+    }
+  }
+}
+
+module.exports = { verifyFace, validateRegistrationFace };
+
 
