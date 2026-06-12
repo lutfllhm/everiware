@@ -23,9 +23,8 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   int _currentIndex = 0;
-  int _prevIndex = 0;
   int _unreadNotif = 0;
   int _offlinePending = 0;
   bool _isBottomNavVisible = true;
@@ -35,6 +34,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     
     // Redirect to onboarding if employee face is not registered yet
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -71,9 +71,27 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _connectivitySub?.cancel();
     _realtimeSub?.cancel();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      final auth = context.read<AuthProvider>();
+      if (auth.isAuthenticated && auth.token != null) {
+        debugPrint('📱 App resumed, force reconnecting SSE...');
+        RealtimeService().disconnect();
+        Future.delayed(const Duration(milliseconds: 100), () {
+          if (mounted && auth.isAuthenticated && auth.token != null) {
+            RealtimeService().connect(auth.token!);
+            _fetchUnread();
+          }
+        });
+      }
+    }
   }
 
   Future<void> _checkOfflineQueue() async {
@@ -147,7 +165,6 @@ class _HomeScreenState extends State<HomeScreen> {
     if (_currentIndex == i) return;
     HapticFeedback.selectionClick();
     setState(() {
-      _prevIndex = _currentIndex;
       _currentIndex = i;
       _isBottomNavVisible = true;
     });
@@ -234,48 +251,9 @@ class _HomeScreenState extends State<HomeScreen> {
               }
               return false;
             },
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 400),
-              switchInCurve: Curves.fastOutSlowIn,
-              switchOutCurve: Curves.fastOutSlowIn,
-              transitionBuilder: (Widget child, Animation<double> animation) {
-                final isForward = _currentIndex >= _prevIndex;
-                final slideOffset = isForward ? const Offset(0.12, 0.0) : const Offset(-0.12, 0.0);
-                
-                if (child.key == ValueKey<int>(_currentIndex)) {
-                  return FadeTransition(
-                    opacity: animation,
-                    child: SlideTransition(
-                      position: Tween<Offset>(
-                        begin: slideOffset,
-                        end: Offset.zero,
-                      ).animate(CurvedAnimation(
-                        parent: animation,
-                        curve: Curves.fastOutSlowIn,
-                      )),
-                      child: child,
-                    ),
-                  );
-                } else {
-                  return FadeTransition(
-                    opacity: animation,
-                    child: SlideTransition(
-                      position: Tween<Offset>(
-                        begin: Offset.zero,
-                        end: isForward ? const Offset(-0.12, 0.0) : const Offset(0.12, 0.0),
-                      ).animate(CurvedAnimation(
-                        parent: animation,
-                        curve: Curves.fastOutSlowIn,
-                      )),
-                      child: child,
-                    ),
-                  );
-                }
-              },
-              child: KeyedSubtree(
-                key: ValueKey<int>(_currentIndex),
-                child: pages[_currentIndex],
-              ),
+            child: IndexedStack(
+              index: _currentIndex,
+              children: pages,
             ),
           ),
           bottomNavigationBar: AnimatedSlide(
