@@ -16,6 +16,7 @@ import '../../services/auth_provider.dart';
 import '../../services/fcm_service.dart';
 import '../../services/realtime_service.dart';
 import 'dashboard_tab.dart';
+import '../../widgets/animations.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -251,7 +252,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               }
               return false;
             },
-            child: IndexedStack(
+            child: AnimatedIndexedStack(
               index: _currentIndex,
               children: pages,
             ),

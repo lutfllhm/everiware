@@ -19,6 +19,7 @@ import 'screens/admin/employee_directory_screen.dart';
 import 'screens/admin/locations_screen.dart';
 import 'screens/admin/broadcast_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'widgets/animations.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
@@ -120,16 +121,9 @@ class IWareApp extends StatelessWidget {
           default:
             return null;
         }
-        return PageRouteBuilder(
+        return PremiumPageRoute(
           settings: settings,
-          pageBuilder: (context, animation, secondaryAnimation) => page,
-          transitionsBuilder: (context, animation, secondaryAnimation, child) {
-            return FadeTransition(
-              opacity: animation,
-              child: child,
-            );
-          },
-          transitionDuration: const Duration(milliseconds: 400),
+          page: page,
         );
       },
     );

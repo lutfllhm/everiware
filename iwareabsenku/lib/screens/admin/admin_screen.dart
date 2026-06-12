@@ -12,6 +12,7 @@ import 'admin_approvals_tab.dart';
 import 'today_attendance_screen.dart';
 import 'team_calendar_screen.dart';
 import 'admin_profile_tab.dart';
+import '../../widgets/animations.dart';
 
 class AdminScreen extends StatefulWidget {
   const AdminScreen({super.key});
@@ -156,7 +157,7 @@ class _AdminScreenState extends State<AdminScreen> with WidgetsBindingObserver {
               }
               return false;
             },
-            child: IndexedStack(
+            child: AnimatedIndexedStack(
               index: _currentIndex,
               children: pages,
             ),
