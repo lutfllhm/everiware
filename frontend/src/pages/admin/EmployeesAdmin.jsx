@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Fragment } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Plus, Edit, Trash2, X, User, Mail, Phone, Building, Briefcase, Calendar, AlertTriangle } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -20,6 +20,7 @@ export default function EmployeesAdmin() {
   const [quotaForm, setQuotaForm] = useState({ total_days: 12, year: new Date().getFullYear() });
   const [locations, setLocations] = useState([]);
   const [locationFilter, setLocationFilter] = useState('');
+  const [groupByLocation, setGroupByLocation] = useState(true);
 
   useEffect(() => { fetchUsers(); fetchManagers(); fetchDepartments(); fetchLocations(); }, [locationFilter]);
 
@@ -148,7 +149,23 @@ export default function EmployeesAdmin() {
     }
   };
 
-  const filtered = users.filter(u => !search || u.name?.toLowerCase().includes(search.toLowerCase()) || u.email?.includes(search) || u.employee_id?.includes(search));
+  const filtered = users.filter(u => !search || u.name?.toLowerCase().includes(search.toLowerCase()) || u.email?.toLowerCase().includes(search.toLowerCase()) || u.employee_id?.toLowerCase().includes(search.toLowerCase()));
+
+  const grouped = {};
+  if (groupByLocation) {
+    filtered.forEach(u => {
+      const loc = u.location_name || 'Belum di-assign';
+      if (!grouped[loc]) {
+        grouped[loc] = [];
+      }
+      grouped[loc].push(u);
+    });
+  }
+  const sortedGroupKeys = Object.keys(grouped).sort((a, b) => {
+    if (a === 'Belum di-assign') return 1;
+    if (b === 'Belum di-assign') return -1;
+    return a.localeCompare(b);
+  });
 
   return (
     <div className="space-y-4">
@@ -169,6 +186,15 @@ export default function EmployeesAdmin() {
               <option key={loc.id} value={loc.id}>{loc.name}</option>
             ))}
           </select>
+          <label className="flex items-center gap-2 text-xs font-semibold text-slate-600 bg-white border border-slate-200 px-3 py-2.5 rounded-lg select-none cursor-pointer hover:bg-slate-50 transition-colors">
+            <input
+              type="checkbox"
+              checked={groupByLocation}
+              onChange={(e) => setGroupByLocation(e.target.checked)}
+              className="rounded text-red-600 focus:ring-red-500 border-slate-300 w-4 h-4 cursor-pointer"
+            />
+            <span>Grup per Penempatan</span>
+          </label>
         </div>
         <button onClick={() => { setEditUser(null); setForm({ name: '', email: '', password: '', phone: '', role: 'employee', department: '', position: '', employee_id: '', join_date: '', manager_id: '', send_invitation: true, location_id: '' }); setAvatarFile(null); setAvatarPreview(null); setShowModal(true); }}
           className="btn-primary py-2.5 flex items-center gap-2 text-sm">
@@ -189,61 +215,134 @@ export default function EmployeesAdmin() {
             </thead>
             <tbody className="divide-y divide-slate-50">
               {loading ? (
-                <tr><td colSpan={7} className="text-center py-8 text-slate-400">Memuat data...</td></tr>
+                <tr><td colSpan={8} className="text-center py-8 text-slate-400">Memuat data...</td></tr>
               ) : filtered.length === 0 ? (
-                <tr><td colSpan={7} className="text-center py-8 text-slate-400">Tidak ada karyawan</td></tr>
-              ) : filtered.map((user) => (
-                <tr key={user.id} className="hover:bg-slate-50 transition-colors">
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 bg-gradient-to-br from-slate-700 to-slate-500 rounded-lg flex items-center justify-center text-white font-bold text-sm overflow-hidden flex-shrink-0">
-                        {user.avatar
-                          ? <img
-                              src={user.avatar.startsWith('http') ? user.avatar : `/uploads/avatar/${user.avatar}`}
-                              alt=""
-                              className="w-full h-full object-cover"
-                              onError={(e) => { e.target.style.display = 'none'; e.target.parentNode.innerHTML = `<span class="text-white font-bold text-sm">${user.name?.[0] || '?'}</span>`; }}
-                            />
-                          : user.name?.[0]
-                        }
+                <tr><td colSpan={8} className="text-center py-8 text-slate-400">Tidak ada karyawan</td></tr>
+              ) : groupByLocation ? (
+                sortedGroupKeys.map(locName => (
+                  <Fragment key={locName}>
+                    {/* Header Row untuk Penempatan */}
+                    <tr className="bg-slate-100/70 border-y border-slate-200">
+                      <td colSpan={8} className="px-4 py-2 bg-slate-50">
+                        <div className="flex items-center gap-2">
+                          <span className="text-slate-400">📍</span>
+                          <span className="text-xs font-bold text-slate-700">{locName}</span>
+                          <span className="bg-slate-200 text-slate-700 px-2 py-0.5 rounded-full text-[10px] font-bold">
+                            {grouped[locName].length} karyawan
+                          </span>
+                        </div>
+                      </td>
+                    </tr>
+                    {/* Daftar karyawan di penempatan tersebut */}
+                    {grouped[locName].map((user) => (
+                      <tr key={user.id} className="hover:bg-slate-50 transition-colors">
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-3">
+                            <div className="w-9 h-9 bg-gradient-to-br from-slate-700 to-slate-500 rounded-lg flex items-center justify-center text-white font-bold text-sm overflow-hidden flex-shrink-0">
+                              {user.avatar
+                                ? <img
+                                    src={user.avatar.startsWith('http') ? user.avatar : `/uploads/avatar/${user.avatar}`}
+                                    alt=""
+                                    className="w-full h-full object-cover"
+                                    onError={(e) => { e.target.style.display = 'none'; e.target.parentNode.innerHTML = `<span class="text-white font-bold text-sm">${user.name?.[0] || '?'}</span>`; }}
+                                  />
+                                : user.name?.[0]
+                              }
+                            </div>
+                            <div>
+                              <div className="font-medium text-slate-900 text-sm">{user.name}</div>
+                              <div className="text-xs text-slate-500">{user.email}</div>
+                              {(user.department || user.position) && (
+                                <div className="text-xs text-slate-400 mt-0.5">{[user.department, user.position].filter(Boolean).join(' · ')}</div>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-slate-600">{user.employee_id || '-'}</td>
+                        <td className="px-4 py-3 text-sm text-slate-600">{user.department || '-'}</td>
+                        <td className="px-4 py-3 text-sm text-slate-600">{user.position || '-'}</td>
+                        <td className="px-4 py-3 text-sm font-medium text-slate-600">
+                          <span className="inline-flex items-center gap-1 text-slate-700 bg-slate-100 px-2 py-0.5 rounded text-xs border border-slate-200">
+                            📍 {user.location_name || 'Belum di-assign'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <button onClick={() => { setQuotaModal(user); setQuotaForm({ total_days: user.total_days || 12, year: new Date().getFullYear() }); }}
+                            className="text-sm font-medium text-slate-700 hover:text-slate-900 hover:underline">
+                            {user.remaining_days ?? '-'} / {user.total_days ?? 12} hari
+                          </button>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={user.is_active ? 'badge-success' : 'badge-danger'}>{user.is_active ? 'Aktif' : 'Nonaktif'}</span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-1">
+                            <button onClick={() => openEdit(user)} className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors" title="Edit">
+                              <Edit size={15} className="text-slate-500" />
+                            </button>
+                            <button onClick={() => setDeleteModal(user)} className="p-1.5 hover:bg-red-50 rounded-lg transition-colors" title="Hapus">
+                              <Trash2 size={15} className="text-red-500" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </Fragment>
+                ))
+              ) : (
+                filtered.map((user) => (
+                  <tr key={user.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 bg-gradient-to-br from-slate-700 to-slate-500 rounded-lg flex items-center justify-center text-white font-bold text-sm overflow-hidden flex-shrink-0">
+                          {user.avatar
+                            ? <img
+                                src={user.avatar.startsWith('http') ? user.avatar : `/uploads/avatar/${user.avatar}`}
+                                alt=""
+                                className="w-full h-full object-cover"
+                                onError={(e) => { e.target.style.display = 'none'; e.target.parentNode.innerHTML = `<span class="text-white font-bold text-sm">${user.name?.[0] || '?'}</span>`; }}
+                              />
+                            : user.name?.[0]
+                          }
+                        </div>
+                        <div>
+                          <div className="font-medium text-slate-900 text-sm">{user.name}</div>
+                          <div className="text-xs text-slate-500">{user.email}</div>
+                          {(user.department || user.position) && (
+                            <div className="text-xs text-slate-400 mt-0.5">{[user.department, user.position].filter(Boolean).join(' · ')}</div>
+                          )}
+                        </div>                    </div>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-slate-600">{user.employee_id || '-'}</td>
+                    <td className="px-4 py-3 text-sm text-slate-600">{user.department || '-'}</td>
+                    <td className="px-4 py-3 text-sm text-slate-600">{user.position || '-'}</td>
+                    <td className="px-4 py-3 text-sm font-medium text-slate-600">
+                      <span className="inline-flex items-center gap-1 text-slate-700 bg-slate-100 px-2 py-0.5 rounded text-xs border border-slate-200">
+                        📍 {user.location_name || 'Belum di-assign'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <button onClick={() => { setQuotaModal(user); setQuotaForm({ total_days: user.total_days || 12, year: new Date().getFullYear() }); }}
+                        className="text-sm font-medium text-slate-700 hover:text-slate-900 hover:underline">
+                        {user.remaining_days ?? '-'} / {user.total_days ?? 12} hari
+                      </button>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={user.is_active ? 'badge-success' : 'badge-danger'}>{user.is_active ? 'Aktif' : 'Nonaktif'}</span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-1">
+                        <button onClick={() => openEdit(user)} className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors" title="Edit">
+                          <Edit size={15} className="text-slate-500" />
+                        </button>
+                        <button onClick={() => setDeleteModal(user)} className="p-1.5 hover:bg-red-50 rounded-lg transition-colors" title="Hapus">
+                          <Trash2 size={15} className="text-red-500" />
+                        </button>
                       </div>
-                      <div>
-                        <div className="font-medium text-slate-900 text-sm">{user.name}</div>
-                        <div className="text-xs text-slate-500">{user.email}</div>
-                        {(user.department || user.position) && (
-                          <div className="text-xs text-slate-400 mt-0.5">{[user.department, user.position].filter(Boolean).join(' · ')}</div>
-                        )}
-                      </div>                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-sm text-slate-600">{user.employee_id || '-'}</td>
-                  <td className="px-4 py-3 text-sm text-slate-600">{user.department || '-'}</td>
-                  <td className="px-4 py-3 text-sm text-slate-600">{user.position || '-'}</td>
-                  <td className="px-4 py-3 text-sm font-medium text-slate-600">
-                    <span className="inline-flex items-center gap-1 text-slate-700 bg-slate-100 px-2 py-0.5 rounded text-xs border border-slate-200">
-                      📍 {user.location_name || 'Belum di-assign'}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <button onClick={() => { setQuotaModal(user); setQuotaForm({ total_days: user.total_days || 12, year: new Date().getFullYear() }); }}
-                      className="text-sm font-medium text-slate-700 hover:text-slate-900 hover:underline">
-                      {user.remaining_days ?? '-'} / {user.total_days ?? 12} hari
-                    </button>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className={user.is_active ? 'badge-success' : 'badge-danger'}>{user.is_active ? 'Aktif' : 'Nonaktif'}</span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-1">
-                      <button onClick={() => openEdit(user)} className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors" title="Edit">
-                        <Edit size={15} className="text-slate-500" />
-                      </button>
-                      <button onClick={() => setDeleteModal(user)} className="p-1.5 hover:bg-red-50 rounded-lg transition-colors" title="Hapus">
-                        <Trash2 size={15} className="text-red-500" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
