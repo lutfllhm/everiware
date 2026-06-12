@@ -28,7 +28,7 @@ router.get('/all', authorize('superadmin', 'admin', 'hrd'), getAllLeaves);
 router.put('/review/:id', authorize('superadmin', 'admin', 'hrd'), reviewLeave);
 router.get('/report', authorize('superadmin', 'admin', 'hrd'), getLeaveReport);
 router.put('/quota/:userId', authorize('superadmin', 'admin', 'hrd'), updateQuota);
-router.post('/carry-over', authorize('superadmin', 'admin'), triggerCarryOver);
+router.post('/carry-over', authorize('superadmin', 'admin', 'hrd'), triggerCarryOver);
 router.delete('/:id', authorize('superadmin', 'admin', 'hrd'), deleteLeave);
 
 module.exports = router;

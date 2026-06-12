@@ -44,7 +44,7 @@ const navGroups = [
       { path: '/admin/users',     icon: Shield,    label: 'Manajemen User', roles: ['superadmin', 'admin'] },
       { path: '/admin/audit-log', icon: Shield,    label: 'Audit Log',      roles: ['superadmin', 'admin'] },
       { path: '/admin/backup',    icon: Database,  label: 'Backup',         roles: ['superadmin'] },
-      { path: '/admin/settings',  icon: Settings,  label: 'Pengaturan',     roles: ['superadmin', 'admin', 'hrd'] },
+      { path: '/admin/settings',  icon: Settings,  label: 'Pengaturan',     roles: ['superadmin', 'admin'] },
     ]
   },
 ];

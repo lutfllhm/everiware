@@ -110,17 +110,17 @@ export default function App() {
           <Route path="/admin/leaves" element={<AdminRoute><LeavesAdmin /></AdminRoute>} />
           <Route path="/admin/reports" element={<AdminRoute><ReportsAdmin /></AdminRoute>} />
           <Route path="/admin/locations" element={<AdminRoute><LocationsAdmin /></AdminRoute>} />
-          <Route path="/admin/backup" element={<AdminRoute><BackupAdmin /></AdminRoute>} />
+          <Route path="/admin/backup" element={<AdminRoute><ProtectedRoute roles={['superadmin']}><BackupAdmin /></ProtectedRoute></AdminRoute>} />
           <Route path="/admin/notifications" element={<AdminRoute><NotificationsAdmin /></AdminRoute>} />
-          <Route path="/admin/users" element={<AdminRoute><UsersAdmin /></AdminRoute>} />
-          <Route path="/admin/settings" element={<AdminRoute><SettingsAdmin /></AdminRoute>} />
+          <Route path="/admin/users" element={<AdminRoute><ProtectedRoute roles={['superadmin', 'admin']}><UsersAdmin /></ProtectedRoute></AdminRoute>} />
+          <Route path="/admin/settings" element={<AdminRoute><ProtectedRoute roles={['superadmin', 'admin']}><SettingsAdmin /></ProtectedRoute></AdminRoute>} />
           <Route path="/admin/shifts" element={<AdminRoute><ShiftsAdmin /></AdminRoute>} />
           <Route path="/admin/leave-types" element={<AdminRoute><LeaveTypesAdmin /></AdminRoute>} />
           <Route path="/admin/team-calendar" element={<AdminRoute><TeamCalendarAdmin /></AdminRoute>} />
           <Route path="/admin/departments" element={<AdminRoute><DepartmentsAdmin /></AdminRoute>} />
           <Route path="/admin/overtime" element={<AdminRoute><OvertimeAdmin /></AdminRoute>} />
           <Route path="/admin/holidays" element={<AdminRoute><HolidaysAdmin /></AdminRoute>} />
-          <Route path="/admin/audit-log" element={<AdminRoute><AuditLogAdmin /></AdminRoute>} />
+          <Route path="/admin/audit-log" element={<AdminRoute><ProtectedRoute roles={['superadmin', 'admin']}><AuditLogAdmin /></ProtectedRoute></AdminRoute>} />
 
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
