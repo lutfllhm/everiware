@@ -134,10 +134,9 @@ async function sendInvitationEmail(email, name, activationLink) {
   const html = `
     <div style="font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; background-color: #f8fafc; padding: 40px 10px; margin: 0; color: #1e293b;">
       <div style="max-width: 540px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.03);">
-        <!-- Header Banner -->
-        <div style="background-color: #6B0E11; padding: 30px 20px; text-align: center;">
-          <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 800; letter-spacing: 3px; font-style: italic;">EVERIWARE</h1>
-          <p style="color: rgba(255,255,255,0.7); margin: 5px 0 0 0; font-size: 11px; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase;">Undangan Aktivasi Akun</p>
+        <!-- Header Logo Section -->
+        <div style="background-color: #ffffff; padding: 25px 20px; text-align: center; border-bottom: 1px solid #f1f5f9;">
+          <img src="https://everiware.iwareid.com/logo.png" alt="Everiware Logo" style="height: 48px; width: auto; max-width: 100%; display: block; margin: 0 auto;" />
         </div>
         
         <!-- Content Body -->
