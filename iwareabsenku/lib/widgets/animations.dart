@@ -417,3 +417,126 @@ class _FloatingWidgetState extends State<FloatingWidget>
       );
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// ANIMATED INDEXED STACK — Tab switch dengan transisi slide & fade halus
+// ─────────────────────────────────────────────────────────────────────────────
+class AnimatedIndexedStack extends StatefulWidget {
+  final int index;
+  final List<Widget> children;
+  final Duration duration;
+
+  const AnimatedIndexedStack({
+    super.key,
+    required this.index,
+    required this.children,
+    this.duration = const Duration(milliseconds: 300),
+  });
+
+  @override
+  State<AnimatedIndexedStack> createState() => _AnimatedIndexedStackState();
+}
+
+class _AnimatedIndexedStackState extends State<AnimatedIndexedStack>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+  late Animation<double> _fade;
+  late Animation<Offset> _slide;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(vsync: this, duration: widget.duration);
+    _fade = CurvedAnimation(parent: _ctrl, curve: Curves.easeOut);
+    _slide = Tween<Offset>(
+      begin: const Offset(0.04, 0.0),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(parent: _ctrl, curve: Curves.fastOutSlowIn));
+    _ctrl.forward();
+  }
+
+  @override
+  void didUpdateWidget(AnimatedIndexedStack oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.index != widget.index) {
+      final isForward = widget.index > oldWidget.index;
+      _slide = Tween<Offset>(
+        begin: Offset(isForward ? 0.04 : -0.04, 0.0),
+        end: Offset.zero,
+      ).animate(CurvedAnimation(parent: _ctrl, curve: Curves.fastOutSlowIn));
+      _ctrl.forward(from: 0.0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: _fade,
+      child: SlideTransition(
+        position: _slide,
+        child: IndexedStack(
+          index: widget.index,
+          children: widget.children,
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PREMIUM PAGE ROUTE — Animasi perpindahan halaman yang profesional & modern
+// ─────────────────────────────────────────────────────────────────────────────
+class PremiumPageRoute<T> extends PageRouteBuilder<T> {
+  final Widget page;
+
+  PremiumPageRoute({required this.page, super.settings})
+      : super(
+          pageBuilder: (context, animation, secondaryAnimation) => page,
+          transitionDuration: const Duration(milliseconds: 380),
+          reverseTransitionDuration: const Duration(milliseconds: 320),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            // Animasi untuk halaman yang masuk (slide + fade)
+            final slideIn = Tween<Offset>(
+              begin: const Offset(0.08, 0.0),
+              end: Offset.zero,
+            ).animate(CurvedAnimation(
+              parent: animation,
+              curve: Curves.fastOutSlowIn,
+            ));
+
+            final fade = Tween<double>(
+              begin: 0.0,
+              end: 1.0,
+            ).animate(CurvedAnimation(
+              parent: animation,
+              curve: Curves.easeOut,
+            ));
+
+            // Animasi untuk halaman yang keluar/tertimpa (scale down sedikit + slide kiri sedikit)
+            final slideOut = Tween<Offset>(
+              begin: Offset.zero,
+              end: const Offset(-0.04, 0.0),
+            ).animate(CurvedAnimation(
+              parent: secondaryAnimation,
+              curve: Curves.fastOutSlowIn,
+            ));
+
+            return SlideTransition(
+              position: slideOut,
+              child: FadeTransition(
+                opacity: fade,
+                child: SlideTransition(
+                  position: slideIn,
+                  child: child,
+                ),
+              ),
+            );
+          },
+        );
+}
+
