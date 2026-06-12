@@ -89,7 +89,6 @@ class _IntroScreenState extends State<IntroScreen> with TickerProviderStateMixin
     setState(() {
       _scanState = 0;
       _scanPhase = 0;
-      _isScanning = false;
       _scanProgress = 0.0;
       _straightPhoto = null;
       _straightFaceBbox = null;

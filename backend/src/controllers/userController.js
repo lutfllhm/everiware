@@ -128,60 +128,42 @@ async function sendInvitationEmail(email, name, activationLink) {
   console.log('[sendInvitationEmail] Starting email send to:', email);
   const { sendEmail } = require('../utils/email');
   const subject = 'Undangan Bergabung - Everiware';
+  
+  const text = `Halo ${name},\n\nAnda telah didaftarkan sebagai karyawan di sistem absensi Everiware oleh HRD.\n\nUntuk mengaktifkan akun Anda dan mengatur password baru, silakan buka tautan berikut:\n${activationLink}\n\nTautan ini berlaku selama 7 hari.\n\nTerima kasih,\nTim HRD Everiware`;
+  
   const html = `
-    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; padding: 40px 15px; margin: 0; min-height: 100%;">
-      <table align="center" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 560px; background-color: #ffffff; border-radius: 16px; box-shadow: 0 4px 25px rgba(0, 0, 0, 0.03); overflow: hidden; border: 1px solid #e2e8f0;">
-        <!-- Header -->
-        <tr>
-          <td style="background: linear-gradient(135deg, #6B0E11 0%, #3a0406 100%); padding: 40px 30px; text-align: center;">
-            <h1 style="color: #ffffff; margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 26px; font-weight: 800; letter-spacing: 4px; font-style: italic;">EVERIWARE</h1>
-            <p style="color: rgba(255, 255, 255, 0.7); margin: 6px 0 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 11px; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase;">Undangan Aktivasi Akun</p>
-          </td>
-        </tr>
-        <!-- Content Body -->
-        <tr>
-          <td style="padding: 40px 40px 35px 40px;">
-            <p style="color: #1e293b; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 16px; font-weight: 700; margin: 0 0 16px 0;">Halo ${name},</p>
-            <p style="color: #475569; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 14px; line-height: 1.6; margin: 0 0 24px 0;">Anda telah didaftarkan sebagai karyawan di sistem absensi <strong>Everiware</strong> oleh HRD.</p>
-            <p style="color: #475569; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 14px; line-height: 1.6; margin: 0 0 24px 0;">Untuk mengaktifkan akun Anda, silakan klik tombol di bawah ini dan atur password Anda:</p>
-            
-            <!-- Button Box -->
-            <table align="center" border="0" cellpadding="0" cellspacing="0" style="margin: 32px auto;">
-              <tr>
-                <td align="center">
-                  <a href="${activationLink}" 
-                     style="background: linear-gradient(135deg, #6B0E11 0%, #3a0406 100%); color: #ffffff; padding: 14px 35px; text-decoration: none; border-radius: 12px; display: inline-block; font-weight: bold; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 15px; box-shadow: 0 4px 10px rgba(107, 14, 17, 0.2);">
-                    Aktifkan Akun Saya
-                  </a>
-                </td>
-              </tr>
-            </table>
-            
-            <p style="color: #64748b; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 13px; line-height: 1.6; margin: 24px 0 0 0;">
-              Link aktivasi: <a href="${activationLink}" style="color: #6B0E11; text-decoration: underline;">${activationLink}</a>
-            </p>
-            <p style="color: #64748b; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 13px; line-height: 1.6; margin: 4px 0 0 0;">
-              Link aktivasi ini berlaku selama <strong>7 hari</strong>.
-            </p>
-            <p style="color: #64748b; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 13px; line-height: 1.6; margin: 16px 0 0 0;">
-              Jika Anda tidak merasa mendaftar, silakan abaikan email ini secara aman.
-            </p>
-            
-            <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 35px 0 20px 0;">
-            
-            <!-- Footer info -->
-            <p style="color: #94a3b8; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 11px; text-align: center; line-height: 1.5; margin: 0;">
-              Email ini dikirimkan secara otomatis oleh sistem Everiware, mohon untuk tidak membalas email ini.<br><br>
-              © 2026 Everiware · CV. Rajawali Bina Maju. All rights reserved.
-            </p>
-          </td>
-        </tr>
-      </table>
+    <div style="font-family: Arial, sans-serif; font-size: 14px; line-height: 1.6; color: #333333; max-width: 550px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
+      <h2 style="color: #6B0E11; margin-top: 0;">EVERIWARE</h2>
+      <p style="font-size: 11px; color: #64748b; margin: -10px 0 20px 0; text-transform: uppercase; letter-spacing: 1px;">Undangan Aktivasi Akun</p>
+      <hr style="border: none; border-top: 1px solid #e2e8f0; margin-bottom: 20px;">
+      
+      <p>Halo <strong>${name}</strong>,</p>
+      <p>Anda telah didaftarkan sebagai karyawan di sistem absensi <strong>Everiware</strong> oleh HRD.</p>
+      <p>Untuk mengaktifkan akun Anda, silakan klik tombol di bawah ini dan atur password Anda:</p>
+      
+      <div style="text-align: center; margin: 25px 0;">
+        <a href="${activationLink}" style="background-color: #6B0E11; color: #ffffff; padding: 12px 30px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold;">
+          Aktifkan Akun Saya
+        </a>
+      </div>
+      
+      <p style="font-size: 13px; color: #64748b;">
+        Atau salin tautan berikut ke browser Anda:<br>
+        <a href="${activationLink}" style="color: #6B0E11; text-decoration: underline;">${activationLink}</a>
+      </p>
+      
+      <p style="font-size: 12px; color: #64748b;">Tautan aktivasi ini berlaku selama <strong>7 hari</strong>.</p>
+      
+      <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 25px 0 15px 0;">
+      <p style="font-size: 11px; color: #94a3b8; text-align: center; margin: 0;">
+        Email ini dikirimkan secara otomatis oleh sistem Everiware, mohon untuk tidak membalas.<br>
+        © 2026 Everiware · CV. Rajawali Bina Maju
+      </p>
     </div>
   `;
   
   console.log('[sendInvitationEmail] Calling sendEmail function...');
-  const result = await sendEmail(email, subject, html);
+  const result = await sendEmail(email, subject, html, text);
   console.log('[sendInvitationEmail] Email sent! Message ID:', result.messageId);
   return result;
 }
