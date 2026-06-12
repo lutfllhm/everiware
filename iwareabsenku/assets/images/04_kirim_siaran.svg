@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" width="240" height="240">
+  <defs>
+    <linearGradient id="a4_horn" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff6a60"/><stop offset="1" stop-color="#d62f27"/></linearGradient>
+    <radialGradient id="a4_mouth" cx="0.5" cy="0.5" r="0.6"><stop offset="0" stop-color="#a31810"/><stop offset="1" stop-color="#6f0e08"/></radialGradient>
+    <linearGradient id="a4_handle" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff8a82"/><stop offset="1" stop-color="#c4271f"/></linearGradient>
+    <filter id="a4_b" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="5"/></filter>
+  </defs>
+  
+  <style>
+    .flt{animation:flt 3s ease-in-out infinite}
+    .shd{transform-box:fill-box;transform-origin:center;animation:shd 3s ease-in-out infinite}
+    .pulse{transform-box:fill-box;transform-origin:center;animation:pulse 1.9s ease-in-out infinite}
+    .bob{animation:bob 2.6s ease-in-out infinite}
+    .blink{animation:blink 1.6s ease-in-out infinite}
+    @keyframes flt{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+    @keyframes shd{0%,100%{transform:scaleX(1);opacity:.45}50%{transform:scaleX(.82);opacity:.3}}
+    @keyframes pulse{0%{transform:scale(.6);opacity:0}55%{transform:scale(1.12);opacity:1}70%{transform:scale(1)}100%{transform:scale(1)}}
+    @keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+    @keyframes blink{0%,100%{opacity:.3}50%{opacity:1}}
+  </style>
+
+  <ellipse class="shd" cx="118" cy="200" rx="74" ry="14" fill="#8c1c15" filter="url(#a4_b)"/>
+  <g class="flt" style="animation-delay:-.9s">
+    <g>
+      <animateTransform attributeName="transform" attributeType="XML" type="rotate" values="-7 96 150;7 96 150;-7 96 150" keyTimes="0;0.5;1" dur="1.9s" repeatCount="indefinite" calcMode="spline" keySplines="0.45 0 0.55 1;0.45 0 0.55 1"/>
+      <rect x="98" y="118" width="20" height="40" rx="9" fill="url(#a4_handle)" transform="rotate(18 108 138)"/>
+      <path d="M70 96 L150 66 A18 50 0 0 1 150 162 L70 132 A12 22 0 0 1 70 96 Z" fill="url(#a4_horn)"/>
+      <ellipse cx="150" cy="114" rx="18" ry="50" fill="url(#a4_mouth)"/>
+      <ellipse cx="150" cy="114" rx="11" ry="40" fill="#7a0f08"/>
+      <path d="M74 98 Q70 114 76 130 L84 128 Q80 114 82 100 Z" fill="#ffffff" opacity="0.30"/>
+    </g>
+    <path d="M176 86 Q190 114 176 142" fill="none" stroke="#ffb347" stroke-width="8" stroke-linecap="round">
+      <animate attributeName="opacity" values="0;1;0" dur="1.9s" begin="0s" repeatCount="indefinite"/>
+    </path>
+    <path d="M192 72 Q214 114 192 156" fill="none" stroke="#ffce6e" stroke-width="8" stroke-linecap="round">
+      <animate attributeName="opacity" values="0;1;0" dur="1.9s" begin="0.35s" repeatCount="indefinite"/>
+    </path>
+  </g>
+</svg>

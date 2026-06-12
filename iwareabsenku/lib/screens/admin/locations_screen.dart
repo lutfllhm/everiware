@@ -39,15 +39,16 @@ class _LocationsScreenState extends State<LocationsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.surface,
-      appBar: AppBar(
-        title: const Text('Lokasi Kantor (Geofence)'),
-        backgroundColor: Colors.white,
-        elevation: 0,
-        surfaceTintColor: Colors.transparent,
-      ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator(color: Color(0xFF8B1F1F)))
-          : RefreshIndicator(
+      body: Column(
+        children: [
+          const ProfileHeader(
+            title: 'Lokasi Kantor (Geofence)',
+            showBackButton: true,
+          ),
+          Expanded(
+            child: _loading
+                ? const Center(child: CircularProgressIndicator(color: Color(0xFF8B1F1F)))
+                : RefreshIndicator(
               onRefresh: _load,
               color: const Color(0xFF8B1F1F),
               child: _locations.isEmpty
@@ -154,6 +155,9 @@ class _LocationsScreenState extends State<LocationsScreen> {
                       },
                     ),
             ),
+          ),
+        ],
+      ),
     );
   }
 }

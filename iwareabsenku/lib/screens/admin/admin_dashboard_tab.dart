@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:full_svg_flutter/full_svg_flutter.dart';
 import '../../services/auth_provider.dart';
 import '../../services/api_service.dart';
 import '../../services/realtime_service.dart';
@@ -32,12 +33,40 @@ class AdminDashboardTab extends StatefulWidget {
 }
 
 class _AdminDashboardTabState extends State<AdminDashboardTab> {
+  // Admin stats
   Map<String, dynamic>? _stats;
   int _pendingLeavesCount = 0;
   int _pendingOvertimesCount = 0;
   bool _loading = true;
   StreamSubscription? _realtimeSub;
   List<Map<String, dynamic>> _recentPendingRequests = [];
+  int _activeAnnouncementIndex = 0;
+
+  final List<Map<String, dynamic>> _announcements = [
+    {
+      'title': 'Kebijakan Kehadiran Baru',
+      'desc': 'Mulai bulan depan, toleransi keterlambatan kehadiran disesuaikan menjadi 10 menit. Harap persiapkan kehadiran Anda.',
+      'icon': Icons.info_outline_rounded,
+      'color': const Color(0xFF1D4ED8),
+      'date': '20 Mei 2026',
+    },
+    {
+      'title': 'Cuti Bersama Hari Raya Nyepi',
+      'desc': 'Sesuai keputusan bersama, libur nasional Cuti Bersama jatuh pada Senin depan. Seluruh kantor akan non-aktif.',
+      'icon': Icons.celebration_rounded,
+      'color': const Color(0xFFF59E0B),
+      'date': '18 Mei 2026',
+    },
+    {
+      'title': 'Sosialisasi SOP Kehadiran',
+      'desc': 'Harap lakukan verifikasi wajah dengan pencahayaan yang cukup saat melakukan check-in agar sistem mengenali wajah Anda secara akurat.',
+      'icon': Icons.face_retouching_natural_rounded,
+      'color': const Color(0xFF16A34A),
+      'date': '15 Mei 2026',
+    },
+  ];
+
+
 
   @override
   void initState() {
@@ -64,11 +93,17 @@ class _AdminDashboardTabState extends State<AdminDashboardTab> {
   Future<void> _loadAllStats() async {
     try {
       final api = ApiService();
+
+      final refreshFuture = context.read<AuthProvider>().refreshProfile();
+
+      // Fetch admin dashboard metrics in parallel
       final results = await Future.wait([
         api.getDashboardStats(),                 // 0
         api.getAllOvertime(status: 'pending'),   // 1
         api.getAllPendingLeaves(),               // 2
       ]);
+
+      await refreshFuture;
 
       final statsRes = results[0];
       final overtimeRes = results[1];
@@ -124,6 +159,8 @@ class _AdminDashboardTabState extends State<AdminDashboardTab> {
       if (mounted) setState(() => _loading = false);
     }
   }
+
+
 
   String _getGreeting() {
     final hour = DateTime.now().hour;
@@ -184,17 +221,13 @@ class _AdminDashboardTabState extends State<AdminDashboardTab> {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
               sliver: SliverList(
                 delegate: SliverChildListDelegate([
-                  // 1. Greeting Section
-                  FadeSlideIn(
-                    delay: const Duration(milliseconds: 50),
-                    child: _buildGreetingSection(user),
-                  ),
-                  // 2. Statistics Summary
+
+                  // 2. Ringkasan Kehadiran Tim (Admin/HRD overview of employee attendance rate)
                   FadeSlideIn(
                     delay: const Duration(milliseconds: 80),
                     child: _buildStatsSummary(),
                   ),
-                  // 3. Grid Menu Title & Grid
+                  // 3. Grid Menu Title & Grid (Menu Layanan Admin)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 16, top: 4),
                     child: Row(
@@ -213,7 +246,7 @@ class _AdminDashboardTabState extends State<AdminDashboardTab> {
                         ),
                         const SizedBox(width: 10),
                         const Text(
-                          'Menu Layanan Admin',
+                          'Menu Layanan Admin/HRD',
                           style: TextStyle(
                             fontSize: 14.5,
                             fontWeight: FontWeight.w800,
@@ -227,6 +260,18 @@ class _AdminDashboardTabState extends State<AdminDashboardTab> {
                   FadeSlideIn(
                     delay: const Duration(milliseconds: 100),
                     child: _buildGridMenu(),
+                  ),
+                  const SizedBox(height: 24),
+                  // New Section: Pengumuman Internal
+                  FadeSlideIn(
+                    delay: const Duration(milliseconds: 110),
+                    child: _buildAnnouncementsSection(),
+                  ),
+                  const SizedBox(height: 24),
+                  // New Section: Akumulasi & Analitik Bulanan
+                  FadeSlideIn(
+                    delay: const Duration(milliseconds: 115),
+                    child: _buildMonthlyAccumulationSection(),
                   ),
                   const SizedBox(height: 24),
                   // 4. Pending Requests List Section
@@ -244,8 +289,12 @@ class _AdminDashboardTabState extends State<AdminDashboardTab> {
     );
   }
 
-  // ── Header Section ─────────────────────────────────────────────────────────
+  // ── Header Section (Redesigned to look exactly like employee header) ───────
   Widget _buildHeader(UserModel? user, int totalRequests) {
+    final greeting = _getGreeting();
+    final quote = _getMotivationalQuote();
+    final greetingIcon = _getGreetingIcon();
+
     return Container(
       width: double.infinity,
       decoration: const BoxDecoration(
@@ -254,23 +303,24 @@ class _AdminDashboardTabState extends State<AdminDashboardTab> {
           fit: BoxFit.cover,
         ),
         borderRadius: BorderRadius.only(
-          bottomLeft: Radius.circular(36),
-          bottomRight: Radius.circular(36),
+          bottomLeft: Radius.circular(28),
+          bottomRight: Radius.circular(28),
         ),
       ),
       child: Stack(
         children: [
+          // Dark overlay for readability
           Positioned.fill(
             child: Container(
               decoration: BoxDecoration(
                 borderRadius: const BorderRadius.only(
-                  bottomLeft: Radius.circular(36),
-                  bottomRight: Radius.circular(36),
+                  bottomLeft: Radius.circular(28),
+                  bottomRight: Radius.circular(28),
                 ),
                 gradient: LinearGradient(
                   colors: [
-                    Colors.black.withOpacity(0.55),
-                    Colors.black.withOpacity(0.35),
+                    Colors.black.withOpacity(0.65),
+                    Colors.black.withOpacity(0.4),
                   ],
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
@@ -281,8 +331,9 @@ class _AdminDashboardTabState extends State<AdminDashboardTab> {
           SafeArea(
             bottom: false,
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 30),
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Top Bar
                   Row(
@@ -323,10 +374,9 @@ class _AdminDashboardTabState extends State<AdminDashboardTab> {
                             onTap: widget.onNotifTap,
                             scale: 0.92,
                             child: PulseBadge(
-                              count: totalRequests, // Show pending requests as unread count in badge
+                              count: totalRequests,
                               child: Container(
-                                width: 38,
-                                height: 38,
+                                width: 38, height: 38,
                                 decoration: BoxDecoration(
                                   color: Colors.white.withOpacity(0.2),
                                   borderRadius: BorderRadius.circular(12),
@@ -345,194 +395,90 @@ class _AdminDashboardTabState extends State<AdminDashboardTab> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 20),
 
-                  // Profile Avatar
+                  // Horizontal Profile Row
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      // Avatar on the left
+                      Container(
+                        width: 60, height: 60,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 2.0),
+                          boxShadow: [
+                            BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 8, offset: const Offset(0, 4))
+                          ],
+                        ),
+                        child: UserAvatar(name: user?.name ?? '', size: 60, avatarFilename: user?.avatar),
+                      ),
+                      const SizedBox(width: 14),
+                      // Greeting and User info on the right
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(
+                                  greetingIcon,
+                                  color: const Color(0xFFFFD54F),
+                                  size: 15,
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  greeting,
+                                  style: TextStyle(
+                                    color: Colors.white.withOpacity(0.85),
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              user?.name ?? 'Admin',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: -0.4,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Translucent Quote Banner
                   Container(
-                    width: 96,
-                    height: 96,
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 3.5),
-                      boxShadow: [
-                        BoxShadow(color: Colors.black.withOpacity(0.25), blurRadius: 12, offset: const Offset(0, 6))
-                      ],
+                      color: Colors.white.withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.white.withOpacity(0.05), width: 1),
                     ),
-                    child: UserAvatar(name: user?.name ?? '', size: 96, avatarFilename: user?.avatar),
+                    child: Text(
+                      quote,
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.9),
+                        fontSize: 10.5,
+                        height: 1.4,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
                   ),
-                  const SizedBox(height: 16),
 
-                  // Profile Info
-                  Text(
-                    user?.name ?? 'Admin',
-                    style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w800, letterSpacing: -0.5),
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        user?.roleLabel ?? 'Admin',
-                        style: TextStyle(color: Colors.white.withOpacity(0.75), fontSize: 13, fontWeight: FontWeight.w400),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 28),
-
-                  // 3D Action Buttons (Leaves and Overtime Approvals)
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildMainActionButton(
-                          title: 'Persetujuan Cuti',
-                          gradient: const LinearGradient(
-                            colors: [
-                              Color(0xFF8E0E5D), // Deep magenta/plum
-                              Color(0xFFC2185B), // Rich ruby pink
-                              Color(0xFFEC407A), // Bright pink
-                            ],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          shadowColor: const Color(0xFF3B001F),
-                          icon: const Icon(Icons.assignment_turned_in_rounded, color: Colors.white, size: 36),
-                          onTap: () {
-                            HapticFeedback.mediumImpact();
-                            widget.onNavigate(1); // Navigates to approvals tab
-                          },
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: _buildMainActionButton(
-                          title: 'Persetujuan Lembur',
-                          gradient: const LinearGradient(
-                            colors: [
-                              Color(0xFF8E0E5D), // Deep magenta/plum
-                              Color(0xFFC2185B), // Rich ruby pink
-                              Color(0xFFEC407A), // Bright pink
-                            ],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          shadowColor: const Color(0xFF3B001F),
-                          icon: const Icon(Icons.more_time_rounded, color: Colors.white, size: 36),
-                          onTap: () {
-                            HapticFeedback.mediumImpact();
-                            // Open approvals tab and focus lembur
-                            widget.onNavigate(1);
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
                 ],
               ),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMainActionButton({
-    required String title,
-    required Gradient gradient,
-    required Color shadowColor,
-    required Widget icon,
-    required VoidCallback onTap,
-  }) {
-    return ScaleTap(
-      onTap: onTap,
-      scale: 0.94,
-      child: Container(
-        height: 112,
-        decoration: BoxDecoration(
-          gradient: gradient,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: shadowColor.withOpacity(0.3),
-              blurRadius: 12,
-              offset: const Offset(0, 8),
-            ),
-            BoxShadow(
-              color: shadowColor.withOpacity(0.7),
-              blurRadius: 0,
-              offset: const Offset(0, 4),
-            ),
-          ],
-          border: Border.all(color: const Color(0xFFEC407A).withOpacity(0.55), width: 1.5),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            SizedBox(
-              width: 64,
-              height: 48,
-              child: Center(child: icon),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              title,
-              style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ── Greeting Section ───────────────────────────────────────────────────────
-  Widget _buildGreetingSection(UserModel? user) {
-    final greeting = _getGreeting();
-    final quote = _getMotivationalQuote();
-    final icon = _getGreetingIcon();
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-      margin: const EdgeInsets.only(bottom: 20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppColors.primaryBorder.withOpacity(0.35), width: 1.2),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.02),
-            blurRadius: 16,
-            spreadRadius: 0,
-            offset: const Offset(0, 6),
-          )
-        ],
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '$greeting, ${user?.name ?? "Admin"} 👋',
-                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.textPrimary, letterSpacing: -0.2),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  quote,
-                  style: const TextStyle(fontSize: 11, color: AppColors.textSecondary, height: 1.45),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 14),
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: const Color(0xFFEFF6FF),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Icon(icon, color: AppColors.primary, size: 20),
           ),
         ],
       ),
@@ -597,7 +543,6 @@ class _AdminDashboardTabState extends State<AdminDashboardTab> {
           const SizedBox(height: 18),
           Row(
             children: [
-              // Progress Ring Visual
               Container(
                 width: 82,
                 height: 82,
@@ -629,7 +574,6 @@ class _AdminDashboardTabState extends State<AdminDashboardTab> {
                 ),
               ),
               const SizedBox(width: 20),
-              // Stats details
               Expanded(
                 child: Column(
                   children: [
@@ -670,46 +614,48 @@ class _AdminDashboardTabState extends State<AdminDashboardTab> {
     );
   }
 
-  // ── 3-Item Grid Menu ───────────────────────────────────────────────────────
+  // ── Redesigned 6-Item Admin Grid Menu ─────────────────────────────────────
   Widget _buildGridMenu() {
     final context = this.context;
     final List<Map<String, dynamic>> items = [
       {
+        'label': 'Persetujuan\nCuti',
+        'iconPath': 'assets/images/01_persetujuan_cuti.svg',
+        'onTap': () => widget.onNavigate(1),
+      },
+      {
+        'label': 'Persetujuan\nLembur',
+        'iconPath': 'assets/images/02_persetujuan_lembur.svg',
+        'onTap': () => widget.onNavigate(1),
+      },
+      {
         'label': 'Daftar\nKaryawan',
-        'colors': [const Color(0xFF3F51B5), const Color(0xFF2196F3)],
-        'shadow': const Color(0xFF2196F3),
+        'iconPath': 'assets/images/03_daftar_karyawan.svg',
         'onTap': () => Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => const EmployeeDirectoryScreen()),
         ),
-        'child': const Icon(Icons.people_alt_rounded, color: Colors.white, size: 16),
       },
       {
         'label': 'Kirim\nSiaran',
-        'colors': [const Color(0xFFFFB300), const Color(0xFFFF6D00)],
-        'shadow': const Color(0xFFFF6D00),
+        'iconPath': 'assets/images/04_kirim_siaran.svg',
         'onTap': () => Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => const BroadcastScreen()),
         ),
-        'child': const Icon(Icons.campaign_rounded, color: Colors.white, size: 16),
       },
       {
         'label': 'Area\nGeofence',
-        'colors': [const Color(0xFF00BCD4), const Color(0xFF00E5FF)],
-        'shadow': const Color(0xFF00E5FF),
+        'iconPath': 'assets/images/05_area_geofence.svg',
         'onTap': () => Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => const LocationsScreen()),
         ),
-        'child': const Icon(Icons.map_rounded, color: Colors.white, size: 16),
       },
       {
         'label': 'Kalender\nTim',
-        'colors': [const Color(0xFF2E7D32), const Color(0xFF00E676)],
-        'shadow': const Color(0xFF00E676),
-        'onTap': () => widget.onNavigate(3), // Navigate to calendar tab (index 3)
-        'child': const Icon(Icons.calendar_month_rounded, color: Colors.white, size: 16),
+        'iconPath': 'assets/images/06_kalender_tim.svg',
+        'onTap': () => widget.onNavigate(3),
       },
     ];
 
@@ -719,7 +665,7 @@ class _AdminDashboardTabState extends State<AdminDashboardTab> {
       physics: const NeverScrollableScrollPhysics(),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 4,
-        childAspectRatio: 0.76,
+        childAspectRatio: 0.74,
         crossAxisSpacing: 8,
         mainAxisSpacing: 16,
       ),
@@ -729,20 +675,30 @@ class _AdminDashboardTabState extends State<AdminDashboardTab> {
         return ScaleTap(
           onTap: item['onTap'] as VoidCallback,
           scale: 0.92,
-          child: Column(
-            children: [
-              Glossy3dIcon(
-                bgGradientColors: item['colors'] as List<Color>,
-                shadowColor: item['shadow'] as Color,
-                child: item['child'] as Widget,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                item['label'] as String,
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Color(0xFF37474F)),
-              ),
-            ],
+          child: Container(
+            color: Colors.transparent,
+            child: Column(
+              children: [
+                IgnorePointer(
+                  child: FSvgPicture.asset(
+                    item['iconPath'] as String,
+                    width: 58,
+                    height: 66,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  item['label'] as String,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 11, 
+                    fontWeight: FontWeight.w700, 
+                    color: AppColors.textSecondary,
+                    height: 1.25,
+                  ),
+                ),
+              ],
+            ),
           ),
         );
       },
@@ -783,7 +739,7 @@ class _AdminDashboardTabState extends State<AdminDashboardTab> {
               ],
             ),
             GestureDetector(
-              onTap: () => widget.onNavigate(1), // Open approvals tab
+              onTap: () => widget.onNavigate(1),
               child: const Text(
                 'Lihat Semua',
                 style: TextStyle(fontSize: 12, color: AppColors.primary, fontWeight: FontWeight.w700),
@@ -822,7 +778,7 @@ class _AdminDashboardTabState extends State<AdminDashboardTab> {
               return AppCard(
                 onTap: () {
                   HapticFeedback.lightImpact();
-                  widget.onNavigate(1); // Open approvals tab
+                  widget.onNavigate(1);
                 },
                 child: Row(
                   children: [
@@ -866,6 +822,293 @@ class _AdminDashboardTabState extends State<AdminDashboardTab> {
               );
             },
           ),
+      ],
+    );
+  }
+
+  // ── Announcements Carousel ──────────────────────────────────────────
+  Widget _buildAnnouncementsSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              width: 4,
+              height: 18,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [AppColors.primary, AppColors.primaryLight],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                ),
+                borderRadius: BorderRadius.circular(4),
+              ),
+            ),
+            const SizedBox(width: 10),
+            const Text(
+              'Pengumuman Internal',
+              style: TextStyle(
+                fontSize: 14.5,
+                fontWeight: FontWeight.w800,
+                color: AppColors.textPrimary,
+                letterSpacing: -0.3,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        SizedBox(
+          height: 140,
+          child: PageView.builder(
+            controller: PageController(viewportFraction: 0.94),
+            itemCount: _announcements.length,
+            onPageChanged: (index) {
+              setState(() {
+                _activeAnnouncementIndex = index;
+              });
+            },
+            itemBuilder: (context, index) {
+              final ann = _announcements[index];
+              final Color accentColor = (ann['color'] as Color?) ?? AppColors.primary;
+              return Container(
+                margin: const EdgeInsets.only(right: 10, bottom: 6),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: AppColors.grey200),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.02),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    )
+                  ],
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(20),
+                  child: Stack(
+                    children: [
+                      // Left colored accent border
+                      Positioned(
+                        left: 0, top: 0, bottom: 0,
+                        child: Container(
+                          width: 5,
+                          color: accentColor,
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                        decoration: BoxDecoration(
+                                          color: accentColor.withOpacity(0.08),
+                                          borderRadius: BorderRadius.circular(20),
+                                        ),
+                                        child: const Text(
+                                          'Info',
+                                          style: TextStyle(
+                                            color: Color(0xFF8B1F1F),
+                                            fontSize: 9,
+                                            fontWeight: FontWeight.w800,
+                                            letterSpacing: 0.2,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        ann['date'] as String,
+                                        style: const TextStyle(color: AppColors.textMuted, fontSize: 10, fontWeight: FontWeight.w500),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    ann['title'] as String,
+                                    style: const TextStyle(
+                                      color: AppColors.textPrimary, 
+                                      fontSize: 13.5, 
+                                      fontWeight: FontWeight.w800, 
+                                      letterSpacing: -0.2
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    ann['desc'] as String,
+                                    style: const TextStyle(
+                                      color: AppColors.textSecondary, 
+                                      fontSize: 11, 
+                                      height: 1.35
+                                    ),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: accentColor.withOpacity(0.08),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                (ann['icon'] as IconData?) ?? Icons.campaign_rounded, 
+                                color: accentColor, 
+                                size: 22
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: List.generate(
+            _announcements.length,
+            (index) => AnimatedContainer(
+              duration: const Duration(milliseconds: 250),
+              margin: const EdgeInsets.symmetric(horizontal: 3),
+              height: 4,
+              width: _activeAnnouncementIndex == index ? 12 : 4,
+              decoration: BoxDecoration(
+                color: _activeAnnouncementIndex == index ? AppColors.primary : AppColors.grey300,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ── Monthly Accumulation Board ──────────────────────────────────────
+  Widget _buildMonthlyAccumulationSection() {
+    final totalEmployees = _stats?['total_employees'] ?? 0;
+    final presentToday = _stats?['present_today'] ?? 0;
+    final monthlyAttendance = _stats?['monthly_attendance'] ?? 0;
+    final double attendanceRate = totalEmployees > 0 ? (presentToday / totalEmployees) * 100 : 0.0;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              width: 4,
+              height: 18,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [AppColors.primary, AppColors.primaryLight],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                ),
+                borderRadius: BorderRadius.circular(4),
+              ),
+            ),
+            const SizedBox(width: 10),
+            const Text(
+              'Akumulasi & Analitik Bulanan',
+              style: TextStyle(
+                fontSize: 14.5,
+                fontWeight: FontWeight.w800,
+                color: AppColors.textPrimary,
+                letterSpacing: -0.3,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: AppColors.grey200),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFEFF6FF),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.check_circle_outline_rounded, color: Colors.blue, size: 20),
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Presensi Bulanan',
+                      style: TextStyle(fontSize: 11, color: AppColors.textSecondary, fontWeight: FontWeight.w500),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '$monthlyAttendance kali',
+                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: AppColors.grey200),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFF0FDF4),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.trending_up_rounded, color: Colors.green, size: 20),
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Tingkat Kehadiran Hari Ini',
+                      style: TextStyle(fontSize: 11, color: AppColors.textSecondary, fontWeight: FontWeight.w500),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${attendanceRate.round()}%',
+                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ],
     );
   }

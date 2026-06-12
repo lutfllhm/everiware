@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" width="240" height="240">
+  <defs>
+    <linearGradient id="a6_top" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff6a60"/><stop offset="1" stop-color="#e23c32"/></linearGradient>
+    <linearGradient id="a6_body" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#eef1f7"/></linearGradient>
+    <linearGradient id="a6_ring" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e7ecf3"/><stop offset="1" stop-color="#b7c2d1"/></linearGradient>
+    <filter id="a6_b" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="5"/></filter>
+  </defs>
+  
+  <style>
+    .flt{animation:flt 3s ease-in-out infinite}
+    .shd{transform-box:fill-box;transform-origin:center;animation:shd 3s ease-in-out infinite}
+    .pulse{transform-box:fill-box;transform-origin:center;animation:pulse 1.9s ease-in-out infinite}
+    .bob{animation:bob 2.6s ease-in-out infinite}
+    .blink{animation:blink 1.6s ease-in-out infinite}
+    @keyframes flt{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+    @keyframes shd{0%,100%{transform:scaleX(1);opacity:.45}50%{transform:scaleX(.82);opacity:.3}}
+    @keyframes pulse{0%{transform:scale(.6);opacity:0}55%{transform:scale(1.12);opacity:1}70%{transform:scale(1)}100%{transform:scale(1)}}
+    @keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+    @keyframes blink{0%,100%{opacity:.3}50%{opacity:1}}
+  </style>
+
+  <ellipse class="shd" cx="120" cy="206" rx="76" ry="14" fill="#9aa3b6" filter="url(#a6_b)"/>
+  <g class="flt" style="animation-delay:-1.6s">
+    <rect x="52" y="58" width="136" height="120" rx="18" fill="url(#a6_body)"/>
+    <path d="M52 76 a18 18 0 0 1 18 -18 h100 a18 18 0 0 1 18 18 v18 H52 Z" fill="url(#a6_top)"/>
+    <rect x="78" y="44" width="12" height="26" rx="6" fill="url(#a6_ring)"/>
+    <rect x="150" y="44" width="12" height="26" rx="6" fill="url(#a6_ring)"/>
+    <rect x="70" y="108" width="20" height="17" rx="5" fill="#dde4ee"/>
+    <rect x="98" y="108" width="20" height="17" rx="5" fill="#dde4ee"/>
+    <rect class="blink" x="126" y="108" width="20" height="17" rx="5" fill="#ff8a82"/>
+    <rect x="154" y="108" width="20" height="17" rx="5" fill="#dde4ee"/>
+    <rect x="70" y="132" width="20" height="17" rx="5" fill="#dde4ee"/>
+    <rect x="98" y="132" width="20" height="17" rx="5" fill="#dde4ee"/>
+    <rect x="126" y="132" width="20" height="17" rx="5" fill="#dde4ee"/>
+    <rect x="154" y="132" width="20" height="17" rx="5" fill="#dde4ee"/>
+
+    <g class="bob" style="animation-delay:0s"><circle cx="92" cy="168" r="18" fill="#5b9bff"/><path d="M74 196 a18 18 0 0 1 36 0 Z" fill="#5b9bff"/><circle cx="86" cy="162" r="5" fill="#ffffff" opacity="0.35"/></g>
+    <g class="bob" style="animation-delay:.5s"><circle cx="148" cy="168" r="18" fill="#ffc24d"/><path d="M130 196 a18 18 0 0 1 36 0 Z" fill="#ffc24d"/><circle cx="142" cy="162" r="5" fill="#ffffff" opacity="0.35"/></g>
+    <g class="bob" style="animation-delay:.25s"><circle cx="120" cy="176" r="21" fill="#4ecb8d"/><path d="M99 208 a21 21 0 0 1 42 0 Z" fill="#4ecb8d"/><circle cx="112" cy="169" r="6" fill="#ffffff" opacity="0.35"/></g>
+  </g>
+</svg>

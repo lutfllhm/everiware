@@ -68,14 +68,12 @@ class _EmployeeDirectoryScreenState extends State<EmployeeDirectoryScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.surface,
-      appBar: AppBar(
-        title: const Text('Daftar Karyawan'),
-        backgroundColor: Colors.white,
-        elevation: 0,
-        surfaceTintColor: Colors.transparent,
-      ),
       body: Column(
         children: [
+          const ProfileHeader(
+            title: 'Daftar Karyawan',
+            showBackButton: true,
+          ),
           // Search Bar
           Container(
             color: Colors.white,

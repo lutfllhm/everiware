@@ -138,21 +138,11 @@ class _OvertimeApprovalScreenState extends State<OvertimeApprovalScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.surface,
-      appBar: widget.showAppBar
-          ? AppBar(
-              title: const Text('Persetujuan Lembur'),
-              backgroundColor: Colors.white,
-              elevation: 0,
-              surfaceTintColor: Colors.transparent,
-            )
-          : null,
-      body: _loading
-          ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
-          : RefreshIndicator(
-              onRefresh: _load,
-              color: AppColors.primary,
+    final Widget mainBody = _loading
+        ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
+        : RefreshIndicator(
+            onRefresh: _load,
+            color: AppColors.primary,
               child: _overtimes.isEmpty
                   ? const EmptyState(
                       icon: Icons.check_circle_outline_rounded,
@@ -352,7 +342,21 @@ class _OvertimeApprovalScreenState extends State<OvertimeApprovalScreen> {
                         );
                       },
                     ),
-            ),
+            );
+
+    return Scaffold(
+      backgroundColor: AppColors.surface,
+      body: widget.showAppBar
+          ? Column(
+              children: [
+                const ProfileHeader(
+                  title: 'Persetujuan Lembur',
+                  showBackButton: true,
+                ),
+                Expanded(child: mainBody),
+              ],
+            )
+          : mainBody,
     );
   }
 }

@@ -119,15 +119,16 @@ class _BroadcastScreenState extends State<BroadcastScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.surface,
-      appBar: AppBar(
-        title: const Text('Kirim Pengumuman (Broadcast)'),
-        backgroundColor: Colors.white,
-        elevation: 0,
-        surfaceTintColor: Colors.transparent,
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: AppCard(
+      body: Column(
+        children: [
+          const ProfileHeader(
+            title: 'Kirim Pengumuman (Broadcast)',
+            showBackButton: true,
+          ),
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(20),
+              child: AppCard(
           child: Form(
             key: _formKey,
             child: Column(
@@ -277,6 +278,9 @@ class _BroadcastScreenState extends State<BroadcastScreen> {
           ),
         ),
       ),
+    ),
+  ],
+),
     );
   }
 }

@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" width="240" height="240">
+  <defs>
+    <linearGradient id="a3_board" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#33c7b1"/><stop offset="1" stop-color="#149483"/></linearGradient>
+    <linearGradient id="a3_clip" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e9eef4"/><stop offset="1" stop-color="#b9c4d2"/></linearGradient>
+    <filter id="a3_b" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="5"/></filter>
+  </defs>
+  
+  <style>
+    .flt{animation:flt 3s ease-in-out infinite}
+    .shd{transform-box:fill-box;transform-origin:center;animation:shd 3s ease-in-out infinite}
+    .pulse{transform-box:fill-box;transform-origin:center;animation:pulse 1.9s ease-in-out infinite}
+    .bob{animation:bob 2.6s ease-in-out infinite}
+    .blink{animation:blink 1.6s ease-in-out infinite}
+    @keyframes flt{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+    @keyframes shd{0%,100%{transform:scaleX(1);opacity:.45}50%{transform:scaleX(.82);opacity:.3}}
+    @keyframes pulse{0%{transform:scale(.6);opacity:0}55%{transform:scale(1.12);opacity:1}70%{transform:scale(1)}100%{transform:scale(1)}}
+    @keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+    @keyframes blink{0%,100%{opacity:.3}50%{opacity:1}}
+  </style>
+
+  <ellipse class="shd" cx="120" cy="206" rx="74" ry="14" fill="#0d6f62" filter="url(#a3_b)"/>
+  <g class="flt" style="animation-delay:-.6s">
+    <rect x="56" y="48" width="128" height="148" rx="18" fill="url(#a3_board)"/>
+    <path d="M58 54 Q56 50 64 50 L100 50 Q78 78 74 150 Q60 120 58 54 Z" fill="#ffffff" opacity="0.18"/>
+    <rect x="74" y="40" width="92" height="22" rx="10" fill="url(#a3_clip)"/>
+    <rect x="104" y="34" width="32" height="16" rx="8" fill="#9aa7b6"/>
+    <rect x="72" y="74" width="96" height="34" rx="9" fill="#ffffff" opacity="0.95"/>
+    <circle class="bob" style="transform-box:fill-box;transform-origin:center;animation-delay:0s" cx="92" cy="91" r="11" fill="#ff8a5c"/>
+    <rect x="112" y="83" width="44" height="6" rx="3" fill="#cdd8e2"/>
+    <rect x="112" y="94" width="30" height="5" rx="2.5" fill="#dfe7ee"/>
+    <rect x="72" y="114" width="96" height="34" rx="9" fill="#ffffff" opacity="0.95"/>
+    <circle class="bob" style="transform-box:fill-box;transform-origin:center;animation-delay:.25s" cx="92" cy="131" r="11" fill="#5b9bff"/>
+    <rect x="112" y="123" width="44" height="6" rx="3" fill="#cdd8e2"/>
+    <rect x="112" y="134" width="30" height="5" rx="2.5" fill="#dfe7ee"/>
+    <rect x="72" y="154" width="96" height="34" rx="9" fill="#ffffff" opacity="0.95"/>
+    <circle class="bob" style="transform-box:fill-box;transform-origin:center;animation-delay:.5s" cx="92" cy="171" r="11" fill="#ffc24d"/>
+    <rect x="112" y="163" width="44" height="6" rx="3" fill="#cdd8e2"/>
+    <rect x="112" y="174" width="30" height="5" rx="2.5" fill="#dfe7ee"/>
+
+  </g>
+</svg>

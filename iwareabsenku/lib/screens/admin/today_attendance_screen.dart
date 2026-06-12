@@ -223,16 +223,16 @@ class _TodayAttendanceScreenState extends State<TodayAttendanceScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.surface,
-      appBar: widget.showAppBar
-          ? AppBar(
-              title: const Text('Kehadiran Hari Ini'),
-              backgroundColor: Colors.white,
-              elevation: 0,
-              surfaceTintColor: Colors.transparent,
-            )
-          : null,
       body: widget.showAppBar
-          ? mainBody
+          ? Column(
+              children: [
+                const ProfileHeader(
+                  title: 'Kehadiran Hari Ini',
+                  showBackButton: true,
+                ),
+                Expanded(child: mainBody),
+              ],
+            )
           : NestedScrollView(
               headerSliverBuilder: (context, innerBoxIsScrolled) => [
                 SliverToBoxAdapter(

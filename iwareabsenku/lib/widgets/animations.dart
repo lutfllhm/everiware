@@ -341,6 +341,7 @@ class _ScaleTapState extends State<ScaleTap>
 
   @override
   Widget build(BuildContext context) => GestureDetector(
+        behavior: HitTestBehavior.opaque,
         onTapDown: (_) {
           if (widget.onTap != null) {
             HapticFeedback.selectionClick();

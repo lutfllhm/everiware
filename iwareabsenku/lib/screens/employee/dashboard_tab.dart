@@ -284,7 +284,24 @@ class _DashboardTabState extends State<DashboardTab> with WidgetsBindingObserver
         }
         return;
       }
-      final position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+      Position? position;
+      try {
+        position = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.high,
+          timeLimit: const Duration(seconds: 8),
+        );
+      } catch (e) {
+        debugPrint('getCurrentPosition failed, trying getLastKnownPosition: $e');
+        try {
+          position = await Geolocator.getLastKnownPosition();
+        } catch (innerErr) {
+          debugPrint('getLastKnownPosition also failed: $innerErr');
+        }
+      }
+
+      if (position == null) {
+        throw Exception('Akses GPS bermasalah atau timeout. Harap pastikan GPS Anda aktif.');
+      }
 
       // Filter lokasi: jika karyawan memiliki lokasi penempatan, gunakan lokasi tersebut saja.
       final userLocId = user?.locationId;
@@ -310,13 +327,13 @@ class _DashboardTabState extends State<DashboardTab> with WidgetsBindingObserver
       String? nearestName;
       double nearestRadius = 100;
       for (var loc in targetLocations) {
-        final lat = (loc['latitude'] as num?)?.toDouble() ?? 0;
-        final lng = (loc['longitude'] as num?)?.toDouble() ?? 0;
+        final lat = double.tryParse(loc['latitude']?.toString() ?? '') ?? 0.0;
+        final lng = double.tryParse(loc['longitude']?.toString() ?? '') ?? 0.0;
         final dist = Geolocator.distanceBetween(position.latitude, position.longitude, lat, lng);
         if (dist < minDist) {
           minDist = dist;
           nearestName = loc['name']?.toString();
-          nearestRadius = (loc['radius'] as num?)?.toDouble() ?? 100;
+          nearestRadius = double.tryParse(loc['radius']?.toString() ?? '') ?? 100.0;
         }
       }
 
@@ -339,7 +356,7 @@ class _DashboardTabState extends State<DashboardTab> with WidgetsBindingObserver
       if (mounted) {
         setState(() {
           _gpsStatus = 'error';
-          _gpsMessage = 'Gagal mendapatkan lokasi';
+          _gpsMessage = e is Exception ? e.toString().replaceAll('Exception: ', '') : 'Gagal mendapatkan lokasi: $e';
         });
       }
     }
@@ -766,7 +783,7 @@ class _DashboardTabState extends State<DashboardTab> with WidgetsBindingObserver
                           ),
                           shadowColor: const Color(0xFF160102),
                           borderColor: const Color(0xFF8B1F1F),
-                          iconPath: 'assets/images/masuk.svg',
+                          iconPath: 'assets/images/masuk_top.png',
                           onTap: () => _openCamera('in'),
                         ),
                       ),
@@ -785,7 +802,7 @@ class _DashboardTabState extends State<DashboardTab> with WidgetsBindingObserver
                           ),
                           shadowColor: const Color(0xFF160102),
                           borderColor: const Color(0xFF8B1F1F),
-                          iconPath: 'assets/images/keluar.svg',
+                          iconPath: 'assets/images/keluar_top.png',
                           onTap: () => _openCamera('out'),
                         ),
                       ),
@@ -835,10 +852,18 @@ class _DashboardTabState extends State<DashboardTab> with WidgetsBindingObserver
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            FSvgPicture.asset(
-              iconPath,
-              width: 48,
-              height: 48,
+            IgnorePointer(
+              child: iconPath.endsWith('.svg')
+                  ? FSvgPicture.asset(
+                      iconPath,
+                      width: 48,
+                      height: 48,
+                    )
+                  : Image.asset(
+                      iconPath,
+                      width: 48,
+                      height: 48,
+                    ),
             ),
             const SizedBox(height: 4),
             Text(
@@ -1206,25 +1231,30 @@ class _DashboardTabState extends State<DashboardTab> with WidgetsBindingObserver
         return ScaleTap(
           onTap: item['onTap'] as VoidCallback,
           scale: 0.92,
-          child: Column(
-            children: [
-              FSvgPicture.asset(
-                item['iconPath'] as String,
-                width: 58,
-                height: 66,
-              ),
-              const SizedBox(height: 6),
-              Text(
-                item['label'] as String,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 11, 
-                  fontWeight: FontWeight.w700, 
-                  color: AppColors.textSecondary,
-                  height: 1.25,
+          child: Container(
+            color: Colors.transparent,
+            child: Column(
+              children: [
+                IgnorePointer(
+                  child: FSvgPicture.asset(
+                    item['iconPath'] as String,
+                    width: 58,
+                    height: 66,
+                  ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 6),
+                Text(
+                  item['label'] as String,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 11, 
+                    fontWeight: FontWeight.w700, 
+                    color: AppColors.textSecondary,
+                    height: 1.25,
+                  ),
+                ),
+              ],
+            ),
           ),
         );
       },

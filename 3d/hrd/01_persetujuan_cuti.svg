@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" width="240" height="240">
+  <defs>
+    <linearGradient id="a1_paper" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#dce6f6"/></linearGradient>
+    <linearGradient id="a1_side" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#bcccea"/><stop offset="1" stop-color="#9fb2d6"/></linearGradient>
+    <radialGradient id="a1_chk" cx="0.35" cy="0.3" r="0.9"><stop offset="0" stop-color="#86f29a"/><stop offset="0.5" stop-color="#36c267"/><stop offset="1" stop-color="#1c9a4c"/></radialGradient>
+    <filter id="a1_b" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="5"/></filter>
+  </defs>
+  
+  <style>
+    .flt{animation:flt 3s ease-in-out infinite}
+    .shd{transform-box:fill-box;transform-origin:center;animation:shd 3s ease-in-out infinite}
+    .pulse{transform-box:fill-box;transform-origin:center;animation:pulse 1.9s ease-in-out infinite}
+    .bob{animation:bob 2.6s ease-in-out infinite}
+    .blink{animation:blink 1.6s ease-in-out infinite}
+    @keyframes flt{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+    @keyframes shd{0%,100%{transform:scaleX(1);opacity:.45}50%{transform:scaleX(.82);opacity:.3}}
+    @keyframes pulse{0%{transform:scale(.6);opacity:0}55%{transform:scale(1.12);opacity:1}70%{transform:scale(1)}100%{transform:scale(1)}}
+    @keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+    @keyframes blink{0%,100%{opacity:.3}50%{opacity:1}}
+  </style>
+
+  <ellipse class="shd" cx="118" cy="206" rx="74" ry="14" fill="#94a3bd" filter="url(#a1_b)"/>
+  <g class="flt" style="animation-delay:-.2s">
+    <rect x="62" y="46" width="116" height="150" rx="16" fill="url(#a1_side)"/>
+    <rect x="54" y="40" width="116" height="150" rx="16" fill="url(#a1_paper)"/>
+    <rect x="72" y="70" width="80" height="9" rx="4.5" fill="#c5d2e8"/>
+    <rect x="72" y="92" width="80" height="9" rx="4.5" fill="#c5d2e8"/>
+    <rect x="72" y="114" width="54" height="9" rx="4.5" fill="#c5d2e8"/>
+    <path d="M64 52 Q62 46 72 46 L116 46 Q86 74 78 126 Q66 108 64 52 Z" fill="#ffffff" opacity="0.55"/>
+    <g class="pulse">
+      <circle cx="158" cy="160" r="38" fill="url(#a1_chk)"/>
+      <ellipse cx="147" cy="145" rx="17" ry="11" fill="#ffffff" opacity="0.35"/>
+      <path d="M141 160 l11 13 l21 -27" fill="none" stroke="#ffffff" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+  </g>
+</svg>
