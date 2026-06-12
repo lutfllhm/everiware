@@ -20,12 +20,12 @@ router.get('/my', getMyAttendance);
 router.get('/locations', getLocations);
 router.post('/locations', authorize('superadmin', 'admin', 'hrd'), createLocation);
 router.put('/locations/:id', authorize('superadmin', 'admin', 'hrd'), updateLocation);
-router.delete('/locations/:id', authorize('superadmin', 'admin'), deleteLocation);
+router.delete('/locations/:id', authorize('superadmin', 'admin', 'hrd'), deleteLocation);
 
 // Admin routes
 router.get('/all', authorize('superadmin', 'admin', 'hrd'), getAllAttendances);
 router.get('/report', authorize('superadmin', 'admin', 'hrd'), getAttendanceReport);
 router.put('/:id', authorize('superadmin', 'admin', 'hrd'), updateAttendance);
-router.delete('/:id', authorize('superadmin', 'admin'), deleteAttendance);
+router.delete('/:id', authorize('superadmin', 'admin', 'hrd'), deleteAttendance);
 
 module.exports = router;

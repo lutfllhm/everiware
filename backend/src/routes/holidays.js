@@ -9,9 +9,9 @@ router.use(authenticate);
 router.get('/', getHolidays);
 
 // Hanya admin yang bisa kelola
-router.post('/', authorize('superadmin', 'admin'), createHoliday);
-router.post('/bulk', authorize('superadmin', 'admin'), bulkImportHolidays);
-router.put('/:id', authorize('superadmin', 'admin'), updateHoliday);
-router.delete('/:id', authorize('superadmin', 'admin'), deleteHoliday);
+router.post('/', authorize('superadmin', 'admin', 'hrd'), createHoliday);
+router.post('/bulk', authorize('superadmin', 'admin', 'hrd'), bulkImportHolidays);
+router.put('/:id', authorize('superadmin', 'admin', 'hrd'), updateHoliday);
+router.delete('/:id', authorize('superadmin', 'admin', 'hrd'), deleteHoliday);
 
 module.exports = router;

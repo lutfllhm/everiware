@@ -26,13 +26,13 @@ router.delete('/fcm-token', removeFcmToken);
 
 // Admin routes
 router.get('/dashboard', authorize('superadmin', 'admin', 'hrd'), getDashboardStats);
-router.get('/settings', authorize('superadmin', 'admin', 'hrd'), getSettings);
+router.get('/settings', authorize('superadmin', 'admin'), getSettings);
 router.put('/settings', authorize('superadmin', 'admin'), updateSettings);
 router.get('/', authorize('superadmin', 'admin', 'hrd'), getAllUsers);
-router.post('/', authorize('superadmin', 'admin'), uploadAvatar.single('avatar'), createUser);
+router.post('/', authorize('superadmin', 'admin', 'hrd'), uploadAvatar.single('avatar'), createUser);
 router.get('/:id', authorize('superadmin', 'admin', 'hrd'), getUser);
-router.put('/:id', authorize('superadmin', 'admin'), updateUser);
-router.delete('/:id', authorize('superadmin', 'admin'), deleteUser);
+router.put('/:id', authorize('superadmin', 'admin', 'hrd'), updateUser);
+router.delete('/:id', authorize('superadmin', 'admin', 'hrd'), deleteUser);
 router.delete('/:id/permanent', authorize('superadmin', 'admin'), permanentDeleteUser);
 
 module.exports = router;
