@@ -15,6 +15,8 @@ import '../../widgets/glass_widgets.dart';
 import 'employee_directory_screen.dart';
 import 'locations_screen.dart';
 import 'broadcast_screen.dart';
+import 'leave_approval_screen.dart';
+import 'overtime_approval_screen.dart';
 
 class AdminDashboardTab extends StatefulWidget {
   final Function(int) onNavigate;
@@ -449,6 +451,17 @@ class _AdminDashboardTabState extends State<AdminDashboardTab> {
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
+                            const SizedBox(height: 2),
+                            Text(
+                              user?.deptPosition ?? '-',
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.7),
+                                fontSize: 11,
+                                fontWeight: FontWeight.w400,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ],
                         ),
                       ),
@@ -619,14 +632,20 @@ class _AdminDashboardTabState extends State<AdminDashboardTab> {
     final context = this.context;
     final List<Map<String, dynamic>> items = [
       {
-        'label': 'Persetujuan\nCuti',
+        'label': 'Riwayat\nCuti',
         'iconPath': 'assets/images/01_persetujuan_cuti.svg',
-        'onTap': () => widget.onNavigate(1),
+        'onTap': () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const LeaveApprovalScreen(showAppBar: true)),
+        ),
       },
       {
-        'label': 'Persetujuan\nLembur',
+        'label': 'Riwayat\nLembur',
         'iconPath': 'assets/images/02_persetujuan_lembur.svg',
-        'onTap': () => widget.onNavigate(1),
+        'onTap': () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const OvertimeApprovalScreen(showAppBar: true)),
+        ),
       },
       {
         'label': 'Daftar\nKaryawan',
