@@ -350,7 +350,7 @@ class _OvertimeApprovalScreenState extends State<OvertimeApprovalScreen> {
           ? Column(
               children: [
                 const ProfileHeader(
-                  title: 'Persetujuan Lembur',
+                  title: 'Riwayat Lembur',
                   showBackButton: true,
                 ),
                 Expanded(child: mainBody),

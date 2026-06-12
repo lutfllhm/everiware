@@ -182,7 +182,7 @@ class _BottomNav extends StatelessWidget {
 
   static const _items = [
     _NavData(icon: Icons.home_outlined,           activeIcon: Icons.home_rounded,               label: 'Beranda',      index: 0),
-    _NavData(icon: Icons.assignment_turned_in_outlined, activeIcon: Icons.assignment_turned_in_rounded, label: 'Persetujuan', index: 1),
+    _NavData(icon: Icons.history_rounded,         activeIcon: Icons.history_rounded,            label: 'Riwayat',      index: 1),
     _NavData(icon: Icons.co_present_outlined,     activeIcon: Icons.co_present_rounded,         label: 'Kehadiran',    index: 2),
     _NavData(icon: Icons.calendar_month_outlined, activeIcon: Icons.calendar_month_rounded,     label: 'Kalender',     index: 3),
     _NavData(icon: Icons.person_outline_rounded, activeIcon: Icons.person_rounded,             label: 'Akun',         index: 4),
