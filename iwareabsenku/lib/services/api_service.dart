@@ -1,6 +1,8 @@
 import 'dart:io';
 import 'package:dio/dio.dart';
+import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:iware_absenku/main.dart';
 import '../utils/constants.dart';
 
 class ApiService {
@@ -28,7 +30,36 @@ class ApiService {
         }
         handler.next(options);
       },
-      onError: (error, handler) {
+      onError: (error, handler) async {
+        if (error.response?.statusCode == 401) {
+          final data = error.response?.data;
+          String message = 'Sesi Anda telah berakhir atau akun dinonaktifkan.';
+          if (data is Map<String, dynamic> && data['message'] != null) {
+            message = data['message'];
+          }
+
+          // Hapus session dari shared preferences
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.remove(AppConstants.tokenKey);
+          await prefs.remove(AppConstants.userKey);
+
+          // Force redirect ke login screen secara global
+          final context = navigatorKey.currentContext;
+          if (context != null) {
+            // ignore: use_build_context_synchronously
+            ScaffoldMessenger.of(context).hideCurrentSnackBar();
+            // ignore: use_build_context_synchronously
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(message),
+                backgroundColor: Colors.red.shade800,
+                behavior: SnackBarBehavior.floating,
+                duration: const Duration(seconds: 4),
+              ),
+            );
+            navigatorKey.currentState?.pushNamedAndRemoveUntil('/login', (r) => false);
+          }
+        }
         handler.next(error);
       },
     ));
