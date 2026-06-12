@@ -318,7 +318,7 @@ class _EmployeeDirectoryScreenState extends State<EmployeeDirectoryScreen> {
               ),
             ),
           ),
-          // Grouping Toggle & Location Filter Chips Panel
+          // Grouping Toggle & Location Dropdown Panel
           Container(
             color: Colors.white,
             child: Column(
@@ -351,46 +351,56 @@ class _EmployeeDirectoryScreenState extends State<EmployeeDirectoryScreen> {
                 ),
                 const SizedBox(height: 2),
                 if (_employees.isNotEmpty)
-                  SizedBox(
-                    height: 38,
-                    child: ListView.builder(
-                      scrollDirection: Axis.horizontal,
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      itemCount: locations.length,
-                      itemBuilder: (context, idx) {
-                        final loc = locations[idx];
-                        final isSelected = _selectedLocationFilter == loc;
-                        return Padding(
-                          padding: const EdgeInsets.only(right: 8),
-                          child: ChoiceChip(
-                            label: Text(
-                              loc,
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                                color: isSelected ? Colors.white : AppColors.textSecondary,
-                              ),
-                            ),
-                            selected: isSelected,
-                            selectedColor: const Color(0xFF8B1F1F),
-                            backgroundColor: AppColors.grey50,
-                            checkmarkColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(20),
-                              side: BorderSide(
-                                color: isSelected ? Colors.transparent : AppColors.border,
-                              ),
-                            ),
-                            onSelected: (selected) {
-                              if (selected) {
-                                setState(() {
-                                  _selectedLocationFilter = loc;
-                                });
-                              }
-                            },
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: AppColors.grey50,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppColors.border, width: 1.5),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: _selectedLocationFilter,
+                          isExpanded: true,
+                          icon: const Icon(
+                            Icons.keyboard_arrow_down_rounded,
+                            size: 20,
+                            color: AppColors.primary,
                           ),
-                        );
-                      },
+                          dropdownColor: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textPrimary,
+                          ),
+                          items: locations.map((loc) {
+                            return DropdownMenuItem<String>(
+                              value: loc,
+                              child: Row(
+                                children: [
+                                  const Icon(
+                                    Icons.location_on_rounded,
+                                    size: 14,
+                                    color: AppColors.primary,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(loc),
+                                ],
+                              ),
+                            );
+                          }).toList(),
+                          onChanged: (val) {
+                            if (val != null) {
+                              setState(() {
+                                _selectedLocationFilter = val;
+                              });
+                            }
+                          },
+                        ),
+                      ),
                     ),
                   ),
                 const SizedBox(height: 12),

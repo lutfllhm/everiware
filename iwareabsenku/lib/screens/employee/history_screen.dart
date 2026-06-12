@@ -257,6 +257,8 @@ class _HistoryScreenState extends State<HistoryScreen>
                               value: _selectedMonth,
                               isDense: true,
                               isExpanded: true,
+                              dropdownColor: Colors.white,
+                              borderRadius: BorderRadius.circular(16),
                               icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: AppColors.textMuted),
                               items: List.generate(12, (i) => DropdownMenuItem(
                                 value: i + 1,
@@ -278,6 +280,8 @@ class _HistoryScreenState extends State<HistoryScreen>
                           child: DropdownButton<int>(
                             value: _selectedYear,
                             isDense: true,
+                            dropdownColor: Colors.white,
+                            borderRadius: BorderRadius.circular(16),
                             icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: AppColors.textMuted),
                             items: [2024, 2025, 2026].map((y) => DropdownMenuItem(
                               value: y,
