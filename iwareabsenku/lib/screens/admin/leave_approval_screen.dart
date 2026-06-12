@@ -85,21 +85,11 @@ class _LeaveApprovalScreenState extends State<LeaveApprovalScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.surface,
-      appBar: widget.showAppBar
-          ? AppBar(
-              title: const Text('Persetujuan Izin & Cuti'),
-              backgroundColor: Colors.white,
-              elevation: 0,
-              surfaceTintColor: Colors.transparent,
-            )
-          : null,
-      body: _loading
-          ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
-          : RefreshIndicator(
-              onRefresh: _load,
-              color: AppColors.primary,
+    final Widget mainBody = _loading
+        ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
+        : RefreshIndicator(
+            onRefresh: _load,
+            color: AppColors.primary,
               child: _leaves.isEmpty
                   ? const EmptyState(
                       icon: Icons.check_circle_outline_rounded,
@@ -278,7 +268,21 @@ class _LeaveApprovalScreenState extends State<LeaveApprovalScreen> {
                         );
                       },
                     ),
-            ),
+            );
+
+    return Scaffold(
+      backgroundColor: AppColors.surface,
+      body: widget.showAppBar
+          ? Column(
+              children: [
+                const ProfileHeader(
+                  title: 'Persetujuan Izin & Cuti',
+                  showBackButton: true,
+                ),
+                Expanded(child: mainBody),
+              ],
+            )
+          : mainBody,
     );
   }
 }

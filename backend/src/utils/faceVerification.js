@@ -139,6 +139,7 @@ async function extractFaceRegion(imageInput, bbox = null) {
 
 /**
  * Verifikasi apakah selfie cocok dengan avatar profil (Fail-Closed Policy)
+ * Menggunakan Python AI Microservice (InsightFace) dengan fallback ke Sharp-based comparison jika offline.
  *
  * @param {string} selfieFilename  - filename selfie di uploads/selfie/
  * @param {string} avatarFilename  - filename avatar di uploads/avatar/
@@ -146,60 +147,104 @@ async function extractFaceRegion(imageInput, bbox = null) {
  * @returns {{ match: boolean, similarity: number, message: string }}
  */
 async function verifyFace(selfieFilename, avatarFilename, selfieBbox = null) {
+  const selfiePath = path.join(UPLOADS_DIR, 'selfie', selfieFilename);
+  const avatarPath = path.join(UPLOADS_DIR, 'avatar', avatarFilename);
+
+  // Pastikan kedua file ada sebelum dikirim ke AI Microservice atau fallback
+  if (!fs.existsSync(avatarPath)) {
+    return { match: false, similarity: 0, message: 'Foto referensi wajah tidak ditemukan' };
+  }
+  if (!fs.existsSync(selfiePath)) {
+    return { match: false, similarity: 0, message: 'File selfie tidak ditemukan' };
+  }
+
   try {
-    const selfiePath = path.join(UPLOADS_DIR, 'selfie', selfieFilename);
-    const avatarPath = path.join(UPLOADS_DIR, 'avatar', avatarFilename);
+    const aiUrl = process.env.AI_SERVICE_URL || 'http://localhost:5006/verify';
+    console.log(`[FaceVerification] Attempting AI verification via ${aiUrl}`);
 
-    // Pastikan kedua file ada
-    if (!fs.existsSync(avatarPath)) {
-      return { match: false, similarity: 0, message: 'Foto referensi wajah tidak ditemukan' };
+    const selfieBuffer = fs.readFileSync(selfiePath);
+    const avatarBuffer = fs.readFileSync(avatarPath);
+
+    // Memanfaatkan native global FormData & Blob pada Node.js v20
+    const formData = new FormData();
+    const selfieBlob = new Blob([selfieBuffer], { type: 'image/jpeg' });
+    const referenceBlob = new Blob([avatarBuffer], { type: 'image/jpeg' });
+
+    formData.append('selfie', selfieBlob, 'selfie.jpg');
+    formData.append('reference', referenceBlob, 'reference.jpg');
+
+    // Timeout controller untuk fetch agar tidak menunggu terlalu lama jika AI service hang
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 detik timeout
+
+    const response = await fetch(aiUrl, {
+      method: 'POST',
+      body: formData,
+      signal: controller.signal
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      throw new Error(`AI Service returned HTTP status ${response.status}`);
     }
-    if (!fs.existsSync(selfiePath)) {
-      return { match: false, similarity: 0, message: 'File selfie tidak ditemukan' };
-    }
 
-    // Extract region wajah dari selfie (pakai bbox jika ada)
-    const selfieBuffer = await extractFaceRegion(selfiePath, selfieBbox);
-    
-    // Putar avatar terlebih dahulu dan baca metadatanya agar pembagian koordinat bbox akurat
-    const rotatedAvatarBuffer = await sharp(avatarPath).rotate().toBuffer();
-    const avatarMeta = await sharp(rotatedAvatarBuffer).metadata();
-    const avatarBbox = avatarMeta ? {
-      x:      Math.round(avatarMeta.width  * 0.15),
-      y:      Math.round(avatarMeta.height * 0.05),
-      width:  Math.round(avatarMeta.width  * 0.70),
-      height: Math.round(avatarMeta.height * 0.65),
-    } : null;
-    const avatarBuffer = await extractFaceRegion(rotatedAvatarBuffer, avatarBbox);
-
-    if (!selfieBuffer || !avatarBuffer) {
-      return { match: false, similarity: 0, message: 'Gagal mengekstrak area wajah dari foto' };
-    }
-
-    // Hitung histogram dan similarity
-    const h1 = computeHistogram(selfieBuffer);
-    const h2 = computeHistogram(avatarBuffer);
-    const histSim = bhattacharyyaCoeff(h1, h2);
-    
-    // Hitung korelasi spasial Pearson
-    const pearsonSim = pearsonCorrelation(selfieBuffer, avatarBuffer);
-
-    // Wajah dianggap cocok jika korelasi spasial AND kemiripan histogram memenuhi batas
-    const match = pearsonSim >= PEARSON_THRESHOLD && histSim >= HISTOGRAM_THRESHOLD;
-
-    console.log(`[FaceVerification] similarity_pearson=${pearsonSim.toFixed(4)} (th=${PEARSON_THRESHOLD}) similarity_histogram=${histSim.toFixed(4)} (th=${HISTOGRAM_THRESHOLD}) match=${match}`);
-
+    const data = await response.json();
+    console.log(`[FaceVerification] AI Service result: match=${data.match}, similarity=${data.similarity?.toFixed(4)}, message="${data.message}"`);
     return {
-      match,
-      similarity: parseFloat(((pearsonSim + histSim) / 2).toFixed(4)),
-      message: match
-        ? 'Wajah terverifikasi'
-        : 'Wajah tidak cocok dengan akun kamu. Pastikan kamu yang melakukan absensi.',
+      match: !!data.match,
+      similarity: parseFloat(data.similarity) || 0.0,
+      message: data.message || (data.match ? 'Wajah terverifikasi' : 'Wajah tidak cocok'),
     };
   } catch (err) {
-    console.error('[FaceVerification] verifyFace error:', err.message);
-    return { match: false, similarity: 0, message: 'Terjadi kesalahan sistem saat memproses verifikasi wajah' };
+    console.warn(`[FaceVerification] AI Service error/offline: ${err.message}. Falling back to local Sharp-based comparison.`);
+
+    // --- FALLBACK TO LOCAL SHARP COMPARISON ---
+    try {
+      // Extract region wajah dari selfie (pakai bbox jika ada)
+      const selfieBuffer = await extractFaceRegion(selfiePath, selfieBbox);
+      
+      // Putar avatar terlebih dahulu dan baca metadatanya agar pembagian koordinat bbox akurat
+      const rotatedAvatarBuffer = await sharp(avatarPath).rotate().toBuffer();
+      const avatarMeta = await sharp(rotatedAvatarBuffer).metadata();
+      const avatarBbox = avatarMeta ? {
+        x:      Math.round(avatarMeta.width  * 0.15),
+        y:      Math.round(avatarMeta.height * 0.05),
+        width:  Math.round(avatarMeta.width  * 0.70),
+        height: Math.round(avatarMeta.height * 0.65),
+      } : null;
+      const avatarBuffer = await extractFaceRegion(rotatedAvatarBuffer, avatarBbox);
+
+      if (!selfieBuffer || !avatarBuffer) {
+        return { match: false, similarity: 0, message: 'Gagal mengekstrak area wajah dari foto (Fallback)' };
+      }
+
+      // Hitung histogram dan similarity
+      const h1 = computeHistogram(selfieBuffer);
+      const h2 = computeHistogram(avatarBuffer);
+      const histSim = bhattacharyyaCoeff(h1, h2);
+      
+      // Hitung korelasi spasial Pearson
+      const pearsonSim = pearsonCorrelation(selfieBuffer, avatarBuffer);
+
+      // Wajah dianggap cocok jika korelasi spasial AND kemiripan histogram memenuhi batas
+      const match = pearsonSim >= PEARSON_THRESHOLD && histSim >= HISTOGRAM_THRESHOLD;
+
+      console.log(`[FaceVerification] Fallback similarity_pearson=${pearsonSim.toFixed(4)} (th=${PEARSON_THRESHOLD}) similarity_histogram=${histSim.toFixed(4)} (th=${HISTOGRAM_THRESHOLD}) match=${match}`);
+
+      return {
+        match,
+        similarity: parseFloat(((pearsonSim + histSim) / 2).toFixed(4)),
+        message: match
+          ? 'Wajah terverifikasi (Local Fallback)'
+          : 'Wajah tidak cocok dengan akun kamu. Pastikan kamu yang melakukan absensi.',
+      };
+    } catch (fallbackErr) {
+      console.error('[FaceVerification] Fallback verifyFace error:', fallbackErr.message);
+      return { match: false, similarity: 0, message: 'Terjadi kesalahan sistem saat memproses verifikasi wajah' };
+    }
   }
 }
 
 module.exports = { verifyFace };
+

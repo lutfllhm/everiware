@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" width="240" height="240">
+  <defs>
+    <radialGradient id="a5_ground" cx="0.5" cy="0.4" r="0.75"><stop offset="0" stop-color="#7aa8ff"/><stop offset="1" stop-color="#3f63d6"/></radialGradient>
+    <radialGradient id="a5_pin" cx="0.35" cy="0.28" r="0.9"><stop offset="0" stop-color="#ff7a72"/><stop offset="0.55" stop-color="#ec3a30"/><stop offset="1" stop-color="#b81d16"/></radialGradient>
+    <filter id="a5_b" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="5"/></filter>
+  </defs>
+  
+  <style>
+    .flt{animation:flt 3s ease-in-out infinite}
+    .shd{transform-box:fill-box;transform-origin:center;animation:shd 3s ease-in-out infinite}
+    .pulse{transform-box:fill-box;transform-origin:center;animation:pulse 1.9s ease-in-out infinite}
+    .bob{animation:bob 2.6s ease-in-out infinite}
+    .blink{animation:blink 1.6s ease-in-out infinite}
+    @keyframes flt{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+    @keyframes shd{0%,100%{transform:scaleX(1);opacity:.45}50%{transform:scaleX(.82);opacity:.3}}
+    @keyframes pulse{0%{transform:scale(.6);opacity:0}55%{transform:scale(1.12);opacity:1}70%{transform:scale(1)}100%{transform:scale(1)}}
+    @keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+    @keyframes blink{0%,100%{opacity:.3}50%{opacity:1}}
+  </style>
+
+  <ellipse cx="120" cy="172" rx="86" ry="38" fill="#2c47a8" opacity="0.30" filter="url(#a5_b)"/>
+  <ellipse cx="120" cy="166" rx="84" ry="36" fill="url(#a5_ground)"/>
+  <ellipse cx="120" cy="166" rx="84" ry="36" fill="none" stroke="#dfe8ff" stroke-width="4" stroke-dasharray="3 12" opacity="0.85"/>
+  <g>
+    <animateTransform attributeName="transform" attributeType="XML" type="rotate" from="0 120 166" to="360 120 166" dur="7s" repeatCount="indefinite"/>
+    <ellipse cx="120" cy="166" rx="58" ry="24" fill="none" stroke="#cdd9ff" stroke-width="3" stroke-dasharray="2 9" opacity="0.6"/>
+  </g>
+  <ellipse class="shd" cx="120" cy="172" rx="22" ry="8" fill="#1c2f7a" opacity="0.45"/>
+  <g class="bob">
+    <path d="M120 168 C100 132 90 120 90 100 A30 30 0 1 1 150 100 C150 120 140 132 120 168 Z" fill="url(#a5_pin)"/>
+    <circle cx="120" cy="98" r="15" fill="#ffffff"/>
+    <circle cx="120" cy="98" r="7.5" fill="#e23a30"/>
+    <ellipse cx="108" cy="82" rx="11" ry="7" fill="#ffffff" opacity="0.40" transform="rotate(-30 108 82)"/>
+  </g>
+</svg>
