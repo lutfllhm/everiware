@@ -144,6 +144,8 @@ class _AttendanceHistoryScreenState extends State<AttendanceHistoryScreen> {
                       child: DropdownButton<int>(
                         value: _selectedMonth,
                         isDense: true,
+                        dropdownColor: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
                         icon: const Icon(Icons.keyboard_arrow_down_rounded,
                             size: 18, color: AppColors.textMuted),
                         items: List.generate(12, (i) => DropdownMenuItem(
@@ -168,6 +170,8 @@ class _AttendanceHistoryScreenState extends State<AttendanceHistoryScreen> {
                     child: DropdownButton<int>(
                       value: _selectedYear,
                       isDense: true,
+                      dropdownColor: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
                       icon: const Icon(Icons.keyboard_arrow_down_rounded,
                           size: 18, color: AppColors.textMuted),
                       items: [2024, 2025, 2026].map((y) => DropdownMenuItem(

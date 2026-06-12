@@ -192,6 +192,8 @@ class _BroadcastScreenState extends State<BroadcastScreen> {
                 const SizedBox(height: 8),
                 DropdownButtonFormField<String>(
                   value: _type,
+                  dropdownColor: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
                   decoration: const InputDecoration(
                     contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                   ),
@@ -212,6 +214,8 @@ class _BroadcastScreenState extends State<BroadcastScreen> {
                 const SizedBox(height: 8),
                 DropdownButtonFormField<String>(
                   value: _targetDept,
+                  dropdownColor: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
                   decoration: const InputDecoration(
                     contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                   ),
@@ -235,6 +239,8 @@ class _BroadcastScreenState extends State<BroadcastScreen> {
                 const SizedBox(height: 8),
                 DropdownButtonFormField<String>(
                   value: _targetLoc,
+                  dropdownColor: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
                   decoration: const InputDecoration(
                     contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                   ),

@@ -356,6 +356,8 @@ class _MyStatsScreenState extends State<MyStatsScreen> {
             child: DropdownButtonHideUnderline(
               child: DropdownButton<int>(
                 value: _selectedMonth,
+                dropdownColor: Colors.white,
+                borderRadius: BorderRadius.circular(16),
                 items: List.generate(12, (i) => DropdownMenuItem(
                   value: i + 1,
                   child: Text(_months[i], style: const TextStyle(fontSize: 14)),
@@ -381,6 +383,8 @@ class _MyStatsScreenState extends State<MyStatsScreen> {
             child: DropdownButtonHideUnderline(
               child: DropdownButton<int>(
                 value: _selectedYear,
+                dropdownColor: Colors.white,
+                borderRadius: BorderRadius.circular(16),
                 items: [2024, 2025, 2026].map((y) => DropdownMenuItem(
                   value: y,
                   child: Text('$y', style: const TextStyle(fontSize: 14)),
