@@ -2,6 +2,8 @@ const bcrypt = require('bcryptjs');
 const { pool } = require('../config/database');
 const { generateId } = require('../utils/helpers');
 const { auditLog } = require('../utils/auditLog');
+const { validateRegistrationFace } = require('../utils/faceVerification');
+
 
 // Get all users (admin)
 const getAllUsers = async (req, res) => {
@@ -480,6 +482,18 @@ const registerFace = async (req, res) => {
 
     console.log('[registerFace] user:', req.user.id, '| file:', facePhoto);
 
+    // Validasi foto wajah menggunakan Python AI Service (atau fallback)
+    const detectResult = await validateRegistrationFace(facePhoto);
+    if (!detectResult.success) {
+      // Hapus file yang terunggah karena tidak valid
+      const fs = require('fs');
+      const path = require('path');
+      const filePath = path.join(__dirname, '../../uploads/avatar', facePhoto);
+      fs.unlink(filePath, () => {});
+
+      return res.status(400).json({ success: false, message: detectResult.message });
+    }
+
     // Update face_photo and set face_registered = TRUE
     await pool.query('UPDATE users SET face_photo = ?, face_registered = TRUE WHERE id = ?', [facePhoto, req.user.id]);
 
@@ -494,5 +508,6 @@ const registerFace = async (req, res) => {
     res.status(500).json({ success: false, message: 'Terjadi kesalahan server' });
   }
 };
+
 
 module.exports = { getAllUsers, getUser, createUser, updateUser, deleteUser, permanentDeleteUser, updateProfile, changePassword, getNotifications, markNotificationRead, deleteNotification, deleteAllNotifications, broadcastNotification, getDashboardStats, getSettings, updateSettings, saveFcmToken, removeFcmToken, registerFace };

@@ -100,6 +100,57 @@ async def verify(selfie: UploadFile = File(...), reference: UploadFile = File(..
             }
         )
 
+@app.post("/detect")
+async def detect(photo: UploadFile = File(...)):
+    try:
+        logger.info(f"Received face detection request: photo='{photo.filename}'")
+
+        # 1. Read and decode photo image
+        photo_bytes = await photo.read()
+        nparr_photo = np.frombuffer(photo_bytes, np.uint8)
+        img_photo = cv2.imdecode(nparr_photo, cv2.IMREAD_COLOR)
+
+        if img_photo is None:
+            logger.warning("Failed to decode photo image.")
+            return {
+                "success": False,
+                "message": "Format gambar tidak valid atau rusak."
+            }
+
+        # 2. Detect faces
+        faces = detector.get(img_photo)
+
+        if not faces:
+            logger.info("No face detected in registration photo.")
+            return {
+                "success": False,
+                "message": "Wajah tidak terdeteksi pada foto. Silakan posisikan wajah Anda tegak menghadap kamera dengan pencahayaan yang cukup."
+            }
+
+        if len(faces) > 1:
+            logger.info(f"Multiple faces ({len(faces)}) detected in registration photo.")
+            return {
+                "success": False,
+                "message": "Terdeteksi lebih dari satu wajah. Pastikan hanya ada Anda sendirian di dalam foto."
+            }
+
+        logger.info("Face detected and validated successfully.")
+        return {
+            "success": True,
+            "message": "Wajah berhasil terdeteksi dan valid."
+        }
+
+    except Exception as e:
+        logger.error(f"Inference error during detection: {e}", exc_info=True)
+        return JSONResponse(
+            status_code=500,
+            content={
+                "success": False,
+                "message": f"Terjadi kesalahan sistem kecerdasan buatan (AI): {str(e)}"
+            }
+        )
+
 @app.get("/health")
 def health():
     return {"status": "healthy", "model": "buffalo_l"}
+
