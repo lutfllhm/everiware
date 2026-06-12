@@ -2,6 +2,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/rendering.dart';
+import 'package:provider/provider.dart';
+import '../../services/auth_provider.dart';
 import '../../services/realtime_service.dart';
 import '../../services/api_service.dart';
 import '../../utils/app_theme.dart';
@@ -18,9 +20,8 @@ class AdminScreen extends StatefulWidget {
   State<AdminScreen> createState() => _AdminScreenState();
 }
 
-class _AdminScreenState extends State<AdminScreen> {
+class _AdminScreenState extends State<AdminScreen> with WidgetsBindingObserver {
   int _currentIndex = 0;
-  int _prevIndex = 0;
   bool _isBottomNavVisible = true;
   int _unreadRequests = 0;
   StreamSubscription? _realtimeSub;
@@ -28,6 +29,7 @@ class _AdminScreenState extends State<AdminScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _fetchUnreadRequests();
 
     _realtimeSub = RealtimeService().events.listen((event) {
@@ -42,8 +44,26 @@ class _AdminScreenState extends State<AdminScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _realtimeSub?.cancel();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      final auth = context.read<AuthProvider>();
+      if (auth.isAuthenticated && auth.token != null) {
+        debugPrint('📱 Admin App resumed, force reconnecting SSE...');
+        RealtimeService().disconnect();
+        Future.delayed(const Duration(milliseconds: 100), () {
+          if (mounted && auth.isAuthenticated && auth.token != null) {
+            RealtimeService().connect(auth.token!);
+            _fetchUnreadRequests();
+          }
+        });
+      }
+    }
   }
 
   Future<void> _fetchUnreadRequests() async {
@@ -66,7 +86,6 @@ class _AdminScreenState extends State<AdminScreen> {
     if (_currentIndex == i) return;
     HapticFeedback.selectionClick();
     setState(() {
-      _prevIndex = _currentIndex;
       _currentIndex = i;
       _isBottomNavVisible = true;
     });
@@ -137,48 +156,9 @@ class _AdminScreenState extends State<AdminScreen> {
               }
               return false;
             },
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 400),
-              switchInCurve: Curves.fastOutSlowIn,
-              switchOutCurve: Curves.fastOutSlowIn,
-              transitionBuilder: (Widget child, Animation<double> animation) {
-                final isForward = _currentIndex >= _prevIndex;
-                final slideOffset = isForward ? const Offset(0.12, 0.0) : const Offset(-0.12, 0.0);
-
-                if (child.key == ValueKey<int>(_currentIndex)) {
-                  return FadeTransition(
-                    opacity: animation,
-                    child: SlideTransition(
-                      position: Tween<Offset>(
-                        begin: slideOffset,
-                        end: Offset.zero,
-                      ).animate(CurvedAnimation(
-                        parent: animation,
-                        curve: Curves.fastOutSlowIn,
-                      )),
-                      child: child,
-                    ),
-                  );
-                } else {
-                  return FadeTransition(
-                    opacity: animation,
-                    child: SlideTransition(
-                      position: Tween<Offset>(
-                        begin: Offset.zero,
-                        end: isForward ? const Offset(-0.12, 0.0) : const Offset(0.12, 0.0),
-                      ).animate(CurvedAnimation(
-                        parent: animation,
-                        curve: Curves.fastOutSlowIn,
-                      )),
-                      child: child,
-                    ),
-                  );
-                }
-              },
-              child: KeyedSubtree(
-                key: ValueKey<int>(_currentIndex),
-                child: pages[_currentIndex],
-              ),
+            child: IndexedStack(
+              index: _currentIndex,
+              children: pages,
             ),
           ),
           bottomNavigationBar: AnimatedSlide(
