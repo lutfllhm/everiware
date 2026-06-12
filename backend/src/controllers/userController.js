@@ -132,33 +132,44 @@ async function sendInvitationEmail(email, name, activationLink) {
   const text = `Halo ${name},\n\nAnda telah didaftarkan sebagai karyawan di sistem absensi Everiware oleh HRD.\n\nUntuk mengaktifkan akun Anda dan mengatur password baru, silakan buka tautan berikut:\n${activationLink}\n\nTautan ini berlaku selama 7 hari.\n\nTerima kasih,\nTim HRD Everiware`;
   
   const html = `
-    <div style="font-family: Arial, sans-serif; font-size: 14px; line-height: 1.6; color: #333333; max-width: 550px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
-      <h2 style="color: #6B0E11; margin-top: 0;">EVERIWARE</h2>
-      <p style="font-size: 11px; color: #64748b; margin: -10px 0 20px 0; text-transform: uppercase; letter-spacing: 1px;">Undangan Aktivasi Akun</p>
-      <hr style="border: none; border-top: 1px solid #e2e8f0; margin-bottom: 20px;">
-      
-      <p>Halo <strong>${name}</strong>,</p>
-      <p>Anda telah didaftarkan sebagai karyawan di sistem absensi <strong>Everiware</strong> oleh HRD.</p>
-      <p>Untuk mengaktifkan akun Anda, silakan klik tombol di bawah ini dan atur password Anda:</p>
-      
-      <div style="text-align: center; margin: 25px 0;">
-        <a href="${activationLink}" style="background-color: #6B0E11; color: #ffffff; padding: 12px 30px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold;">
-          Aktifkan Akun Saya
-        </a>
+    <div style="font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; background-color: #f8fafc; padding: 40px 10px; margin: 0; color: #1e293b;">
+      <div style="max-width: 540px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.03);">
+        <!-- Header Banner -->
+        <div style="background-color: #6B0E11; padding: 30px 20px; text-align: center;">
+          <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 800; letter-spacing: 3px; font-style: italic;">EVERIWARE</h1>
+          <p style="color: rgba(255,255,255,0.7); margin: 5px 0 0 0; font-size: 11px; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase;">Undangan Aktivasi Akun</p>
+        </div>
+        
+        <!-- Content Body -->
+        <div style="padding: 30px;">
+          <p style="font-size: 16px; font-weight: 700; margin-top: 0; color: #0f172a;">Halo ${name},</p>
+          <p style="font-size: 14px; line-height: 1.6; color: #475569;">Anda telah didaftarkan sebagai karyawan di sistem absensi <strong>Everiware</strong> oleh HRD.</p>
+          <p style="font-size: 14px; line-height: 1.6; color: #475569;">Untuk mengaktifkan akun Anda, silakan klik tombol di bawah ini dan atur kata sandi baru Anda:</p>
+          
+          <!-- Button Box -->
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${activationLink}" style="background-color: #6B0E11; color: #ffffff; padding: 12px 30px; text-decoration: none; border-radius: 8px; display: inline-block; font-weight: bold; font-size: 15px; box-shadow: 0 4px 10px rgba(107, 14, 17, 0.15);">
+              Aktifkan Akun Saya
+            </a>
+          </div>
+          
+          <!-- Alternative Link Card -->
+          <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; margin: 25px 0;">
+            <span style="font-size: 11px; font-weight: 700; color: #64748b; letter-spacing: 1px; display: block; margin-bottom: 5px;">Tautan Alternatif (Salin & Tempel di Browser):</span>
+            <a href="${activationLink}" style="color: #6B0E11; font-size: 13px; word-break: break-all; text-decoration: underline;">${activationLink}</a>
+          </div>
+          
+          <p style="font-size: 12px; color: #64748b;">* Tautan aktivasi ini berlaku selama <strong>7 hari</strong>.</p>
+          
+          <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 30px 0 20px 0;">
+          
+          <!-- Footer Info -->
+          <div style="text-align: center; font-size: 11px; color: #94a3b8; line-height: 1.5;">
+            <p style="margin: 0 0 5px 0;">Email ini dikirimkan secara otomatis oleh sistem Everiware, mohon untuk tidak membalas.</p>
+            <p style="margin: 0; font-weight: 600;">© 2026 Everiware · CV. Rajawali Bina Maju. All rights reserved.</p>
+          </div>
+        </div>
       </div>
-      
-      <p style="font-size: 13px; color: #64748b;">
-        Atau salin tautan berikut ke browser Anda:<br>
-        <a href="${activationLink}" style="color: #6B0E11; text-decoration: underline;">${activationLink}</a>
-      </p>
-      
-      <p style="font-size: 12px; color: #64748b;">Tautan aktivasi ini berlaku selama <strong>7 hari</strong>.</p>
-      
-      <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 25px 0 15px 0;">
-      <p style="font-size: 11px; color: #94a3b8; text-align: center; margin: 0;">
-        Email ini dikirimkan secara otomatis oleh sistem Everiware, mohon untuk tidak membalas.<br>
-        © 2026 Everiware · CV. Rajawali Bina Maju
-      </p>
     </div>
   `;
   

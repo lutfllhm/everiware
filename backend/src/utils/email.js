@@ -20,27 +20,45 @@ const sendOTPEmail = async (email, name, otp) => {
     subject: '🔐 Kode OTP Verifikasi - Everiware',
     text: textContent,
     html: `
-      <div style="font-family: Arial, sans-serif; font-size: 14px; line-height: 1.6; color: #333333; max-width: 550px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
-        <h2 style="color: #6B0E11; margin-top: 0;">EVERIWARE</h2>
-        <p style="font-size: 11px; color: #64748b; margin: -10px 0 20px 0; text-transform: uppercase; letter-spacing: 1px;">Sistem Absensi Digital</p>
-        <hr style="border: none; border-top: 1px solid #e2e8f0; margin-bottom: 20px;">
-        
-        <p>Halo <strong>${name}</strong>,</p>
-        <p>Terima kasih telah bergabung dengan <strong>Everiware</strong>. Silakan gunakan Kode Verifikasi (OTP) di bawah ini untuk menyelesaikan verifikasi akun Anda:</p>
-        
-        <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; text-align: center; margin: 20px 0; font-size: 24px; font-weight: bold; letter-spacing: 5px; color: #6B0E11;">
-          ${otp}
+      <div style="font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; background-color: #f8fafc; padding: 40px 10px; margin: 0; color: #1e293b;">
+        <div style="max-width: 540px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.03);">
+          <!-- Header Banner -->
+          <div style="background-color: #6B0E11; padding: 30px 20px; text-align: center;">
+            <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 800; letter-spacing: 3px; font-style: italic;">EVERIWARE</h1>
+            <p style="color: rgba(255,255,255,0.7); margin: 5px 0 0 0; font-size: 11px; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase;">Sistem Absensi Digital</p>
+          </div>
+          
+          <!-- Content Body -->
+          <div style="padding: 30px;">
+            <p style="font-size: 16px; font-weight: 700; margin-top: 0; color: #0f172a;">Halo ${name},</p>
+            <p style="font-size: 14px; line-height: 1.6; color: #475569;">Terima kasih telah bergabung dengan <strong>Everiware</strong>. Silakan gunakan Kode Verifikasi (OTP) di bawah ini untuk menyelesaikan pendaftaran atau verifikasi akun Anda:</p>
+            
+            <!-- OTP Display Card -->
+            <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; text-align: center; margin: 25px 0;">
+              <span style="font-size: 11px; font-weight: 700; color: #64748b; letter-spacing: 1.5px; text-transform: uppercase; display: block; margin-bottom: 6px;">KODE OTP VERIFIKASI</span>
+              <span style="font-family: 'Courier New', Courier, monospace; font-size: 36px; font-weight: 800; color: #6B0E11; letter-spacing: 6px; display: inline-block; padding-left: 6px;">${otp}</span>
+            </div>
+            
+            <!-- Security Warning Card -->
+            <div style="background-color: #fef2f2; border: 1px solid #fee2e2; border-left: 4px solid #ef4444; border-radius: 8px; padding: 15px; margin: 25px 0;">
+              <h4 style="color: #991b1b; margin: 0 0 5px 0; font-size: 13px; font-weight: 700;">⚠️ Keamanan Akun:</h4>
+              <ul style="color: #7f1d1d; font-size: 12px; margin: 0; padding-left: 15px; line-height: 1.5;">
+                <li>Jangan bagikan kode verifikasi ini kepada siapapun.</li>
+                <li>Kode OTP ini hanya berlaku selama <strong>10 menit</strong>.</li>
+              </ul>
+            </div>
+            
+            <p style="font-size: 13px; color: #64748b; line-height: 1.5; margin-bottom: 0;">Jika Anda tidak merasa melakukan permintaan verifikasi ini, abaikan email ini secara aman.</p>
+            
+            <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 30px 0 20px 0;">
+            
+            <!-- Footer Info -->
+            <div style="text-align: center; font-size: 11px; color: #94a3b8; line-height: 1.5;">
+              <p style="margin: 0 0 5px 0;">Email ini dikirimkan secara otomatis oleh sistem, mohon untuk tidak membalas.</p>
+              <p style="margin: 0; font-weight: 600;">© 2026 Everiware · CV. Rajawali Bina Maju. All rights reserved.</p>
+            </div>
+          </div>
         </div>
-        
-        <p style="font-size: 12px; color: #dc2626; background-color: #fef2f2; padding: 10px; border-radius: 6px; border-left: 4px solid #ef4444;">
-          <strong>⚠️ Penting:</strong> Demi keamanan, mohon tidak membagikan kode verifikasi ini kepada siapa pun. Kode OTP ini berlaku selama <strong>10 menit</strong>.
-        </p>
-        
-        <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 25px 0 15px 0;">
-        <p style="font-size: 11px; color: #94a3b8; text-align: center; margin: 0;">
-          Email ini dikirimkan secara otomatis oleh sistem, mohon untuk tidak membalas.<br>
-          © 2026 Everiware · CV. Rajawali Bina Maju
-        </p>
       </div>
     `,
   };
@@ -56,27 +74,43 @@ const sendPasswordResetEmail = async (email, name, otp) => {
     subject: '🔑 Reset Password - Everiware',
     text: textContent,
     html: `
-      <div style="font-family: Arial, sans-serif; font-size: 14px; line-height: 1.6; color: #333333; max-width: 550px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
-        <h2 style="color: #6B0E11; margin-top: 0;">EVERIWARE</h2>
-        <p style="font-size: 11px; color: #64748b; margin: -10px 0 20px 0; text-transform: uppercase; letter-spacing: 1px;">Sistem Absensi Digital</p>
-        <hr style="border: none; border-top: 1px solid #e2e8f0; margin-bottom: 20px;">
-        
-        <p>Halo <strong>${name}</strong>,</p>
-        <p>Kami menerima permintaan untuk mereset kata sandi akun Everiware Anda. Silakan gunakan Kode Verifikasi (OTP) di bawah ini untuk membuat kata sandi baru:</p>
-        
-        <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; text-align: center; margin: 20px 0; font-size: 24px; font-weight: bold; letter-spacing: 5px; color: #6B0E11;">
-          ${otp}
+      <div style="font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; background-color: #f8fafc; padding: 40px 10px; margin: 0; color: #1e293b;">
+        <div style="max-width: 540px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.03);">
+          <!-- Header Banner -->
+          <div style="background-color: #6B0E11; padding: 30px 20px; text-align: center;">
+            <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 800; letter-spacing: 3px; font-style: italic;">EVERIWARE</h1>
+            <p style="color: rgba(255,255,255,0.7); margin: 5px 0 0 0; font-size: 11px; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase;">Reset Kata Sandi</p>
+          </div>
+          
+          <!-- Content Body -->
+          <div style="padding: 30px;">
+            <p style="font-size: 16px; font-weight: 700; margin-top: 0; color: #0f172a;">Halo ${name},</p>
+            <p style="font-size: 14px; line-height: 1.6; color: #475569;">Kami menerima permintaan untuk mereset kata sandi akun Everiware Anda. Silakan gunakan Kode Verifikasi (OTP) di bawah ini untuk membuat kata sandi baru:</p>
+            
+            <!-- OTP Display Card -->
+            <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; text-align: center; margin: 25px 0;">
+              <span style="font-size: 11px; font-weight: 700; color: #64748b; letter-spacing: 1.5px; text-transform: uppercase; display: block; margin-bottom: 6px;">KODE OTP RESET PASSWORD</span>
+              <span style="font-family: 'Courier New', Courier, monospace; font-size: 36px; font-weight: 800; color: #6B0E11; letter-spacing: 6px; display: inline-block; padding-left: 6px;">${otp}</span>
+            </div>
+            
+            <!-- Security Warning Card -->
+            <div style="background-color: #fef2f2; border: 1px solid #fee2e2; border-left: 4px solid #ef4444; border-radius: 8px; padding: 15px; margin: 25px 0;">
+              <h4 style="color: #991b1b; margin: 0 0 5px 0; font-size: 13px; font-weight: 700;">⚠️ Keamanan Akun:</h4>
+              <ul style="color: #7f1d1d; font-size: 12px; margin: 0; padding-left: 15px; line-height: 1.5;">
+                <li>Kode OTP ini hanya berlaku selama <strong>10 menit</strong>.</li>
+                <li>Jika Anda tidak merasa melakukan permintaan ini, abaikan email ini secara aman.</li>
+              </ul>
+            </div>
+            
+            <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 30px 0 20px 0;">
+            
+            <!-- Footer Info -->
+            <div style="text-align: center; font-size: 11px; color: #94a3b8; line-height: 1.5;">
+              <p style="margin: 0 0 5px 0;">Email ini dikirimkan secara otomatis oleh sistem, mohon untuk tidak membalas.</p>
+              <p style="margin: 0; font-weight: 600;">© 2026 Everiware · CV. Rajawali Bina Maju. All rights reserved.</p>
+            </div>
+          </div>
         </div>
-        
-        <p style="font-size: 12px; color: #dc2626; background-color: #fef2f2; padding: 10px; border-radius: 6px; border-left: 4px solid #ef4444;">
-          <strong>⚠️ Penting:</strong> Kode ini hanya berlaku selama <strong>10 menit</strong>. Jika Anda tidak melakukan permintaan ini, Anda dapat mengabaikan email ini secara aman.
-        </p>
-        
-        <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 25px 0 15px 0;">
-        <p style="font-size: 11px; color: #94a3b8; text-align: center; margin: 0;">
-          Email ini dikirimkan secara otomatis oleh sistem, mohon untuk tidak membalas.<br>
-          © 2026 Everiware · CV. Rajawali Bina Maju
-        </p>
       </div>
     `,
   };
@@ -95,25 +129,36 @@ const sendLeaveNotification = async (email, name, status, leaveType) => {
     subject: `${status === 'approved' ? '✅' : '❌'} Pengajuan ${leaveType} - ${statusText} - Everiware`,
     text: textContent,
     html: `
-      <div style="font-family: Arial, sans-serif; font-size: 14px; line-height: 1.6; color: #333333; max-width: 550px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
-        <h2 style="color: #6B0E11; margin-top: 0;">EVERIWARE</h2>
-        <p style="font-size: 11px; color: #64748b; margin: -10px 0 20px 0; text-transform: uppercase; letter-spacing: 1px;">Sistem Absensi Digital</p>
-        <hr style="border: none; border-top: 1px solid #e2e8f0; margin-bottom: 20px;">
-        
-        <p>Halo <strong>${name}</strong>,</p>
-        <p>Kami menginformasikan bahwa pengajuan izin/cuti Anda untuk jenis <strong>${leaveType}</strong> telah selesai diproses oleh HRD/Admin dengan status:</p>
-        
-        <div style="background-color: ${statusColor}0f; border: 1px solid ${statusColor}40; border-left: 5px solid ${statusColor}; border-radius: 6px; padding: 15px; margin: 20px 0; font-size: 18px; font-weight: bold; color: ${statusColor};">
-          ${status === 'approved' ? '✅ DISETUJUI' : '❌ DITOLAK'}
+      <div style="font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; background-color: #f8fafc; padding: 40px 10px; margin: 0; color: #1e293b;">
+        <div style="max-width: 540px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.03);">
+          <!-- Header Banner -->
+          <div style="background-color: #6B0E11; padding: 30px 20px; text-align: center;">
+            <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 800; letter-spacing: 3px; font-style: italic;">EVERIWARE</h1>
+            <p style="color: rgba(255,255,255,0.7); margin: 5px 0 0 0; font-size: 11px; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase;">Status Pengajuan Izin/Cuti</p>
+          </div>
+          
+          <!-- Content Body -->
+          <div style="padding: 30px;">
+            <p style="font-size: 16px; font-weight: 700; margin-top: 0; color: #0f172a;">Halo ${name},</p>
+            <p style="font-size: 14px; line-height: 1.6; color: #475569;">Kami menginformasikan bahwa pengajuan izin/cuti Anda untuk jenis <strong>${leaveType}</strong> telah selesai diproses oleh HRD/Admin dengan status:</p>
+            
+            <!-- Status Badge Card -->
+            <div style="background-color: ${statusColor}0a; border: 1px solid ${statusColor}20; border-left: 5px solid ${statusColor}; border-radius: 8px; padding: 18px; margin: 25px 0;">
+              <span style="font-size: 11px; font-weight: 700; color: #64748b; letter-spacing: 1.5px; text-transform: uppercase; display: block; margin-bottom: 5px;">STATUS AKHIR</span>
+              <span style="font-size: 20px; font-weight: 800; color: ${statusColor};">${status === 'approved' ? '✅ DISETUJUI' : '❌ DITOLAK'}</span>
+            </div>
+            
+            <p style="font-size: 14px; line-height: 1.6; color: #475569;">Silakan masuk ke aplikasi mobile atau dashboard web <strong>Everiware</strong> Anda untuk memeriksa rincian detail atau riwayat lebih lanjut.</p>
+            
+            <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 30px 0 20px 0;">
+            
+            <!-- Footer Info -->
+            <div style="text-align: center; font-size: 11px; color: #94a3b8; line-height: 1.5;">
+              <p style="margin: 0 0 5px 0;">Email ini dikirimkan secara otomatis oleh sistem, mohon untuk tidak membalas.</p>
+              <p style="margin: 0; font-weight: 600;">© 2026 Everiware · CV. Rajawali Bina Maju. All rights reserved.</p>
+            </div>
+          </div>
         </div>
-        
-        <p>Silakan masuk ke aplikasi <strong>Everiware</strong> Anda untuk memeriksa rincian lebih lanjut.</p>
-        
-        <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 25px 0 15px 0;">
-        <p style="font-size: 11px; color: #94a3b8; text-align: center; margin: 0;">
-          Email ini dikirimkan secara otomatis oleh sistem, mohon untuk tidak membalas.<br>
-          © 2026 Everiware · CV. Rajawali Bina Maju
-        </p>
       </div>
     `,
   };
