@@ -17,6 +17,7 @@ import 'locations_screen.dart';
 import 'broadcast_screen.dart';
 import 'leave_approval_screen.dart';
 import 'overtime_approval_screen.dart';
+import 'create_announcement_screen.dart';
 
 class AdminDashboardTab extends StatefulWidget {
   final Function(int) onNavigate;
@@ -44,7 +45,9 @@ class _AdminDashboardTabState extends State<AdminDashboardTab> {
   List<Map<String, dynamic>> _recentPendingRequests = [];
   int _activeAnnouncementIndex = 0;
 
-  final List<Map<String, dynamic>> _announcements = [
+  List<Map<String, dynamic>> _announcements = [];
+
+  final List<Map<String, dynamic>> _defaultAnnouncements = [
     {
       'title': 'Kebijakan Kehadiran Baru',
       'desc': 'Mulai bulan depan, toleransi keterlambatan kehadiran disesuaikan menjadi 10 menit. Harap persiapkan kehadiran Anda.',
@@ -58,6 +61,7 @@ class _AdminDashboardTabState extends State<AdminDashboardTab> {
       'icon': Icons.celebration_rounded,
       'color': const Color(0xFFF59E0B),
       'date': '18 Mei 2026',
+      '_isHoliday': true,
     },
     {
       'title': 'Sosialisasi SOP Kehadiran',
@@ -73,6 +77,7 @@ class _AdminDashboardTabState extends State<AdminDashboardTab> {
   @override
   void initState() {
     super.initState();
+    _announcements = List<Map<String, dynamic>>.from(_defaultAnnouncements);
     _loadAllStats();
 
     _realtimeSub = RealtimeService().events.listen((event) {
@@ -80,7 +85,8 @@ class _AdminDashboardTabState extends State<AdminDashboardTab> {
       if (evName == 'attendance_update' ||
           evName == 'leave_update' ||
           evName == 'overtime_update' ||
-          evName == 'notification_update') {
+          evName == 'notification_update' ||
+          evName == 'announcement_update') {
         _loadAllStats();
       }
     });
@@ -103,6 +109,7 @@ class _AdminDashboardTabState extends State<AdminDashboardTab> {
         api.getDashboardStats(),                 // 0
         api.getAllOvertime(status: 'pending'),   // 1
         api.getAllPendingLeaves(),               // 2
+        api.getAnnouncements(),                  // 3
       ]);
 
       await refreshFuture;
@@ -110,6 +117,62 @@ class _AdminDashboardTabState extends State<AdminDashboardTab> {
       final statsRes = results[0];
       final overtimeRes = results[1];
       final leavesRes = results[2];
+      final announcementsRes = results[3];
+
+      // Parse company announcements dynamically
+      List<Map<String, dynamic>> parsedAnnouncements = [];
+      if (announcementsRes['success'] == true && announcementsRes['announcements'] != null) {
+        final List list = announcementsRes['announcements'] as List;
+        for (var ann in list) {
+          final title = ann['title']?.toString() ?? '';
+          final content = ann['content']?.toString() ?? '';
+          final type = ann['type']?.toString().toLowerCase() ?? 'info';
+          final isHolidayVal = ann['is_holiday'] == 1 || ann['is_holiday'] == true || ann['is_holiday'] == 'true';
+          final createdAt = ann['created_at']?.toString();
+
+          String dateStr = '-';
+          if (createdAt != null) {
+            try {
+              final dt = DateTime.parse(createdAt).toLocal();
+              dateStr = DateFormat('d MMM yyyy', 'id_ID').format(dt);
+            } catch (_) {}
+          }
+
+          IconData icon = Icons.info_outline_rounded;
+          Color color = const Color(0xFF1D4ED8);
+
+          if (type == 'success') {
+            icon = Icons.check_circle_outline_rounded;
+            color = AppColors.success;
+          } else if (type == 'warning') {
+            icon = Icons.warning_amber_rounded;
+            color = AppColors.warning;
+          } else if (type == 'error') {
+            icon = Icons.cancel_outlined;
+            color = AppColors.danger;
+          }
+
+          if (isHolidayVal) {
+            icon = Icons.celebration_rounded;
+            color = const Color(0xFFF59E0B);
+          }
+
+          parsedAnnouncements.add({
+            'title': title,
+            'desc': content,
+            'icon': icon,
+            'color': color,
+            'date': dateStr,
+            '_isHoliday': isHolidayVal,
+          });
+        }
+      }
+
+      if (parsedAnnouncements.isNotEmpty) {
+        _announcements = parsedAnnouncements.take(5).toList();
+      } else {
+        _announcements = List<Map<String, dynamic>>.from(_defaultAnnouncements);
+      }
 
       List<Map<String, dynamic>> recent = [];
       
@@ -632,7 +695,7 @@ class _AdminDashboardTabState extends State<AdminDashboardTab> {
     final context = this.context;
     final List<Map<String, dynamic>> items = [
       {
-        'label': 'Riwayat\nCuti',
+        'label': 'Persetujuan\nCuti',
         'iconPath': 'assets/images/01_persetujuan_cuti.svg',
         'onTap': () => Navigator.push(
           context,
@@ -640,7 +703,7 @@ class _AdminDashboardTabState extends State<AdminDashboardTab> {
         ),
       },
       {
-        'label': 'Riwayat\nLembur',
+        'label': 'Persetujuan\nLembur',
         'iconPath': 'assets/images/02_persetujuan_lembur.svg',
         'onTap': () => Navigator.push(
           context,
@@ -661,6 +724,14 @@ class _AdminDashboardTabState extends State<AdminDashboardTab> {
         'onTap': () => Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => const BroadcastScreen()),
+        ),
+      },
+      {
+        'label': 'Buat\nPengumuman',
+        'icon': Icons.campaign_rounded,
+        'onTap': () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const CreateAnnouncementScreen()),
         ),
       },
       {
@@ -699,11 +770,37 @@ class _AdminDashboardTabState extends State<AdminDashboardTab> {
             child: Column(
               children: [
                 IgnorePointer(
-                  child: FSvgPicture.asset(
-                    item['iconPath'] as String,
-                    width: 58,
-                    height: 66,
-                  ),
+                  child: item['iconPath'] != null
+                      ? FSvgPicture.asset(
+                          item['iconPath'] as String,
+                          width: 58,
+                          height: 66,
+                        )
+                      : Container(
+                          width: 58,
+                          height: 66,
+                          alignment: Alignment.center,
+                          child: Container(
+                            width: 48,
+                            height: 48,
+                            decoration: BoxDecoration(
+                              color: AppColors.primaryBg,
+                              borderRadius: BorderRadius.circular(16),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: AppColors.primary.withOpacity(0.12),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: Icon(
+                              item['icon'] as IconData,
+                              color: AppColors.primary,
+                              size: 26,
+                            ),
+                          ),
+                        ),
                 ),
                 const SizedBox(height: 6),
                 Text(
@@ -747,7 +844,7 @@ class _AdminDashboardTabState extends State<AdminDashboardTab> {
                 ),
                 const SizedBox(width: 10),
                 const Text(
-                  'Pengajuan Terbaru',
+                  'Aktivitas Pengajuan Terbaru',
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w800,
@@ -772,17 +869,48 @@ class _AdminDashboardTabState extends State<AdminDashboardTab> {
         else if (_recentPendingRequests.isEmpty)
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+            padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 24),
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(24),
               border: Border.all(color: AppColors.grey200),
+              boxShadow: AppColors.cardShadow(),
             ),
-            child: const Center(
-              child: Text(
-                'Tidak ada pengajuan pending saat ini.',
-                style: TextStyle(fontSize: 12, color: AppColors.textMuted, fontWeight: FontWeight.w500),
-              ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: const BoxDecoration(
+                    color: AppColors.successBg,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.done_all_rounded,
+                    color: AppColors.success,
+                    size: 28,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                const Text(
+                  'Seluruh Permohonan Telah Diproses',
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Belum ada pengajuan baru yang memerlukan persetujuan.',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: AppColors.textMuted,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
             ),
           )
         else
@@ -866,7 +994,7 @@ class _AdminDashboardTabState extends State<AdminDashboardTab> {
             ),
             const SizedBox(width: 10),
             const Text(
-              'Pengumuman Internal',
+              'Pengumuman Perusahaan',
               style: TextStyle(
                 fontSize: 14.5,
                 fontWeight: FontWeight.w800,
@@ -878,7 +1006,7 @@ class _AdminDashboardTabState extends State<AdminDashboardTab> {
         ),
         const SizedBox(height: 16),
         SizedBox(
-          height: 140,
+          height: 145,
           child: PageView.builder(
             controller: PageController(viewportFraction: 0.94),
             itemCount: _announcements.length,
@@ -891,18 +1019,12 @@ class _AdminDashboardTabState extends State<AdminDashboardTab> {
               final ann = _announcements[index];
               final Color accentColor = (ann['color'] as Color?) ?? AppColors.primary;
               return Container(
-                margin: const EdgeInsets.only(right: 10, bottom: 6),
+                margin: const EdgeInsets.only(right: 10, bottom: 8),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(color: AppColors.grey200),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.02),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    )
-                  ],
+                  boxShadow: AppColors.cardShadow(),
                 ),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(20),
@@ -916,8 +1038,20 @@ class _AdminDashboardTabState extends State<AdminDashboardTab> {
                           color: accentColor,
                         ),
                       ),
+                      // Soft background tint matching accent color
+                      Positioned.fill(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [Colors.white, accentColor.withOpacity(0.015)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                          ),
+                        ),
+                      ),
                       Padding(
-                        padding: const EdgeInsets.all(16),
+                        padding: const EdgeInsets.all(18),
                         child: Row(
                           children: [
                             Expanded(
@@ -928,16 +1062,16 @@ class _AdminDashboardTabState extends State<AdminDashboardTab> {
                                   Row(
                                     children: [
                                       Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                                         decoration: BoxDecoration(
                                           color: accentColor.withOpacity(0.08),
                                           borderRadius: BorderRadius.circular(20),
                                         ),
-                                        child: const Text(
-                                          'Info',
+                                        child: Text(
+                                          ann['_isHoliday'] == true ? 'Hari Libur' : 'Info',
                                           style: TextStyle(
-                                            color: Color(0xFF8B1F1F),
-                                            fontSize: 9,
+                                            color: accentColor,
+                                            fontSize: 9.5,
                                             fontWeight: FontWeight.w800,
                                             letterSpacing: 0.2,
                                           ),
@@ -1046,7 +1180,7 @@ class _AdminDashboardTabState extends State<AdminDashboardTab> {
             ),
             const SizedBox(width: 10),
             const Text(
-              'Akumulasi & Analitik Bulanan',
+              'Ikhtisar Kinerja Bulanan',
               style: TextStyle(
                 fontSize: 14.5,
                 fontWeight: FontWeight.w800,
@@ -1061,32 +1195,45 @@ class _AdminDashboardTabState extends State<AdminDashboardTab> {
           children: [
             Expanded(
               child: Container(
-                padding: const EdgeInsets.all(14),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(24),
                   border: Border.all(color: AppColors.grey200),
+                  boxShadow: AppColors.cardShadow(),
+                  gradient: LinearGradient(
+                    colors: [Colors.white, const Color(0xFFEFF6FF).withOpacity(0.15)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: const BoxDecoration(
-                        color: Color(0xFFEFF6FF),
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEFF6FF),
                         shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.blue.withOpacity(0.15),
+                            blurRadius: 8,
+                            spreadRadius: 1,
+                          ),
+                        ],
                       ),
-                      child: const Icon(Icons.check_circle_outline_rounded, color: Colors.blue, size: 20),
+                      child: const Icon(Icons.check_circle_outline_rounded, color: Colors.blue, size: 22),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 14),
                     const Text(
-                      'Presensi Bulanan',
-                      style: TextStyle(fontSize: 11, color: AppColors.textSecondary, fontWeight: FontWeight.w500),
+                      'Kehadiran Kumulatif',
+                      style: TextStyle(fontSize: 11.5, color: AppColors.textSecondary, fontWeight: FontWeight.w600),
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '$monthlyAttendance kali',
-                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+                      '$monthlyAttendance Kali',
+                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppColors.textPrimary, letterSpacing: -0.5),
                     ),
                   ],
                 ),
@@ -1095,32 +1242,45 @@ class _AdminDashboardTabState extends State<AdminDashboardTab> {
             const SizedBox(width: 12),
             Expanded(
               child: Container(
-                padding: const EdgeInsets.all(14),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(24),
                   border: Border.all(color: AppColors.grey200),
+                  boxShadow: AppColors.cardShadow(),
+                  gradient: LinearGradient(
+                    colors: [Colors.white, const Color(0xFFF0FDF4).withOpacity(0.15)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: const BoxDecoration(
-                        color: Color(0xFFF0FDF4),
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF0FDF4),
                         shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.green.withOpacity(0.15),
+                            blurRadius: 8,
+                            spreadRadius: 1,
+                          ),
+                        ],
                       ),
-                      child: const Icon(Icons.trending_up_rounded, color: Colors.green, size: 20),
+                      child: const Icon(Icons.trending_up_rounded, color: Colors.green, size: 22),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 14),
                     const Text(
-                      'Tingkat Kehadiran Hari Ini',
-                      style: TextStyle(fontSize: 11, color: AppColors.textSecondary, fontWeight: FontWeight.w500),
+                      'Rasio Kehadiran Hari Ini',
+                      style: TextStyle(fontSize: 11.5, color: AppColors.textSecondary, fontWeight: FontWeight.w600),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       '${attendanceRate.round()}%',
-                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppColors.textPrimary, letterSpacing: -0.5),
                     ),
                   ],
                 ),

@@ -63,7 +63,9 @@ class _DashboardTabState extends State<DashboardTab> with WidgetsBindingObserver
   String? _nearestOfficeName;
   double? _distanceToOffice;
 
-  final List<Map<String, dynamic>> _announcements = [
+  List<Map<String, dynamic>> _announcements = [];
+
+  final List<Map<String, dynamic>> _defaultAnnouncements = [
     {
       'title': 'Kebijakan Kehadiran Baru',
       'desc': 'Mulai bulan depan, toleransi keterlambatan kehadiran disesuaikan menjadi 10 menit. Harap persiapkan kehadiran Anda.',
@@ -77,6 +79,7 @@ class _DashboardTabState extends State<DashboardTab> with WidgetsBindingObserver
       'icon': Icons.celebration_rounded,
       'color': const Color(0xFFF59E0B),
       'date': '18 Mei 2026',
+      '_isHoliday': true,
     },
     {
       'title': 'Sosialisasi SOP Kehadiran',
@@ -90,6 +93,7 @@ class _DashboardTabState extends State<DashboardTab> with WidgetsBindingObserver
   @override
   void initState() {
     super.initState();
+    _announcements = List<Map<String, dynamic>>.from(_defaultAnnouncements);
     WidgetsBinding.instance.addObserver(this);
     _loadData();
 
@@ -98,7 +102,8 @@ class _DashboardTabState extends State<DashboardTab> with WidgetsBindingObserver
       if (evName == 'attendance_update' ||
           evName == 'leave_update' ||
           evName == 'overtime_update' ||
-          evName == 'notification_update') {
+          evName == 'notification_update' ||
+          evName == 'announcement_update') {
         _loadData();
       }
     });
@@ -134,6 +139,7 @@ class _DashboardTabState extends State<DashboardTab> with WidgetsBindingObserver
         api.getLocations(),            // 5
         api.getHolidays(year: now.year), // 6
         api.getMyAttendance(month: now.month, year: now.year), // 7
+        api.getAnnouncements(),        // 8
       ]);
 
       // Tunggu hingga profile refresh selesai
@@ -147,6 +153,62 @@ class _DashboardTabState extends State<DashboardTab> with WidgetsBindingObserver
       final locationsRes = results[5];
       final holidaysRes = results[6];
       final attRes = results[7];
+      final announcementsRes = results[8];
+
+      // Parse company announcements dynamically
+      List<Map<String, dynamic>> parsedAnnouncements = [];
+      if (announcementsRes['success'] == true && announcementsRes['announcements'] != null) {
+        final List list = announcementsRes['announcements'] as List;
+        for (var ann in list) {
+          final title = ann['title']?.toString() ?? '';
+          final content = ann['content']?.toString() ?? '';
+          final type = ann['type']?.toString().toLowerCase() ?? 'info';
+          final isHolidayVal = ann['is_holiday'] == 1 || ann['is_holiday'] == true || ann['is_holiday'] == 'true';
+          final createdAt = ann['created_at']?.toString();
+
+          String dateStr = '-';
+          if (createdAt != null) {
+            try {
+              final dt = DateTime.parse(createdAt).toLocal();
+              dateStr = DateFormat('d MMM yyyy', 'id_ID').format(dt);
+            } catch (_) {}
+          }
+
+          IconData icon = Icons.info_outline_rounded;
+          Color color = const Color(0xFF1D4ED8);
+
+          if (type == 'success') {
+            icon = Icons.check_circle_outline_rounded;
+            color = AppColors.success;
+          } else if (type == 'warning') {
+            icon = Icons.warning_amber_rounded;
+            color = AppColors.warning;
+          } else if (type == 'error') {
+            icon = Icons.cancel_outlined;
+            color = AppColors.danger;
+          }
+
+          if (isHolidayVal) {
+            icon = Icons.celebration_rounded;
+            color = const Color(0xFFF59E0B);
+          }
+
+          parsedAnnouncements.add({
+            'title': title,
+            'desc': content,
+            'icon': icon,
+            'color': color,
+            'date': dateStr,
+            '_isHoliday': isHolidayVal,
+          });
+        }
+      }
+
+      if (parsedAnnouncements.isNotEmpty) {
+        _announcements = parsedAnnouncements.take(5).toList();
+      } else {
+        _announcements = List<Map<String, dynamic>>.from(_defaultAnnouncements);
+      }
 
       // Hitung statistik kehadiran bulanan
       int present = 0, lateCount = 0, leaveSick = 0;
@@ -1276,6 +1338,7 @@ class _DashboardTabState extends State<DashboardTab> with WidgetsBindingObserver
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: AppColors.grey200),
         boxShadow: AppColors.cardShadow(),
       ),
       child: Column(
@@ -1296,7 +1359,7 @@ class _DashboardTabState extends State<DashboardTab> with WidgetsBindingObserver
               ),
               const SizedBox(width: 10),
               Text(
-                'Ringkasan Kehadiran ($monthName)',
+                'Analisis Kehadiran Bulanan ($monthName)',
                 style: const TextStyle(
                   fontSize: 14.5, 
                   fontWeight: FontWeight.w800, 
@@ -1347,10 +1410,11 @@ class _DashboardTabState extends State<DashboardTab> with WidgetsBindingObserver
                                     ? AppColors.warning
                                     : AppColors.danger),
                             letterSpacing: -0.5,
+                            height: 1.1,
                           ),
                         ),
                         const Text(
-                          'Hadir',
+                          'Rasio',
                           style: TextStyle(
                             fontSize: 9,
                             fontWeight: FontWeight.w800,
@@ -1416,26 +1480,32 @@ class _DashboardTabState extends State<DashboardTab> with WidgetsBindingObserver
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.grey100, width: 1),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.02),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.grey200),
+        boxShadow: AppColors.cardShadow(),
+        gradient: LinearGradient(
+          colors: [Colors.white, bgColor.withOpacity(0.12)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            padding: const EdgeInsets.all(5),
+            padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
               color: bgColor,
               shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: color.withOpacity(0.12),
+                  blurRadius: 6,
+                  spreadRadius: 1,
+                ),
+              ],
             ),
-            child: Icon(icon, color: color, size: 16),
+            child: Icon(icon, color: color, size: 15),
           ),
           const SizedBox(height: 8),
           Text(
@@ -1476,6 +1546,7 @@ class _DashboardTabState extends State<DashboardTab> with WidgetsBindingObserver
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: AppColors.grey200),
         boxShadow: AppColors.cardShadow(),
       ),
       child: Column(
@@ -1492,7 +1563,7 @@ class _DashboardTabState extends State<DashboardTab> with WidgetsBindingObserver
               ),
               const SizedBox(width: 8),
               const Text(
-                'Ringkasan Cuti Kerja',
+                'Alokasi & Sisa Cuti Tahunan',
                 style: TextStyle(
                   fontSize: 14.5,
                   fontWeight: FontWeight.bold,
@@ -1593,7 +1664,7 @@ class _DashboardTabState extends State<DashboardTab> with WidgetsBindingObserver
             ),
             const SizedBox(width: 8),
             const Text(
-              'Pengumuman Internal',
+              'Pengumuman Perusahaan',
               style: TextStyle(
                 fontSize: 14.5,
                 fontWeight: FontWeight.bold,
@@ -1621,6 +1692,7 @@ class _DashboardTabState extends State<DashboardTab> with WidgetsBindingObserver
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: AppColors.grey200),
                   boxShadow: AppColors.cardShadow(),
                 ),
                 child: ClipRRect(
@@ -1633,6 +1705,18 @@ class _DashboardTabState extends State<DashboardTab> with WidgetsBindingObserver
                         child: Container(
                           width: 5,
                           color: accentColor,
+                        ),
+                      ),
+                      // Soft background tint matching accent color
+                      Positioned.fill(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [Colors.white, accentColor.withOpacity(0.015)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                          ),
                         ),
                       ),
                       Padding(
@@ -1843,6 +1927,7 @@ class _DashboardTabState extends State<DashboardTab> with WidgetsBindingObserver
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: AppColors.grey200),
         boxShadow: AppColors.cardShadow(),
       ),
       child: Column(
@@ -1859,20 +1944,51 @@ class _DashboardTabState extends State<DashboardTab> with WidgetsBindingObserver
               ),
               const SizedBox(width: 8),
               const Text(
-                'Status Pengajuan Terbaru',
+                'Status Permohonan Terbaru',
                 style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
               ),
             ],
           ),
           const SizedBox(height: 16),
           if (_recentLeaves.isEmpty && _overtimeList.isEmpty)
-            const Center(
-              child: Padding(
-                padding: EdgeInsets.symmetric(vertical: 20),
-                child: Text(
-                  'Tidak ada pengajuan terbaru',
-                  style: TextStyle(color: AppColors.textMuted, fontSize: 12),
-                ),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryBg.withOpacity(0.4),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.history_rounded,
+                      color: AppColors.primary,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Belum Ada Permohonan Terbaru',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Riwayat permohonan cuti atau lembur Anda akan muncul di sini.',
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      color: AppColors.textMuted,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
               ),
             ),
           // Recent Leaves
@@ -1912,7 +2028,13 @@ class _DashboardTabState extends State<DashboardTab> with WidgetsBindingObserver
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: AppColors.grey200),
           boxShadow: AppColors.cardShadow(),
+          gradient: LinearGradient(
+            colors: [Colors.white, const Color(0xFF25D366).withOpacity(0.03)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
         ),
         child: Row(
           children: [
@@ -1921,6 +2043,13 @@ class _DashboardTabState extends State<DashboardTab> with WidgetsBindingObserver
               decoration: BoxDecoration(
                 color: const Color(0xFF25D366).withOpacity(0.08),
                 borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF25D366).withOpacity(0.1),
+                    blurRadius: 8,
+                    spreadRadius: 1,
+                  ),
+                ],
               ),
               child: const Icon(Icons.support_agent_rounded, color: Color(0xFF128C7E), size: 28),
             ),
@@ -1930,12 +2059,12 @@ class _DashboardTabState extends State<DashboardTab> with WidgetsBindingObserver
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'Layanan Bantuan HR',
+                    'Pusat Bantuan & Hubungan Karyawan',
                     style: TextStyle(color: AppColors.textPrimary, fontSize: 13.5, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 3),
-                  Text(
-                    'Hubungi tim HRD jika menemui kendala operasional',
+                  const Text(
+                    'Hubungi tim HRD untuk konsultasi administrasi & operasional',
                     style: TextStyle(color: AppColors.textSecondary, fontSize: 10.5, fontWeight: FontWeight.w500),
                   ),
                 ],

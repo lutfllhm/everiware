@@ -390,6 +390,18 @@ class ApiService {
     } catch (e) { return _handleError(e); }
   }
 
+  // HRD: semua pengajuan cuti/izin dengan filter opsional
+  Future<Map<String, dynamic>> getAllLeaves({String? status, int? month, int? year}) async {
+    try {
+      final res = await _dio.get('/leave/all', queryParameters: {
+        if (status != null) 'status': status,
+        if (month != null) 'month': month,
+        if (year != null) 'year': year,
+      });
+      return _handleResponse(res);
+    } catch (e) { return _handleError(e); }
+  }
+
   // HRD: review (approve/reject) pengajuan
   Future<Map<String, dynamic>> reviewLeave(String id, String status, {String? notes}) async {
     try {
@@ -549,6 +561,26 @@ class ApiService {
         'type': type ?? 'info',
         if (department != null && department != 'all') 'department': department,
         if (locationId != null && locationId != 'all') 'location_id': locationId,
+      });
+      return _handleResponse(res);
+    } catch (e) { return _handleError(e); }
+  }
+
+  // COMPANY ANNOUNCEMENTS (DEDICATED)
+  Future<Map<String, dynamic>> getAnnouncements() async {
+    try {
+      final res = await _dio.get('/announcements');
+      return _handleResponse(res);
+    } catch (e) { return _handleError(e); }
+  }
+
+  Future<Map<String, dynamic>> createAnnouncement(String title, String content, {String? type, bool isHoliday = false}) async {
+    try {
+      final res = await _dio.post('/announcements', data: {
+        'title': title,
+        'content': content,
+        'type': type ?? 'info',
+        'is_holiday': isHoliday,
       });
       return _handleResponse(res);
     } catch (e) { return _handleError(e); }
