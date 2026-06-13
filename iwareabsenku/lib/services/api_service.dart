@@ -585,4 +585,23 @@ class ApiService {
       return _handleResponse(res);
     } catch (e) { return _handleError(e); }
   }
+
+  Future<Map<String, dynamic>> updateAnnouncement(String id, String title, String content, {String? type, bool isHoliday = false}) async {
+    try {
+      final res = await _dio.put('/announcements/$id', data: {
+        'title': title,
+        'content': content,
+        'type': type ?? 'info',
+        'is_holiday': isHoliday,
+      });
+      return _handleResponse(res);
+    } catch (e) { return _handleError(e); }
+  }
+
+  Future<Map<String, dynamic>> deleteAnnouncement(String id) async {
+    try {
+      final res = await _dio.delete('/announcements/$id');
+      return _handleResponse(res);
+    } catch (e) { return _handleError(e); }
+  }
 }
