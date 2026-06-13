@@ -18,6 +18,7 @@ import 'broadcast_screen.dart';
 import 'leave_approval_screen.dart';
 import 'overtime_approval_screen.dart';
 import 'create_announcement_screen.dart';
+import 'manage_announcements_screen.dart';
 
 class AdminDashboardTab extends StatefulWidget {
   final Function(int) onNavigate;
@@ -727,11 +728,11 @@ class _AdminDashboardTabState extends State<AdminDashboardTab> {
         ),
       },
       {
-        'label': 'Buat\nPengumuman',
-        'icon': Icons.campaign_rounded,
+        'label': 'Kelola\nPengumuman',
+        'iconPath': 'assets/images/07_kelola_pengumuman.svg',
         'onTap': () => Navigator.push(
           context,
-          MaterialPageRoute(builder: (_) => const CreateAnnouncementScreen()),
+          MaterialPageRoute(builder: (_) => const ManageAnnouncementsScreen()),
         ),
       },
       {

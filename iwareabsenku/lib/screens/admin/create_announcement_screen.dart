@@ -5,7 +5,8 @@ import '../../utils/app_theme.dart';
 import '../../widgets/common_widgets.dart';
 
 class CreateAnnouncementScreen extends StatefulWidget {
-  const CreateAnnouncementScreen({super.key});
+  final Map<String, dynamic>? announcement;
+  const CreateAnnouncementScreen({super.key, this.announcement});
 
   @override
   State<CreateAnnouncementScreen> createState() => _CreateAnnouncementScreenState();
@@ -20,6 +21,18 @@ class _CreateAnnouncementScreenState extends State<CreateAnnouncementScreen> {
   bool _loading = false;
 
   @override
+  void initState() {
+    super.initState();
+    if (widget.announcement != null) {
+      final ann = widget.announcement!;
+      _titleCtrl.text = ann['title']?.toString() ?? '';
+      _contentCtrl.text = ann['content']?.toString() ?? '';
+      _type = ann['type']?.toString().toLowerCase() ?? 'info';
+      _isHoliday = ann['is_holiday'] == 1 || ann['is_holiday'] == true || ann['is_holiday'] == 'true';
+    }
+  }
+
+  @override
   void dispose() {
     _titleCtrl.dispose();
     _contentCtrl.dispose();
@@ -32,12 +45,25 @@ class _CreateAnnouncementScreenState extends State<CreateAnnouncementScreen> {
     setState(() => _loading = true);
     HapticFeedback.mediumImpact();
     try {
-      final res = await ApiService().createAnnouncement(
-        _titleCtrl.text.trim(),
-        _contentCtrl.text.trim(),
-        type: _type,
-        isHoliday: _isHoliday,
-      );
+      final bool isEdit = widget.announcement != null;
+      final Map<String, dynamic> res;
+
+      if (isEdit) {
+        res = await ApiService().updateAnnouncement(
+          widget.announcement!['id'] as String,
+          _titleCtrl.text.trim(),
+          _contentCtrl.text.trim(),
+          type: _type,
+          isHoliday: _isHoliday,
+        );
+      } else {
+        res = await ApiService().createAnnouncement(
+          _titleCtrl.text.trim(),
+          _contentCtrl.text.trim(),
+          type: _type,
+          isHoliday: _isHoliday,
+        );
+      }
 
       if (!mounted) return;
       setState(() => _loading = false);
@@ -63,7 +89,7 @@ class _CreateAnnouncementScreenState extends State<CreateAnnouncementScreen> {
               ],
             ),
             content: Text(
-              res['message'] ?? 'Pengumuman perusahaan berhasil diterbitkan.',
+              res['message'] ?? (isEdit ? 'Pengumuman perusahaan berhasil diperbarui.' : 'Pengumuman perusahaan berhasil diterbitkan.'),
               style: const TextStyle(color: AppColors.textSecondary),
             ),
             actions: [
@@ -79,7 +105,7 @@ class _CreateAnnouncementScreenState extends State<CreateAnnouncementScreen> {
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(res['message'] ?? 'Gagal membuat pengumuman'),
+          content: Text(res['message'] ?? 'Gagal memproses pengumuman'),
           backgroundColor: AppColors.danger,
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -100,12 +126,14 @@ class _CreateAnnouncementScreenState extends State<CreateAnnouncementScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final bool isEdit = widget.announcement != null;
+
     return Scaffold(
       backgroundColor: AppColors.surface,
       body: Column(
         children: [
-          const ProfileHeader(
-            title: 'Buat Pengumuman',
+          ProfileHeader(
+            title: isEdit ? 'Edit Pengumuman' : 'Buat Pengumuman',
             showBackButton: true,
           ),
           Expanded(
@@ -133,22 +161,22 @@ class _CreateAnnouncementScreenState extends State<CreateAnnouncementScreen> {
                             ),
                           ),
                           const SizedBox(width: 12),
-                          const Expanded(
+                          Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  'Buat Pengumuman Baru',
-                                  style: TextStyle(
+                                  isEdit ? 'Ubah Pengumuman' : 'Buat Pengumuman Baru',
+                                  style: const TextStyle(
                                     fontWeight: FontWeight.w800,
                                     fontSize: 16,
                                     color: AppColors.textPrimary,
                                   ),
                                 ),
-                                SizedBox(height: 2),
+                                const SizedBox(height: 2),
                                 Text(
-                                  'Tampilkan informasi penting di beranda karyawan.',
-                                  style: TextStyle(fontSize: 11, color: AppColors.textMuted),
+                                  isEdit ? 'Ubah informasi penting perusahaan.' : 'Tampilkan informasi penting di beranda karyawan.',
+                                  style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
                                 ),
                               ],
                             ),
@@ -256,7 +284,7 @@ class _CreateAnnouncementScreenState extends State<CreateAnnouncementScreen> {
                       ),
                       const SizedBox(height: 28),
                       PrimaryButton(
-                        text: 'Publikasikan Pengumuman 📢',
+                        text: isEdit ? 'Simpan Perubahan 💾' : 'Publikasikan Pengumuman 📢',
                         color: AppColors.primary,
                         onPressed: _loading ? null : _submit,
                         isLoading: _loading,

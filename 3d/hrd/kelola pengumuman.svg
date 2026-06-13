@@ -1,0 +1,54 @@
+<svg width="320" height="300" viewBox="0 0 320 300" role="img" xmlns="http://www.w3.org/2000/svg">
+<title>Megafon 3D - Kelola Pengumuman</title>
+<desc>Ikon megafon mengambang naik-turun, gelombang suara berdenyut, dan roda gigi berputar.</desc>
+<style>
+.shadow{transform-box:fill-box;transform-origin:center;animation:shadowPulse 3.4s ease-in-out infinite;}
+.icon{transform-box:fill-box;transform-origin:center;animation:bob 3.4s ease-in-out infinite;}
+.gear{transform-box:fill-box;transform-origin:center;animation:spin 7s linear infinite;}
+.wave{transform-box:fill-box;transform-origin:center;animation:ping 2.2s ease-out infinite;opacity:0;}
+.wave.w2{animation-delay:.45s;}
+.wave.w3{animation-delay:.9s;}
+@keyframes bob{0%,100%{transform:translateY(0) rotate(-2.5deg);}50%{transform:translateY(-14px) rotate(2.5deg);}}
+@keyframes shadowPulse{0%,100%{transform:scale(1);opacity:.22;}50%{transform:scale(.8);opacity:.12;}}
+@keyframes spin{to{transform:rotate(360deg);}}
+@keyframes ping{0%{opacity:0;transform:scale(.5);}25%{opacity:.95;}100%{opacity:0;transform:scale(1.3);}}
+@media (prefers-reduced-motion: reduce){.shadow,.icon,.gear,.wave{animation:none;}.wave{opacity:.85;}}
+</style>
+<defs>
+<linearGradient id="coneGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFC062"/><stop offset="0.5" stop-color="#FF8A2B"/><stop offset="1" stop-color="#E04D14"/></linearGradient>
+<linearGradient id="neckGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFB04D"/><stop offset="1" stop-color="#D6470F"/></linearGradient>
+<linearGradient id="rimGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFD98A"/><stop offset="1" stop-color="#FF9636"/></linearGradient>
+<radialGradient id="innerGrad"><stop offset="0" stop-color="#C23A12"/><stop offset="1" stop-color="#6E1805"/></radialGradient>
+<linearGradient id="handleGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F2731F"/><stop offset="1" stop-color="#A83A0C"/></linearGradient>
+<linearGradient id="gearGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7CC0FF"/><stop offset="0.55" stop-color="#3A86E8"/><stop offset="1" stop-color="#1A5FC0"/></linearGradient>
+<filter id="soft" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="5"/></filter>
+</defs>
+<ellipse class="shadow" cx="158" cy="252" rx="74" ry="14" fill="rgba(0,0,0,0.85)" filter="url(#soft)"/>
+<g class="icon">
+<g class="wave w1"><path d="M214,116 Q230,140 214,164" fill="none" stroke="#FF8A2B" stroke-width="7" stroke-linecap="round"/></g>
+<g class="wave w2"><path d="M226,104 Q248,140 226,176" fill="none" stroke="#FF8A2B" stroke-width="7" stroke-linecap="round"/></g>
+<g class="wave w3"><path d="M238,92 Q266,140 238,188" fill="none" stroke="#FF8A2B" stroke-width="7" stroke-linecap="round"/></g>
+<path d="M120,158 L150,168 L146,196 Q145,202 138,202 L130,202 Q123,202 123,196 Z" fill="url(#handleGrad)"/>
+<rect x="72" y="124" width="22" height="32" rx="7" fill="url(#neckGrad)"/>
+<path d="M92,122 L196,92 L196,188 L92,158 Z" fill="url(#coneGrad)"/>
+<path d="M100,126 L188,98 L186,110 L102,138 Z" fill="#FFFFFF" opacity="0.30"/>
+<ellipse cx="196" cy="140" rx="12" ry="50" fill="url(#rimGrad)"/>
+<ellipse cx="196" cy="140" rx="7" ry="40" fill="url(#innerGrad)"/>
+<ellipse cx="193" cy="120" rx="3.5" ry="11" fill="#FFFFFF" opacity="0.45"/>
+<g class="gear">
+<g transform="translate(248,210)">
+<g transform="rotate(0)"><rect x="-6" y="-30" width="12" height="15" rx="3" fill="url(#gearGrad)"/></g>
+<g transform="rotate(45)"><rect x="-6" y="-30" width="12" height="15" rx="3" fill="url(#gearGrad)"/></g>
+<g transform="rotate(90)"><rect x="-6" y="-30" width="12" height="15" rx="3" fill="url(#gearGrad)"/></g>
+<g transform="rotate(135)"><rect x="-6" y="-30" width="12" height="15" rx="3" fill="url(#gearGrad)"/></g>
+<g transform="rotate(180)"><rect x="-6" y="-30" width="12" height="15" rx="3" fill="url(#gearGrad)"/></g>
+<g transform="rotate(225)"><rect x="-6" y="-30" width="12" height="15" rx="3" fill="url(#gearGrad)"/></g>
+<g transform="rotate(270)"><rect x="-6" y="-30" width="12" height="15" rx="3" fill="url(#gearGrad)"/></g>
+<g transform="rotate(315)"><rect x="-6" y="-30" width="12" height="15" rx="3" fill="url(#gearGrad)"/></g>
+<circle r="22" fill="url(#gearGrad)"/>
+<circle cx="-6" cy="-7" r="13" fill="#FFFFFF" opacity="0.18"/>
+<circle r="9" fill="#15539E"/>
+</g>
+</g>
+</g>
+</svg>
