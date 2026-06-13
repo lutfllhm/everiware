@@ -276,7 +276,7 @@ class _LeaveApprovalScreenState extends State<LeaveApprovalScreen> {
           ? Column(
               children: [
                 const ProfileHeader(
-                  title: 'Riwayat Izin & Cuti',
+                  title: 'Persetujuan Izin & Cuti',
                   showBackButton: true,
                 ),
                 Expanded(child: mainBody),

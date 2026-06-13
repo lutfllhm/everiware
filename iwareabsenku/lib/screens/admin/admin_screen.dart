@@ -8,7 +8,7 @@ import '../../services/realtime_service.dart';
 import '../../services/api_service.dart';
 import '../../utils/app_theme.dart';
 import 'admin_dashboard_tab.dart';
-import 'admin_approvals_tab.dart';
+import 'admin_history_tab.dart';
 import 'today_attendance_screen.dart';
 import 'team_calendar_screen.dart';
 import 'admin_profile_tab.dart';
@@ -102,7 +102,7 @@ class _AdminScreenState extends State<AdminScreen> with WidgetsBindingObserver {
         onNotifTap: () => _goToTab(1), // Navigates to approvals tab
         unreadNotif: _unreadRequests,
       ),
-      const AdminApprovalsTab(),
+      const AdminHistoryTab(),
       const TodayAttendanceScreen(showAppBar: false),
       const TeamCalendarScreen(showAppBar: false),
       const AdminProfileTab(),

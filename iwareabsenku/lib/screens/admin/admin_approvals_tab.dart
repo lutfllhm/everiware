@@ -41,7 +41,7 @@ class _AdminApprovalsTabState extends State<AdminApprovalsTab>
           headerSliverBuilder: (_, __) => [
             SliverToBoxAdapter(
               child: ProfileHeader(
-                title: 'Riwayat',
+                title: 'Persetujuan',
                 name: user?.name,
                 position: user?.position ?? user?.roleLabel,
                 department: user?.department ?? user?.deptPosition,

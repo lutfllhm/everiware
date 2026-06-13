@@ -20,6 +20,7 @@ const overtimeRoutes   = require('./routes/overtime');
 const holidayRoutes    = require('./routes/holidays');
 const auditLogRoutes   = require('./routes/auditLog');
 const realtimeRoutes   = require('./routes/realtime');
+const announcementRoutes = require('./routes/announcements');
 
 const app = express();
 
@@ -104,6 +105,7 @@ app.use('/api/overtime', overtimeRoutes);
 app.use('/api/holidays', holidayRoutes);
 app.use('/api/audit-logs', auditLogRoutes);
 app.use('/api/realtime', realtimeRoutes);
+app.use('/api/announcements', announcementRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => res.json({ status: 'OK', message: 'iWare Presence API is running 🚀', timestamp: new Date() }));
