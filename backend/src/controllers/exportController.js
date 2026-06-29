@@ -203,6 +203,7 @@ const exportAttendanceDetailPDF = async (req, res) => {
       `SELECT u.name, u.employee_id, u.department, a.date, a.check_in, a.check_out, a.status, l.name as lokasi
        FROM users u
        LEFT JOIN attendances a ON u.id = a.user_id ${filter}
+       LEFT JOIN attendance_locations l ON a.location_id = l.id
        WHERE u.role='employee' AND u.is_active=TRUE
        ORDER BY u.name, a.date`,
       params
