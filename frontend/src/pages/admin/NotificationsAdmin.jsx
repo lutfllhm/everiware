@@ -17,7 +17,7 @@ const typeConfig = {
   error:   { icon: XCircle,       bg: 'bg-red-50',     border: 'border-red-200',    text: 'text-red-600',    badge: 'bg-red-100 text-red-700'       },
 };
 
-const leaveTypeLabel = { annual: 'Cuti Tahunan', sick: 'Izin Sakit', permission: 'Izin', wfh: 'Work From Home', dinas: 'Dinas Luar' };
+const leaveTypeLabel = { annual: 'Cuti Tahunan', sick: 'Izin Sakit', permission: 'Izin', dinas: 'Dinas Luar' };
 
 export default function NotificationsAdmin() {
   const [tab, setTab] = useState('pending'); // pending | notifications | broadcast

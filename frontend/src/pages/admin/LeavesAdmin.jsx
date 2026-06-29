@@ -20,7 +20,6 @@ const typeConfig = {
   annual:          { label: 'Cuti Tahunan', cls: 'badge-info' },
   sick:            { label: 'Izin Sakit', cls: 'badge-purple' },
   permission:      { label: 'Izin', cls: 'badge-warning' },
-  wfh:             { label: 'WFH', cls: 'badge-success' },
   dinas:           { label: 'Dinas Luar', cls: 'badge-warning' },
   late_permission: { label: 'Izin Terlambat', cls: 'badge-warning' },
   early_leave:     { label: 'Izin Pulang Cepat', cls: 'badge-warning' },

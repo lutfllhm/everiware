@@ -270,11 +270,9 @@ class _LeaveHistorySubTabState extends State<_LeaveHistorySubTab> {
                                                     ? 'Cuti Tahunan'
                                                     : l['type'] == 'sick'
                                                         ? 'Izin Sakit'
-                                                        : l['type'] == 'wfh'
-                                                            ? 'WFH'
-                                                            : l['type'] == 'dinas'
-                                                                ? 'Dinas Luar'
-                                                                : l['type'] ?? '-',
+                                                        : l['type'] == 'dinas'
+                                                            ? 'Dinas Luar'
+                                                            : l['type'] ?? '-',
                                                 style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, fontWeight: FontWeight.w600),
                                               ),
                                             ),

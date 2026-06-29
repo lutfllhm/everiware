@@ -146,7 +146,7 @@ export default function LeaveTypesAdmin() {
                   <div>
                     <label className="text-xs font-medium text-slate-600 mb-1 block">Kode (unik, tanpa spasi) *</label>
                     <input value={form.code} onChange={e => setForm({ ...form, code: e.target.value.toLowerCase().replace(/\s+/g,'_') })}
-                      className="input-field text-sm font-mono" placeholder="wfh, dinas_luar..." required />
+                      className="input-field text-sm font-mono" placeholder="dinas_luar, sabbatical..." required />
                   </div>
                 )}
                 <div>

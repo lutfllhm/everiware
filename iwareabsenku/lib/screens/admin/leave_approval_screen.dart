@@ -165,11 +165,9 @@ class _LeaveApprovalScreenState extends State<LeaveApprovalScreen> {
                                           ? 'Cuti Tahunan'
                                           : l['type'] == 'sick'
                                               ? 'Izin Sakit'
-                                              : l['type'] == 'wfh'
-                                                  ? 'WFH'
-                                                  : l['type'] == 'dinas'
-                                                      ? 'Dinas Luar'
-                                                      : l['type'] ?? '-',
+                                              : l['type'] == 'dinas'
+                                                  ? 'Dinas Luar'
+                                                  : l['type'] ?? '-',
                                       style: const TextStyle(
                                         fontSize: 11,
                                         color: AppColors.warning,

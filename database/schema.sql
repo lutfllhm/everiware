@@ -280,7 +280,6 @@ INSERT INTO leave_types (id, code, name, requires_attachment, deducts_quota, blo
 ('lt-001', 'annual',          'Cuti Tahunan',       FALSE, TRUE,  TRUE,  NULL),
 ('lt-002', 'sick',            'Izin Sakit',         TRUE,  FALSE, TRUE,  NULL),
 ('lt-003', 'permission',      'Izin',               FALSE, FALSE, TRUE,  NULL),
-('lt-004', 'wfh',             'Work From Home',     FALSE, FALSE, TRUE,  NULL),
 ('lt-005', 'dinas',           'Dinas Luar',         FALSE, FALSE, TRUE,  NULL),
 ('lt-006', 'late_permission', 'Izin Terlambat',     FALSE, FALSE, FALSE, NULL),
 ('lt-007', 'early_leave',     'Izin Pulang Cepat',  FALSE, FALSE, FALSE, NULL),

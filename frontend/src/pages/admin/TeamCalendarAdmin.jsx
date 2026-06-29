@@ -19,7 +19,6 @@ const leaveColors = {
   annual:     { dot: 'bg-sky-500',    pill: 'bg-sky-100 text-sky-700 border-sky-200',    label: 'Cuti Tahunan' },
   sick:       { dot: 'bg-purple-500', pill: 'bg-purple-100 text-purple-700 border-purple-200', label: 'Izin Sakit' },
   permission: { dot: 'bg-amber-500',  pill: 'bg-amber-100 text-amber-700 border-amber-200',  label: 'Izin' },
-  wfh:        { dot: 'bg-teal-500',   pill: 'bg-teal-100 text-teal-700 border-teal-200',   label: 'WFH' },
   dinas:      { dot: 'bg-orange-500', pill: 'bg-orange-100 text-orange-700 border-orange-200', label: 'Dinas Luar' },
 };
 

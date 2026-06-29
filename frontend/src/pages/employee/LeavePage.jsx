@@ -115,7 +115,6 @@ export default function LeavePage({ defaultTab = 0 }) {
     annual:          { label: 'Cuti Tahunan',  color: 'text-blue-600',   bg: 'bg-blue-100' },
     sick:            { label: 'Izin Sakit',    color: 'text-purple-600', bg: 'bg-purple-100' },
     permission:      { label: 'Izin',          color: 'text-orange-600', bg: 'bg-orange-100' },
-    wfh:             { label: 'Work From Home',color: 'text-teal-600',   bg: 'bg-teal-100' },
     dinas:           { label: 'Dinas Luar',    color: 'text-amber-600',  bg: 'bg-amber-100' },
     late_permission: { label: 'Izin Terlambat', color: 'text-amber-600',  bg: 'bg-amber-100' },
     early_leave:     { label: 'Izin Pulang Cepat', color: 'text-orange-600', bg: 'bg-orange-100' },

@@ -14,7 +14,6 @@ enum RequestType {
   latePermission,  // Izin Terlambat
   earlyLeave,      // Izin Pulang Cepat
   leaveAnnual,     // Ajukan Cuti (annual)
-  leaveWfh,        // Ajukan Cuti (WFH)
   sick,            // Izin Sakit
   dinas,           // Dinas Luar
   leaveOffice,     // Izin Keluar Kantor
@@ -27,7 +26,6 @@ extension RequestTypeMeta on RequestType {
       case RequestType.latePermission: return 'Izin Terlambat';
       case RequestType.earlyLeave: return 'Izin Pulang Cepat';
       case RequestType.leaveAnnual: return 'Ajukan Cuti Tahunan';
-      case RequestType.leaveWfh: return 'Ajukan WFH';
       case RequestType.sick: return 'Izin Sakit';
       case RequestType.dinas: return 'Dinas Luar';
       case RequestType.leaveOffice: return 'Izin Keluar Kantor';
@@ -40,7 +38,6 @@ extension RequestTypeMeta on RequestType {
       case RequestType.latePermission: return 'late_permission';
       case RequestType.earlyLeave: return 'early_leave';
       case RequestType.leaveAnnual: return 'annual';
-      case RequestType.leaveWfh: return 'wfh';
       case RequestType.sick: return 'sick';
       case RequestType.dinas: return 'dinas';
       case RequestType.leaveOffice: return 'leave_office';
@@ -57,7 +54,6 @@ extension RequestTypeMeta on RequestType {
       case RequestType.leaveOffice:
         return true;
       case RequestType.leaveAnnual:
-      case RequestType.leaveWfh:
       case RequestType.dinas:
       case RequestType.overtime:
         return false;
@@ -80,7 +76,6 @@ extension RequestTypeMeta on RequestType {
       case RequestType.latePermission: return Icons.access_time_rounded;
       case RequestType.earlyLeave: return Icons.home_rounded;
       case RequestType.leaveAnnual: return Icons.beach_access_rounded;
-      case RequestType.leaveWfh: return Icons.home_work_rounded;
       case RequestType.sick: return Icons.medical_services_rounded;
       case RequestType.dinas: return Icons.location_on_rounded;
       case RequestType.leaveOffice: return Icons.reply_rounded;
@@ -93,7 +88,6 @@ extension RequestTypeMeta on RequestType {
       case RequestType.latePermission: return const Color(0xFF2E7D32);
       case RequestType.earlyLeave: return const Color(0xFFFFB300);
       case RequestType.leaveAnnual: return const Color(0xFF00BCD4);
-      case RequestType.leaveWfh: return const Color(0xFF0D9488);
       case RequestType.sick: return const Color(0xFF7C4DFF);
       case RequestType.dinas: return const Color(0xFF00E5FF);
       case RequestType.leaveOffice: return const Color(0xFFE040FB);
@@ -125,8 +119,6 @@ class _RequestFormScreenState extends State<RequestFormScreen> {
         return 'Pulang Cepat';
       case RequestType.leaveAnnual:
         return 'Cuti Tahunan';
-      case RequestType.leaveWfh:
-        return 'Ajukan WFH';
       case RequestType.sick:
         return 'Izin Sakit';
       case RequestType.dinas:

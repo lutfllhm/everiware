@@ -169,7 +169,7 @@ class LeaveModel {
 
   bool get canCancel => status == 'pending';
 
-  String get typeLabel => type == 'annual' ? 'Cuti Tahunan' : type == 'sick' ? 'Izin Sakit' : type == 'wfh' ? 'WFH' : type == 'dinas' ? 'Dinas Luar' : 'Izin';
+  String get typeLabel => type == 'annual' ? 'Cuti Tahunan' : type == 'sick' ? 'Izin Sakit' : type == 'dinas' ? 'Dinas Luar' : 'Izin';
   String get statusLabel {
     switch (status) {
       case 'pending': return 'Menunggu';

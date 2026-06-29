@@ -326,7 +326,7 @@ const exportLeaveExcel = async (req, res) => {
     hdr.font = { bold: true, color: { argb: 'FFFFFFFF' } };
     hdr.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E293B' } };
 
-    const typeMap = { annual:'Cuti Tahunan', sick:'Izin Sakit', permission:'Izin', wfh:'WFH', dinas:'Dinas Luar' };
+    const typeMap = { annual:'Cuti Tahunan', sick:'Izin Sakit', permission:'Izin', dinas:'Dinas Luar' };
     const statusMap = { pending:'Menunggu', approved:'Disetujui', rejected:'Ditolak' };
 
     rows.forEach((r, i) => {

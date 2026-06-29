@@ -500,7 +500,6 @@ class _LeaveRequestCard extends StatelessWidget {
   static const _typeMap = {
     'annual':         {'color': Color(0xFF8B1F1F), 'bg': Color(0xFFFFEBEE), 'label': 'Cuti Tahunan'},
     'sick':           {'color': Color(0xFF0284C7), 'bg': Color(0xFFF0F9FF), 'label': 'Izin Sakit'},
-    'wfh':            {'color': Color(0xFF0D9488), 'bg': Color(0xFFF0FDFA), 'label': 'WFH'},
     'dinas':          {'color': Color(0xFFD97706), 'bg': Color(0xFFFFFBEB), 'label': 'Dinas Luar'},
     'permission':     {'color': Color(0xFF7C3AED), 'bg': Color(0xFFF5F3FF), 'label': 'Izin'},
     'late_permission':{'color': Color(0xFF2E7D32), 'bg': Color(0xFFF0FDF4), 'label': 'Izin Terlambat'},

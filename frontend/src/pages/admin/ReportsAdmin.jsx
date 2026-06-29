@@ -134,7 +134,6 @@ export default function ReportsAdmin() {
     { name: 'Cuti Tahunan', value: leaveReport.filter(l => l.type === 'annual').length,     color: '#38bdf8' },
     { name: 'Izin Sakit',   value: leaveReport.filter(l => l.type === 'sick').length,       color: '#a855f7' },
     { name: 'Izin',         value: leaveReport.filter(l => l.type === 'permission').length, color: '#f59e0b' },
-    { name: 'WFH',          value: leaveReport.filter(l => l.type === 'wfh').length,        color: '#14b8a6' },
     { name: 'Dinas',        value: leaveReport.filter(l => l.type === 'dinas').length,      color: '#6366f1' },
   ].filter(d => d.value > 0);
 
@@ -449,8 +448,8 @@ export default function ReportsAdmin() {
                       </td>
                       <td className="px-4 py-3 text-sm text-slate-500">{[row.department, row.position].filter(Boolean).join(' · ') || '-'}</td>
                       <td className="px-4 py-3">
-                        <span className={row.type === 'annual' ? 'badge-info' : row.type === 'sick' ? 'badge-purple' : row.type === 'wfh' ? 'badge-success' : 'badge-warning'}>
-                          {row.type === 'annual' ? 'Cuti' : row.type === 'sick' ? 'Sakit' : row.type === 'wfh' ? 'WFH' : row.type === 'dinas' ? 'Dinas' : 'Izin'}
+                        <span className={row.type === 'annual' ? 'badge-info' : row.type === 'sick' ? 'badge-purple' : 'badge-warning'}>
+                          {row.type === 'annual' ? 'Cuti' : row.type === 'sick' ? 'Sakit' : row.type === 'dinas' ? 'Dinas' : 'Izin'}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-sm text-slate-600">
