@@ -1,6 +1,13 @@
 const crypto = require('crypto');
 const { pool } = require('../config/database');
 
+// Komponen waktu WIB (UTC+7) untuk LOGIKA perhitungan (cek terlambat, cek hari
+// Sabtu/Minggu, dll), tidak tergantung timezone server/container. Baca field
+// dengan getUTC*() pada hasilnya — nilainya sudah digeser +7 jam secara manual.
+// JANGAN pakai untuk nilai yang akan disimpan ke kolom DATETIME (lihat
+// attendanceController.js untuk penjelasan kenapa).
+const nowWIBParts = () => new Date(Date.now() + 7 * 60 * 60 * 1000);
+
 const generateOTP = () => {
   return Math.floor(100000 + Math.random() * 900000).toString();
 };
@@ -75,4 +82,4 @@ const getWorkingDaysSync = (startDate, endDate) => {
   return count;
 };
 
-module.exports = { generateOTP, generateId, calculateDistance, formatDate, getWorkingDays, getWorkingDaysSync };
+module.exports = { generateOTP, generateId, calculateDistance, formatDate, getWorkingDays, getWorkingDaysSync, nowWIBParts };

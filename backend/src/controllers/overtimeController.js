@@ -1,5 +1,5 @@
 const { pool } = require('../config/database');
-const { generateId } = require('../utils/helpers');
+const { generateId, nowWIBParts } = require('../utils/helpers');
 const { sendPushNotification } = require('../utils/fcm');
 const { auditLog } = require('../utils/auditLog');
 
@@ -222,8 +222,8 @@ const getOvertimeReport = async (req, res) => {
       dateFilter = 'AND ot.date >= ? AND ot.date <= ?';
       params = [start_date, end_date];
     } else {
-      const m = month || new Date().getMonth() + 1;
-      const y = year  || new Date().getFullYear();
+      const m = month || nowWIBParts().getUTCMonth() + 1;
+      const y = year  || nowWIBParts().getUTCFullYear();
       dateFilter = 'AND MONTH(ot.date) = ? AND YEAR(ot.date) = ?';
       params = [m, y];
     }

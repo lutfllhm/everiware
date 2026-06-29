@@ -1,5 +1,5 @@
 const { pool } = require('../config/database');
-const { generateId, getWorkingDays } = require('../utils/helpers');
+const { generateId, getWorkingDays, nowWIBParts } = require('../utils/helpers');
 const { sendLeaveNotification } = require('../utils/email');
 const { sendPushNotification } = require('../utils/fcm');
 const { auditLog } = require('../utils/auditLog');
@@ -498,7 +498,7 @@ const getTeamCalendar = async (req, res) => {
     );
 
     // Karyawan yang belum absen hari ini (hari kerja)
-    const dayOfWeek = new Date().getDay();
+    const dayOfWeek = nowWIBParts().getUTCDay();
     let notYetCheckedIn = [];
     if (dayOfWeek !== 0 && dayOfWeek !== 6) {
       const [allEmp] = await pool.query(

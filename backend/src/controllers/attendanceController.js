@@ -1,16 +1,19 @@
 const { pool } = require('../config/database');
-const { generateId, calculateDistance } = require('../utils/helpers');
+const { generateId, calculateDistance, nowWIBParts } = require('../utils/helpers');
 const { auditLog } = require('../utils/auditLog');
 const { verifyFace } = require('../utils/faceVerification');
 
-// Helper: waktu sekarang (server berjalan di timezone lokal/WIB)
+// Helper: waktu sekarang untuk DISIMPAN ke kolom DATETIME (check_in/check_out).
+// Harus tetap instant UTC asli — koneksi mysql2 (lihat config/database.js) sudah
+// diset `timezone: '+07:00'` dan akan mengonversinya ke WIB sendiri saat serialisasi.
+// JANGAN geser manual di sini, atau nilai yang tersimpan akan dobel +7 jam.
 const nowWIB = () => new Date();
 
 const todayWIB = () => {
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(2, '0');
-  const d = String(now.getDate()).padStart(2, '0');
+  const now = nowWIBParts();
+  const y = now.getUTCFullYear();
+  const m = String(now.getUTCMonth() + 1).padStart(2, '0');
+  const d = String(now.getUTCDate()).padStart(2, '0');
   return `${y}-${m}-${d}`;
 };
 
@@ -22,7 +25,7 @@ const checkIn = async (req, res) => {
     const today = todayWIB();
 
     // Cek apakah hari ini Sabtu dan apakah Sabtu masuk kerja
-    const dayOfWeek = new Date().getDay(); // 6 = Sabtu
+    const dayOfWeek = nowWIBParts().getUTCDay(); // 6 = Sabtu
     const [satSettings] = await pool.query(
       "SELECT setting_key, setting_value FROM app_settings WHERE setting_key IN ('saturday_work_enabled')"
     );
@@ -59,8 +62,8 @@ const checkIn = async (req, res) => {
         "SELECT setting_value FROM app_settings WHERE setting_key = 'late_permission_max_time'"
       );
       const maxTime = setting[0]?.setting_value || '11:00';
-      const now = nowWIB();
-      const nowHHMM = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+      const nowParts = nowWIBParts();
+      const nowHHMM = `${String(nowParts.getUTCHours()).padStart(2, '0')}:${String(nowParts.getUTCMinutes()).padStart(2, '0')}`;
       if (nowHHMM > maxTime) {
         return res.status(400).json({
           success: false,
@@ -163,7 +166,8 @@ const checkIn = async (req, res) => {
 
     const [startH, startM] = workStart.split(':').map(Number);
     const workStartMinutes = startH * 60 + startM + tolerance;
-    const nowMinutes = now.getHours() * 60 + now.getMinutes();
+    const nowParts = nowWIBParts();
+    const nowMinutes = nowParts.getUTCHours() * 60 + nowParts.getUTCMinutes();
 
     // Jika memiliki non-blocking permit, set status 'present' walaupun terlambat
     let status;
@@ -247,8 +251,8 @@ const checkOut = async (req, res) => {
         "SELECT setting_value FROM app_settings WHERE setting_key = 'early_leave_min_time'"
       );
       const minTime = setting[0]?.setting_value || '13:00';
-      const now = nowWIB();
-      const nowHHMM = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+      const nowParts = nowWIBParts();
+      const nowHHMM = `${String(nowParts.getUTCHours()).padStart(2, '0')}:${String(nowParts.getUTCMinutes()).padStart(2, '0')}`;
       if (nowHHMM < minTime) {
         return res.status(400).json({
           success: false,
@@ -393,7 +397,7 @@ const getTodayAttendance = async (req, res) => {
     const ps = Object.fromEntries(permissionSettings.map(r => [r.setting_key, r.setting_value]));
 
     // Kirim info jam kerja hari ini (termasuk Sabtu)
-    const dayOfWeek = new Date().getDay();
+    const dayOfWeek = nowWIBParts().getUTCDay();
     const [workSettings] = await pool.query(
       "SELECT setting_key, setting_value FROM app_settings WHERE setting_key IN ('work_start_time','work_end_time','saturday_work_enabled','saturday_end_time')"
     );
@@ -430,8 +434,8 @@ const getTodayAttendance = async (req, res) => {
 const getMyAttendance = async (req, res) => {
   try {
     const { month, year } = req.query;
-    const m = month || new Date().getMonth() + 1;
-    const y = year || new Date().getFullYear();
+    const m = month || nowWIBParts().getUTCMonth() + 1;
+    const y = year || nowWIBParts().getUTCFullYear();
 
     const [rows] = await pool.query(
       `SELECT a.*, l.name as location_name FROM attendances a 
@@ -450,8 +454,8 @@ const getMyAttendance = async (req, res) => {
 const getAllAttendances = async (req, res) => {
   try {
     const { month, year, userId, page = 1, limit = 20 } = req.query;
-    const m = month || new Date().getMonth() + 1;
-    const y = year || new Date().getFullYear();
+    const m = month || nowWIBParts().getUTCMonth() + 1;
+    const y = year || nowWIBParts().getUTCFullYear();
     const offset = (page - 1) * limit;
 
     let query = `SELECT a.*, u.name as user_name, u.employee_id, u.department, u.position, u.avatar as user_avatar, l.name as location_name 
@@ -489,8 +493,8 @@ const getAttendanceReport = async (req, res) => {
       params = [start_date, end_date, start_date, end_date];
       periodLabel = `${start_date} s/d ${end_date}`;
     } else {
-      const m = parseInt(month) || new Date().getMonth() + 1;
-      const y = parseInt(year)  || new Date().getFullYear();
+      const m = parseInt(month) || nowWIBParts().getUTCMonth() + 1;
+      const y = parseInt(year)  || nowWIBParts().getUTCFullYear();
       dateFilter = 'AND MONTH(a.date) = ? AND YEAR(a.date) = ?';
       params = [m, y, m, y];
       periodLabel = `${m}/${y}`;

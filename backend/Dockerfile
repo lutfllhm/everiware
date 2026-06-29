@@ -17,6 +17,9 @@ FROM node:20-alpine
 
 WORKDIR /app
 
+# tzdata required for the TZ env var below to actually take effect on Alpine
+RUN apk add --no-cache tzdata
+
 # Copy production dependencies from builder stage
 COPY --from=builder /app/node_modules ./node_modules
 
@@ -26,6 +29,7 @@ COPY . .
 # Set environment defaults
 ENV NODE_ENV=production
 ENV PORT=5005
+ENV TZ=Asia/Jakarta
 
 # Expose backend port
 EXPOSE 5005
