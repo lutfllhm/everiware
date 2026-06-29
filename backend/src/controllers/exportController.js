@@ -160,7 +160,7 @@ const exportAttendancePDF = async (req, res) => {
     let headerY = doc.y;
     doc.fontSize(9).font('Helvetica-Bold');
     headers.forEach((h, i) => {
-      doc.text(h, x, headerY, { width: cols[i], align: i > 2 ? 'center' : 'left' });
+      doc.text(h, x, headerY, { width: cols[i], align: i > 2 ? 'center' : 'left', lineBreak: false });
       x += cols[i];
     });
     doc.y = headerY;
@@ -179,7 +179,7 @@ const exportAttendancePDF = async (req, res) => {
       x = 40;
       const vals = [r.name, r.employee_id||'-', r.department||'-', r.hadir, r.terlambat, r.tidak_hadir, r.cuti, r.sakit];
       vals.forEach((v, i) => {
-        doc.fillColor('#1E293B').text(String(v), x, rowY, { width: cols[i], align: i > 2 ? 'center' : 'left' });
+        doc.fillColor('#1E293B').text(String(v), x, rowY, { width: cols[i], align: i > 2 ? 'center' : 'left', lineBreak: false });
         x += cols[i];
       });
       doc.y = rowY;
