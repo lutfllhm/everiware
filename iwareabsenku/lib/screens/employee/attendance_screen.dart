@@ -4,6 +4,7 @@ import 'dart:io';
 import 'dart:math';
 import 'dart:ui' as ui;
 import 'package:image/image.dart' as img;
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:camera/camera.dart';
@@ -1667,10 +1668,12 @@ class _AttendanceSuccessScreenState extends State<AttendanceSuccessScreen>
                   child: widget.userAvatar != null && widget.userAvatar!.isNotEmpty
                       ? ClipRRect(
                           borderRadius: BorderRadius.circular(14),
-                          child: Image.network(
-                            '${AppConstants.uploadsUrl}/avatar/${widget.userAvatar}',
+                          child: CachedNetworkImage(
+                            imageUrl: '${AppConstants.uploadsUrl}/avatar/${widget.userAvatar}',
                             fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => Center(
+                            memCacheWidth: 96,
+                            memCacheHeight: 96,
+                            errorWidget: (_, __, ___) => Center(
                               child: Text(
                                 _getInitials(widget.userName),
                                 style: const TextStyle(

@@ -958,7 +958,7 @@ class _UnifiedFormTabState extends State<_UnifiedFormTab> {
               Stack(children: [
                 ClipRRect(
                   borderRadius: BorderRadius.circular(12),
-                  child: Image.file(_attachment!, height: 160, width: double.infinity, fit: BoxFit.cover),
+                  child: Image.file(_attachment!, height: 160, width: double.infinity, fit: BoxFit.cover, cacheHeight: 320),
                 ),
                 Positioned(top: 8, right: 8, child: GestureDetector(
                   onTap: () => setState(() => _attachment = null),

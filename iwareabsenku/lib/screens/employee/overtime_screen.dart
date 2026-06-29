@@ -1067,6 +1067,7 @@ class _FormTabState extends State<_FormTab> {
                       width: double.infinity,
                       height: 180,
                       fit: BoxFit.cover,
+                      cacheHeight: 360,
                     ),
                   ),
                   Positioned(

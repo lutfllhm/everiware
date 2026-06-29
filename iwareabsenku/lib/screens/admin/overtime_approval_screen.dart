@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -101,14 +102,11 @@ class _OvertimeApprovalScreenState extends State<OvertimeApprovalScreen> {
               maxScale: 4.0,
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(12),
-                child: Image.network(
-                  url,
+                child: CachedNetworkImage(
+                  imageUrl: url,
                   fit: BoxFit.contain,
-                  loadingBuilder: (_, child, progress) {
-                    if (progress == null) return child;
-                    return const Center(child: CircularProgressIndicator(color: Colors.white));
-                  },
-                  errorBuilder: (_, __, ___) => Container(
+                  placeholder: (_, __) => const Center(child: CircularProgressIndicator(color: Colors.white)),
+                  errorWidget: (_, __, ___) => Container(
                     color: Colors.white,
                     padding: const EdgeInsets.all(32),
                     child: const Column(
@@ -288,10 +286,12 @@ class _OvertimeApprovalScreenState extends State<OvertimeApprovalScreen> {
                                                       border: Border.all(color: AppColors.border),
                                                     ),
                                                     clipBehavior: Clip.antiAlias,
-                                                    child: Image.network(
-                                                      attachmentUrl,
+                                                    child: CachedNetworkImage(
+                                                      imageUrl: attachmentUrl,
                                                       fit: BoxFit.cover,
-                                                      errorBuilder: (_, __, ___) => const Center(
+                                                      memCacheWidth: 320,
+                                                      memCacheHeight: 240,
+                                                      errorWidget: (_, __, ___) => const Center(
                                                         child: Icon(Icons.broken_image_rounded, color: AppColors.textMuted),
                                                       ),
                                                     ),

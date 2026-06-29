@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import '../utils/app_theme.dart';
 
@@ -29,12 +30,13 @@ class ZoomableNetworkImage extends StatelessWidget {
           borderRadius: borderRadius ?? BorderRadius.circular(12),
           child: Stack(
             children: [
-              Image.network(
-                url,
+              CachedNetworkImage(
+                imageUrl: url,
                 height: height,
                 width: double.infinity,
                 fit: fit,
-                errorBuilder: (_, __, ___) => Container(
+                memCacheHeight: height != null ? (height! * 2).round() : 320,
+                errorWidget: (_, __, ___) => Container(
                   height: height ?? 160,
                   color: AppColors.grey100,
                   child: const Center(
@@ -42,17 +44,14 @@ class ZoomableNetworkImage extends StatelessWidget {
                         color: AppColors.textMuted, size: 32),
                   ),
                 ),
-                loadingBuilder: (_, child, progress) {
-                  if (progress == null) return child;
-                  return Container(
-                    height: height ?? 160,
-                    color: AppColors.grey100,
-                    child: const Center(
-                      child: CircularProgressIndicator(
-                          color: AppColors.primary, strokeWidth: 2),
-                    ),
-                  );
-                },
+                placeholder: (_, __) => Container(
+                  height: height ?? 160,
+                  color: AppColors.grey100,
+                  child: const Center(
+                    child: CircularProgressIndicator(
+                        color: AppColors.primary, strokeWidth: 2),
+                  ),
+                ),
               ),
               // Zoom hint overlay
               Positioned(
@@ -123,10 +122,10 @@ class _ImageLightboxState extends State<_ImageLightbox> {
                   transformationController: _ctrl,
                   minScale: 0.5,
                   maxScale: 4.0,
-                  child: Image.network(
-                    widget.url,
+                  child: CachedNetworkImage(
+                    imageUrl: widget.url,
                     fit: BoxFit.contain,
-                    errorBuilder: (_, __, ___) => const Icon(
+                    errorWidget: (_, __, ___) => const Icon(
                         Icons.broken_image_outlined,
                         color: Colors.white54, size: 64),
                   ),
