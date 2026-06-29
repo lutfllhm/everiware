@@ -83,6 +83,7 @@ export default function ReportsAdmin() {
       const urlMap = {
         'att-excel':     `/export/attendance/excel?${q}`,
         'att-pdf':       `/export/attendance/pdf?${q}`,
+        'att-detail-pdf': `/export/attendance/detail-pdf?${q}`,
         'leave-excel':   `/export/leave/excel?${q}`,
         'monthly-excel': `/export/monthly-recap/excel?${q}`,
       };
@@ -238,6 +239,11 @@ export default function ReportsAdmin() {
                 className="btn-secondary py-2 flex items-center gap-1.5 text-sm disabled:opacity-50">
                 <FileText size={14} className="text-red-500" />
                 {exporting === 'att-pdf' ? 'Exporting...' : 'PDF'}
+              </button>
+              <button onClick={() => handleExport('att-detail-pdf')} disabled={!!exporting || !rangeValid}
+                className="btn-secondary py-2 flex items-center gap-1.5 text-sm disabled:opacity-50">
+                <FileText size={14} className="text-orange-500" />
+                {exporting === 'att-detail-pdf' ? 'Exporting...' : 'PDF Detail Jam'}
               </button>
               <button onClick={() => handleExport('monthly-excel')} disabled={!!exporting || !rangeValid}
                 className="btn-secondary py-2 flex items-center gap-1.5 text-sm disabled:opacity-50">

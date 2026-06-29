@@ -149,9 +149,9 @@ const exportAttendancePDF = async (req, res) => {
     // Header
     doc.fontSize(16).font('Helvetica-Bold').text(companyName, { align: 'center' });
     doc.fontSize(12).font('Helvetica').text(`Rekap Absensi ${label}`, { align: 'center' });
-    doc.moveDown(0.5);
+    doc.y += 10;
     doc.moveTo(40, doc.y).lineTo(doc.page.width - 40, doc.y).stroke();
-    doc.moveDown(0.5);
+    doc.y += 10;
 
     // Table header
     const cols = [180, 80, 110, 55, 65, 75, 50, 50];
@@ -163,18 +163,18 @@ const exportAttendancePDF = async (req, res) => {
       doc.text(h, x, headerY, { width: cols[i], align: i > 2 ? 'center' : 'left', lineBreak: false });
       x += cols[i];
     });
-    doc.y = headerY;
-    doc.moveDown(0.3);
+    doc.y = headerY + 14;
     doc.moveTo(40, doc.y).lineTo(doc.page.width - 40, doc.y).stroke();
-    doc.moveDown(0.2);
+    doc.y += 6;
 
     // Rows
+    const rowHeight = 16;
     doc.font('Helvetica').fontSize(8);
     report.forEach((r, idx) => {
       if (doc.y > doc.page.height - 80) { doc.addPage(); }
       const rowY = doc.y;
       if (idx % 2 === 0) {
-        doc.rect(40, rowY - 2, doc.page.width - 80, 14).fill('#F8FAFC').stroke('#F8FAFC');
+        doc.rect(40, rowY - 2, doc.page.width - 80, rowHeight).fill('#F8FAFC').stroke('#F8FAFC');
       }
       x = 40;
       const vals = [r.name, r.employee_id||'-', r.department||'-', r.hadir, r.terlambat, r.tidak_hadir, r.cuti, r.sakit];
@@ -182,8 +182,7 @@ const exportAttendancePDF = async (req, res) => {
         doc.fillColor('#1E293B').text(String(v), x, rowY, { width: cols[i], align: i > 2 ? 'center' : 'left', lineBreak: false });
         x += cols[i];
       });
-      doc.y = rowY;
-      doc.moveDown(0.4);
+      doc.y = rowY + rowHeight;
     });
 
     doc.moveDown(1);
@@ -192,6 +191,106 @@ const exportAttendancePDF = async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: 'Gagal export PDF' });
+  }
+};
+
+// ── EXPORT DETAIL ABSENSI PDF (per nama, per tanggal, jam masuk/pulang) ───────
+const exportAttendanceDetailPDF = async (req, res) => {
+  try {
+    const { filter, params, label, fileTag } = buildDateFilter(req.query);
+
+    const [rows] = await pool.query(
+      `SELECT u.name, u.employee_id, u.department, a.date, a.check_in, a.check_out, a.status, l.name as lokasi
+       FROM users u
+       LEFT JOIN attendances a ON u.id = a.user_id ${filter}
+       WHERE u.role='employee' AND u.is_active=TRUE
+       ORDER BY u.name, a.date`,
+      params
+    );
+
+    const [settings] = await pool.query("SELECT setting_value FROM app_settings WHERE setting_key='company_name'");
+    const companyName = settings[0]?.setting_value || 'iWare Absenku';
+
+    const byUser = {};
+    rows.forEach(r => {
+      if (!byUser[r.name]) byUser[r.name] = { info: r, records: [] };
+      if (r.date) byUser[r.name].records.push(r);
+    });
+
+    const doc = new PDFDocument({ margin: 40, size: 'A4' });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=detail_absensi_${fileTag}.pdf`);
+    doc.pipe(res);
+
+    const cols = [90, 110, 90, 90, 90];
+    const headers = ['Tanggal', 'Jam Masuk', 'Jam Pulang', 'Status', 'Lokasi'];
+    const tableLeft = 40;
+    const tableWidth = cols.reduce((a, b) => a + b, 0);
+    const rowHeight = 16;
+
+    const drawTableHeader = () => {
+      let x = tableLeft;
+      const y = doc.y;
+      doc.fontSize(9).font('Helvetica-Bold');
+      headers.forEach((h, i) => {
+        doc.fillColor('#1E293B').text(h, x, y, { width: cols[i], align: i === 0 ? 'left' : 'center', lineBreak: false });
+        x += cols[i];
+      });
+      doc.y = y + 14;
+      doc.moveTo(tableLeft, doc.y).lineTo(tableLeft + tableWidth, doc.y).stroke();
+      doc.y += 6;
+    };
+
+    Object.entries(byUser).forEach(([name, { info, records }], userIdx) => {
+      if (userIdx > 0) doc.addPage();
+
+      doc.fontSize(16).font('Helvetica-Bold').fillColor('#000000').text(companyName, { align: 'center' });
+      doc.fontSize(12).font('Helvetica').text(`Detail Absensi ${label}`, { align: 'center' });
+      doc.y += 10;
+      doc.moveTo(40, doc.y).lineTo(doc.page.width - 40, doc.y).stroke();
+      doc.y += 10;
+
+      doc.fontSize(11).font('Helvetica-Bold').text(name, 40, doc.y);
+      doc.fontSize(9).font('Helvetica').fillColor('#475569')
+        .text(`ID: ${info.employee_id || '-'}    Departemen: ${info.department || '-'}`, 40, doc.y + 14);
+      doc.y += 32;
+
+      drawTableHeader();
+
+      doc.font('Helvetica').fontSize(8);
+      records.forEach((r, idx) => {
+        if (doc.y > doc.page.height - 80) {
+          doc.addPage();
+          doc.y = 40;
+          drawTableHeader();
+          doc.font('Helvetica').fontSize(8);
+        }
+        const rowY = doc.y;
+        if (idx % 2 === 0) {
+          doc.rect(tableLeft, rowY - 2, tableWidth, rowHeight).fill('#F8FAFC').stroke('#F8FAFC');
+        }
+        let x = tableLeft;
+        const vals = [fmtDate(r.date), fmtTime(r.check_in), fmtTime(r.check_out), statusLabel(r.status), r.lokasi || '-'];
+        vals.forEach((v, i) => {
+          doc.fillColor('#1E293B').text(String(v), x, rowY, { width: cols[i], align: i === 0 ? 'left' : 'center', lineBreak: false });
+          x += cols[i];
+        });
+        doc.y = rowY + rowHeight;
+      });
+
+      if (records.length === 0) {
+        doc.fontSize(9).fillColor('#94A3B8').text('Tidak ada data absensi pada periode ini.', 40, doc.y);
+        doc.y += rowHeight;
+      }
+
+      doc.moveDown(1);
+      doc.fontSize(8).fillColor('#94A3B8').text(`Dicetak: ${new Date().toLocaleString('id-ID')}`, { align: 'right' });
+    });
+
+    doc.end();
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Gagal export detail PDF' });
   }
 };
 
@@ -336,4 +435,4 @@ const exportMonthlyRecapExcel = async (req, res) => {
   }
 };
 
-module.exports = { exportAttendanceExcel, exportAttendancePDF, exportLeaveExcel, exportMonthlyRecapExcel };
+module.exports = { exportAttendanceExcel, exportAttendancePDF, exportAttendanceDetailPDF, exportLeaveExcel, exportMonthlyRecapExcel };
