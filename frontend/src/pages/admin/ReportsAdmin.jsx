@@ -87,7 +87,7 @@ export default function ReportsAdmin() {
         'monthly-excel': `/export/monthly-recap/excel?${q}`,
       };
       const token = JSON.parse(localStorage.getItem('iware-auth') || '{}')?.token;
-      const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://192.168.120.223:5005/api'}${urlMap[type]}`, {
+      const res = await fetch(`/api${urlMap[type]}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (!res.ok) throw new Error('Export gagal');
