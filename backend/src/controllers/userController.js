@@ -184,6 +184,20 @@ const updateUser = async (req, res) => {
     const { id } = req.params;
     const { name, phone, role, department, position, employee_id, join_date, is_active, new_password, manager_id, location_id } = req.body;
 
+    // Validasi location_id & manager_id agar tidak menabrak foreign key constraint
+    if (location_id) {
+      const [loc] = await pool.query('SELECT id FROM attendance_locations WHERE id = ?', [location_id]);
+      if (!loc.length) {
+        return res.status(400).json({ success: false, message: 'Lokasi penempatan tidak ditemukan. Silakan muat ulang halaman dan coba lagi.' });
+      }
+    }
+    if (manager_id) {
+      const [mgr] = await pool.query('SELECT id FROM users WHERE id = ?', [manager_id]);
+      if (!mgr.length) {
+        return res.status(400).json({ success: false, message: 'Atasan/manager tidak ditemukan. Silakan muat ulang halaman dan coba lagi.' });
+      }
+    }
+
     // Jika ada new_password, hash dan update sekalian
     if (new_password) {
       const hashed = await bcrypt.hash(new_password, 10);
@@ -201,6 +215,9 @@ const updateUser = async (req, res) => {
     res.json({ success: true, message: 'Data user berhasil diperbarui' });
   } catch (err) {
     console.error(err);
+    if (err.code === 'ER_NO_REFERENCED_ROW_2' || err.code === 'ER_NO_REFERENCED_ROW') {
+      return res.status(400).json({ success: false, message: 'Data lokasi/atasan yang dipilih tidak valid. Silakan muat ulang halaman dan coba lagi.' });
+    }
     res.status(500).json({ success: false, message: 'Terjadi kesalahan server' });
   }
 };

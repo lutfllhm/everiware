@@ -130,6 +130,9 @@ export default function EmployeesAdmin() {
     setAvatarFile(null);
     setAvatarPreview(null);
     setShowModal(true);
+    // Refresh lokasi & manager agar tidak ada opsi usang yang sudah dihapus di database
+    fetchLocations();
+    fetchManagers();
   };
 
   const handleAvatarChange = (e) => {

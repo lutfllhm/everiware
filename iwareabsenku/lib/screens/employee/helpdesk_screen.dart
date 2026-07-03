@@ -313,7 +313,7 @@ class _HelpdeskScreenState extends State<HelpdeskScreen> {
           ),
           SizedBox(height: 2),
           Text(
-            'Jl. Rajawali No. 88, Jakarta Pusat, Indonesia',
+            'Iware Official Store, Jl. Babatan Pantai No.14, RT.003/RW.01, Dukuh Sutorejo, Kec. Mulyorejo, Surabaya, Jawa Timur 60113, Indonesia',
             style: TextStyle(fontSize: 12, color: AppColors.textMuted, height: 1.4),
           ),
           SizedBox(height: 12),
@@ -323,7 +323,7 @@ class _HelpdeskScreenState extends State<HelpdeskScreen> {
           ),
           SizedBox(height: 2),
           Text(
-            'Senin - Sabtu (08:00 - 17:00 WIB)\nHari Minggu & Libur Nasional tutup.',
+            'Senin - Jum\'at (08:00 - 17:00 WIB)\nSabtu (08:00 - 15:00 WIB)\nHari Minggu & Tanggal Merah libur.',
             style: TextStyle(fontSize: 12, color: AppColors.textMuted, height: 1.4),
           ),
         ],

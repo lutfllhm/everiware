@@ -1,4 +1,4 @@
-package com.iware.iware_presence_app
+package com.rbm.everiware
 
 import io.flutter.embedding.android.FlutterFragmentActivity
 
