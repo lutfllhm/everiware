@@ -85,9 +85,9 @@ const createUser = async (req, res) => {
 
     // Buat user dengan password NULL dan is_verified FALSE
     await pool.query(
-      `INSERT INTO users (id, name, email, password, phone, role, department, position, employee_id, join_date, avatar, is_verified, otp_code, otp_expires, location_id) 
+      `INSERT INTO users (id, name, email, password, phone, role, department, position, employee_id, join_date, avatar, is_verified, otp_code, otp_expires, location_id)
        VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, FALSE, ?, ?, ?)`,
-      [id, name, email, phone, role || 'employee', department, position, employee_id, join_date, avatar, activationToken, tokenExpires, location_id || null]
+      [id, name, email, phone, role || 'employee', department, position, employee_id || null, join_date || null, avatar, activationToken, tokenExpires, location_id || null]
     );
 
     // Kirim email undangan jika diminta
@@ -119,6 +119,9 @@ const createUser = async (req, res) => {
     });
   } catch (err) {
     console.error(err);
+    if (err.code === 'ER_DUP_ENTRY' && err.sqlMessage?.includes('employee_id')) {
+      return res.status(400).json({ success: false, message: 'ID Karyawan sudah digunakan oleh karyawan lain. Silakan gunakan ID yang berbeda.' });
+    }
     res.status(500).json({ success: false, message: 'Terjadi kesalahan server' });
   }
 };
@@ -183,6 +186,7 @@ const updateUser = async (req, res) => {
   try {
     const { id } = req.params;
     const { name, phone, role, department, position, employee_id, join_date, is_active, new_password, manager_id, location_id } = req.body;
+    const employeeIdValue = employee_id || null;
 
     // Validasi location_id & manager_id agar tidak menabrak foreign key constraint
     if (location_id) {
@@ -203,12 +207,12 @@ const updateUser = async (req, res) => {
       const hashed = await bcrypt.hash(new_password, 10);
       await pool.query(
         'UPDATE users SET name = ?, phone = ?, role = ?, department = ?, position = ?, employee_id = ?, join_date = ?, is_active = ?, password = ?, manager_id = ?, location_id = ? WHERE id = ?',
-        [name, phone, role, department, position, employee_id, join_date || null, is_active !== undefined ? is_active : true, hashed, manager_id || null, location_id || null, id]
+        [name, phone, role, department, position, employeeIdValue, join_date || null, is_active !== undefined ? is_active : true, hashed, manager_id || null, location_id || null, id]
       );
     } else {
       await pool.query(
         'UPDATE users SET name = ?, phone = ?, role = ?, department = ?, position = ?, employee_id = ?, join_date = ?, is_active = ?, manager_id = ?, location_id = ? WHERE id = ?',
-        [name, phone, role, department, position, employee_id, join_date || null, is_active !== undefined ? is_active : true, manager_id || null, location_id || null, id]
+        [name, phone, role, department, position, employeeIdValue, join_date || null, is_active !== undefined ? is_active : true, manager_id || null, location_id || null, id]
       );
     }
 
@@ -217,6 +221,9 @@ const updateUser = async (req, res) => {
     console.error(err);
     if (err.code === 'ER_NO_REFERENCED_ROW_2' || err.code === 'ER_NO_REFERENCED_ROW') {
       return res.status(400).json({ success: false, message: 'Data lokasi/atasan yang dipilih tidak valid. Silakan muat ulang halaman dan coba lagi.' });
+    }
+    if (err.code === 'ER_DUP_ENTRY' && err.sqlMessage?.includes('employee_id')) {
+      return res.status(400).json({ success: false, message: 'ID Karyawan sudah digunakan oleh karyawan lain. Silakan gunakan ID yang berbeda.' });
     }
     res.status(500).json({ success: false, message: 'Terjadi kesalahan server' });
   }
