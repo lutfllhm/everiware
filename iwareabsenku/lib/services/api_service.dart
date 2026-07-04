@@ -94,13 +94,6 @@ class ApiService {
     } catch (e) { return _handleError(e); }
   }
 
-  Future<Map<String, dynamic>> register(String name, String email, String password, String phone) async {
-    try {
-      final res = await _dio.post('/auth/register', data: {'name': name, 'email': email, 'password': password, 'phone': phone});
-      return _handleResponse(res);
-    } catch (e) { return _handleError(e); }
-  }
-
   Future<Map<String, dynamic>> verifyOTP(String userId, String otp) async {
     try {
       final res = await _dio.post('/auth/verify-otp', data: {'userId': userId, 'otp': otp});
@@ -118,13 +111,6 @@ class ApiService {
   Future<Map<String, dynamic>> getMe() async {
     try {
       final res = await _dio.get('/auth/me');
-      return _handleResponse(res);
-    } catch (e) { return _handleError(e); }
-  }
-
-  Future<Map<String, dynamic>> updatePhone(String userId, String phone) async {
-    try {
-      final res = await _dio.post('/auth/update-phone', data: {'userId': userId, 'phone': phone});
       return _handleResponse(res);
     } catch (e) { return _handleError(e); }
   }
@@ -281,13 +267,6 @@ class ApiService {
         data: formData,
         options: Options(headers: {'Content-Type': 'multipart/form-data'}),
       );
-      return _handleResponse(res);
-    } catch (e) { return _handleError(e); }
-  }
-
-  Future<Map<String, dynamic>> googleAuth(String idToken) async {
-    try {
-      final res = await _dio.post('/auth/google', data: {'token': idToken});
       return _handleResponse(res);
     } catch (e) { return _handleError(e); }
   }

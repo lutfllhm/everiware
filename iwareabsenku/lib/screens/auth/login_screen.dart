@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:google_sign_in/google_sign_in.dart';
 import '../../services/auth_provider.dart';
 import '../../services/biometric_service.dart';
 import '../../utils/app_theme.dart';
-import 'register_screen.dart';
 import 'otp_screen.dart';
 import 'forgot_password_screen.dart';
 import 'welcome_screen.dart';
@@ -23,7 +21,6 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
   bool _obscure = true;
-  bool _googleLoading = false;
   bool _biometricAvailable = false;
   bool _biometricEnabled = false;
 
@@ -134,125 +131,6 @@ class _LoginScreenState extends State<LoginScreen> {
           content: Text('Login biometrik berhasil diaktifkan'),
           backgroundColor: Colors.green,
         ));
-      }
-    }
-  }
-
-  Future<void> _loginWithGoogle() async {
-    HapticFeedback.lightImpact();
-    setState(() => _googleLoading = true);
-    try {
-      final googleSignIn = GoogleSignIn(scopes: ['email', 'profile']);
-      await googleSignIn.signOut();
-      final account = await googleSignIn.signIn();
-      if (account == null) {
-        if (mounted) setState(() => _googleLoading = false);
-        return;
-      }
-      final authService = await account.authentication;
-      final idToken = authService.idToken;
-      if (idToken == null) {
-        if (mounted) _showError('Gagal mendapatkan token Google');
-        if (mounted) setState(() => _googleLoading = false);
-        return;
-      }
-      if (!mounted) return;
-      final authProvider = context.read<AuthProvider>();
-      final data = await authProvider.googleLogin(idToken);
-      if (!mounted) return;
-      if (data['success'] == true) {
-        if (data['needPhone'] != true) {
-          Navigator.pushReplacementNamed(context, authProvider.isAdmin ? '/admin' : '/home');
-        } else {
-          _promptPhoneNumber(data['userId']);
-        }
-      } else {
-        _showError(data['message'] ?? 'Login Google gagal');
-      }
-    } catch (_) {
-      if (!mounted) return;
-      _showError('Login Google gagal');
-    } finally {
-      if (mounted) setState(() => _googleLoading = false);
-    }
-  }
-
-  Future<void> _promptPhoneNumber(String userId) async {
-    final phoneCtrl = TextEditingController();
-    final formKey = GlobalKey<FormState>();
-    final authProvider = context.read<AuthProvider>();
-
-    final ok = await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Lengkapi Profil', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
-        content: Form(
-          key: formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'Silakan masukkan nomor WhatsApp Anda untuk melanjutkan registrasi.',
-                style: TextStyle(fontSize: 13, color: AppColors.textMuted),
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: phoneCtrl,
-                keyboardType: TextInputType.phone,
-                decoration: InputDecoration(
-                  labelText: 'Nomor WhatsApp',
-                  prefixText: '+62 ',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-                validator: (val) {
-                  if (val == null || val.trim().isEmpty) return 'Nomor WhatsApp wajib diisi';
-                  if (val.trim().length < 8) return 'Nomor WhatsApp tidak valid';
-                  return null;
-                },
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Batal', style: TextStyle(color: Colors.grey)),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              if (formKey.currentState!.validate()) {
-                Navigator.pop(ctx, true);
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF6B0E11),
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            ),
-            child: const Text('Simpan'),
-          ),
-        ],
-      ),
-    );
-
-    if (ok == true && mounted) {
-      String fullPhone = phoneCtrl.text.trim();
-      if (!fullPhone.startsWith('62') && !fullPhone.startsWith('+62') && !fullPhone.startsWith('0')) {
-        fullPhone = '0$fullPhone';
-      }
-      try {
-        final res = await authProvider.updatePhone(userId, fullPhone);
-        if (mounted) {
-          if (res['success'] == true) {
-            Navigator.pushReplacementNamed(context, authProvider.isAdmin ? '/admin' : '/home');
-          } else {
-            _showError(res['message'] ?? 'Gagal menyimpan nomor WhatsApp');
-          }
-        }
-      } catch (e) {
-        _showError('Gagal menghubungkan ke server.');
       }
     }
   }
@@ -563,20 +441,18 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
 
-                      // Biometric & Google Login Section
-                      const SizedBox(height: 20),
-                      Row(children: [
-                        Expanded(child: Divider(color: Colors.white.withOpacity(0.15))),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                          child: Text('atau', style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 12)),
-                        ),
-                        Expanded(child: Divider(color: Colors.white.withOpacity(0.15))),
-                      ]),
-                      const SizedBox(height: 20),
-                      
-                      // Biometric button (if available)
+                      // Biometric Login Section
                       if (_biometricAvailable && _biometricEnabled) ...[
+                        const SizedBox(height: 20),
+                        Row(children: [
+                          Expanded(child: Divider(color: Colors.white.withOpacity(0.15))),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            child: Text('atau', style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 12)),
+                          ),
+                          Expanded(child: Divider(color: Colors.white.withOpacity(0.15))),
+                        ]),
+                        const SizedBox(height: 20),
                         GestureDetector(
                           onTap: _loginWithBiometric,
                           child: Container(
@@ -598,63 +474,9 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                           ),
                         ),
-                        const SizedBox(height: 12),
                       ],
-                      
-                      // Google button
-                      GestureDetector(
-                        onTap: _googleLoading ? null : _loginWithGoogle,
-                        child: Container(
-                          width: double.infinity,
-                          height: 48,
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.06),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: Colors.white.withOpacity(0.12), width: 1),
-                          ),
-                          child: _googleLoading
-                              ? const Center(child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)))
-                              : Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                                  Image.asset('assets/images/google_logo.png', width: 18, height: 18,
-                                      errorBuilder: (_, __, ___) => const Icon(Icons.g_mobiledata_rounded, size: 22, color: Colors.white)),
-                                  const SizedBox(width: 10),
-                                  const Text('Lanjutkan dengan Google', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.white)),
-                                ]),
-                        ),
-                      ),
-                      
-                      const SizedBox(height: 24),
 
-                      // Register Text Link
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            'Belum punya akun? ',
-                            style: TextStyle(
-                              color: Colors.white.withOpacity(0.6),
-                              fontSize: 13,
-                            ),
-                          ),
-                          GestureDetector(
-                            onTap: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const RegisterScreen(),
-                              ),
-                            ),
-                            child: const Text(
-                              'Daftar sekarang',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 13,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 24),
 
                       // Info & Kebijakan Link
                       GestureDetector(

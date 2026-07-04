@@ -3,7 +3,6 @@ const jwt = require('jsonwebtoken');
 const { pool } = require('../config/database');
 const { generateOTP, generateId } = require('../utils/helpers');
 const { sendOTPEmail, sendPasswordResetEmail } = require('../utils/email');
-const { OAuth2Client } = require('google-auth-library');
 
 // Helper: format user object konsisten untuk web & mobile
 const formatUser = (user) => ({
@@ -27,32 +26,6 @@ const formatUser = (user) => ({
 
 const generateToken = (user) =>
   jwt.sign({ id: user.id, role: user.role }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN });
-const register = async (req, res) => {
-  try {
-    const { name, email, password, phone } = req.body;
-    if (!name || !email || !password || !phone)
-      return res.status(400).json({ success: false, message: 'Semua field wajib diisi' });
-
-    const [existing] = await pool.query('SELECT id FROM users WHERE email = ?', [email]);
-    if (existing.length) return res.status(400).json({ success: false, message: 'Email sudah terdaftar' });
-
-    const hashedPassword = await bcrypt.hash(password, 10);
-    const otp = generateOTP();
-    const otpExpires = new Date(Date.now() + 10 * 60 * 1000);
-    const id = generateId();
-
-    await pool.query(
-      'INSERT INTO users (id, name, email, password, phone, otp_code, otp_expires) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [id, name, email, hashedPassword, phone, otp, otpExpires]
-    );
-
-    await sendOTPEmail(email, name, otp);
-    res.status(201).json({ success: true, message: 'Registrasi berhasil! Cek email untuk kode OTP', userId: id });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ success: false, message: 'Terjadi kesalahan server' });
-  }
-};
 
 // Verify OTP
 const verifyOTP = async (req, res) => {
@@ -114,7 +87,7 @@ const login = async (req, res) => {
     if (!rows.length) return res.status(401).json({ success: false, message: 'Email atau password salah' });
 
     const user = rows[0];
-    if (!user.password) return res.status(401).json({ success: false, message: 'Akun ini terdaftar via Google. Gunakan login Google.' });
+    if (!user.password) return res.status(401).json({ success: false, message: 'Akun ini belum memiliki password. Hubungi admin.' });
     if (!user.is_verified) return res.status(401).json({ success: false, message: 'Akun belum diverifikasi', userId: user.id, needVerify: true });
 
     const isMatch = await bcrypt.compare(password, user.password);
@@ -125,79 +98,6 @@ const login = async (req, res) => {
       success: true, message: 'Login berhasil!', token,
       user: formatUser(user)
     });
-  } catch (err) {
-    res.status(500).json({ success: false, message: 'Terjadi kesalahan server' });
-  }
-};
-
-// Google OAuth
-const googleAuth = async (req, res) => {
-  try {
-    const { token } = req.body;
-    const { OAuth2Client: GoogleOAuth2Client } = require('google-auth-library');
-    const authClient = new GoogleOAuth2Client(process.env.GOOGLE_CLIENT_ID);
-    const ticket = await authClient.verifyIdToken({ idToken: token, audience: process.env.GOOGLE_CLIENT_ID });
-    const payload = ticket.getPayload();
-    const { sub: googleId, email, name, picture } = payload;
-
-    let [rows] = await pool.query(
-      `SELECT u.*, al.name as location_name 
-       FROM users u 
-       LEFT JOIN attendance_locations al ON u.location_id = al.id 
-       WHERE u.email = ? OR u.google_id = ?`,
-      [email, googleId]
-    );
-    let user;
-
-    if (rows.length) {
-      user = rows[0];
-      await pool.query('UPDATE users SET google_id = ?, avatar = ?, is_verified = TRUE WHERE id = ?', [googleId, picture, user.id]);
-    } else {
-      const id = generateId();
-      await pool.query(
-        'INSERT INTO users (id, name, email, google_id, avatar, is_verified) VALUES (?, ?, ?, ?, ?, TRUE)',
-        [id, name, email, googleId, picture]
-      );
-      const [newUser] = await pool.query(
-        `SELECT u.*, al.name as location_name 
-         FROM users u 
-         LEFT JOIN attendance_locations al ON u.location_id = al.id 
-         WHERE u.id = ?`,
-        [id]
-      );
-      user = newUser[0];
-    }
-
-    if (!user.phone) {
-      return res.json({ success: true, needPhone: true, userId: user.id, message: 'Lengkapi nomor WhatsApp kamu' });
-    }
-
-    const jwtToken = generateToken(user);
-    res.json({
-      success: true, message: 'Login Google berhasil!', token: jwtToken,
-      user: formatUser(user)
-    });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ success: false, message: 'Gagal login dengan Google' });
-  }
-};
-
-// Update phone after Google login
-const updatePhone = async (req, res) => {
-  try {
-    const { userId, phone } = req.body;
-    await pool.query('UPDATE users SET phone = ? WHERE id = ?', [phone, userId]);
-    const [rows] = await pool.query(
-      `SELECT u.*, al.name as location_name 
-       FROM users u 
-       LEFT JOIN attendance_locations al ON u.location_id = al.id 
-       WHERE u.id = ?`,
-      [userId]
-    );
-    const user = rows[0];
-    const token = generateToken(user);
-    res.json({ success: true, message: 'Nomor WhatsApp berhasil disimpan!', token, user: formatUser(user) });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Terjadi kesalahan server' });
   }
@@ -397,4 +297,4 @@ const checkActivationToken = async (req, res) => {
   }
 };
 
-module.exports = { register, verifyOTP, resendOTP, login, googleAuth, updatePhone, getMe, forgotPassword, verifyResetOTP, resetPassword, activateAccount, checkActivationToken };
+module.exports = { verifyOTP, resendOTP, login, getMe, forgotPassword, verifyResetOTP, resetPassword, activateAccount, checkActivationToken };

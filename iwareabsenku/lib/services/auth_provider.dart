@@ -62,17 +62,6 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  Future<Map<String, dynamic>> register(String name, String email, String password, String phone) async {
-    _isLoading = true;
-    notifyListeners();
-    try {
-      return await ApiService().register(name, email, password, phone);
-    } finally {
-      _isLoading = false;
-      notifyListeners();
-    }
-  }
-
   Future<Map<String, dynamic>> verifyOTP(String userId, String otp) async {
     _isLoading = true;
     notifyListeners();
@@ -106,36 +95,6 @@ class AuthProvider extends ChangeNotifier {
     await prefs.remove(AppConstants.userKey);
     notifyListeners();
     RealtimeService().disconnect();
-  }
-
-  Future<Map<String, dynamic>> googleLogin(String idToken) async {
-    _isLoading = true;
-    notifyListeners();
-    try {
-      final data = await ApiService().googleAuth(idToken);
-      if (data['success'] == true && data['needPhone'] != true) {
-        await _saveAuth(data);
-      }
-      return data;
-    } finally {
-      _isLoading = false;
-      notifyListeners();
-    }
-  }
-
-  Future<Map<String, dynamic>> updatePhone(String userId, String phone) async {
-    _isLoading = true;
-    notifyListeners();
-    try {
-      final data = await ApiService().updatePhone(userId, phone);
-      if (data['success'] == true) {
-        await _saveAuth(data);
-      }
-      return data;
-    } finally {
-      _isLoading = false;
-      notifyListeners();
-    }
   }
 
   void updateUser(UserModel user) {

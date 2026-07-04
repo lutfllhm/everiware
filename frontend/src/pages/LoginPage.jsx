@@ -1,18 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Eye, EyeOff, Mail, Lock, Phone, User, RefreshCw } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, User, RefreshCw } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../api/axios';
 import useAuthStore from '../store/authStore';
-
-const GoogleIcon = () => (
-  <svg viewBox="0 0 24 24" className="w-4 h-4 flex-shrink-0">
-    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-  </svg>
-);
 
 const imgVariants = {
   initial: (dir) => ({ x: dir === 'left' ? '6%' : '-6%', scale: 1.1, opacity: 0, filter: 'blur(12px) brightness(0.8)' }),
@@ -42,10 +33,9 @@ export default function LoginPage() {
   const [pendingUserId, setPendingUserId] = useState(null);
   const [resetToken, setResetToken] = useState(null);
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
-  const [form, setForm] = useState({ name: '', email: '', password: '', phone: '', newPassword: '' });
+  const [form, setForm] = useState({ email: '', password: '', newPassword: '' });
 
   const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
-  const goTo = (newMode) => { setDirection(newMode === 'register' ? 'left' : 'right'); setMode(newMode); };
 
   const handleForgotPassword = async (e) => {
     e.preventDefault(); setLoading(true);
@@ -99,18 +89,6 @@ export default function LoginPage() {
     finally { setLoading(false); }
   };
 
-  const handleRegister = async (e) => {
-    e.preventDefault();
-    if (!form.phone) return toast.error('Nomor WhatsApp wajib diisi');
-    setLoading(true);
-    try {
-      const { data } = await api.post('/auth/register', form);
-      setPendingUserId(data.userId); setDirection('left'); setMode('otp');
-      toast.success('Kode verifikasi dikirim ke email kamu');
-    } catch (err) { toast.error(err.response?.data?.message || 'Registrasi gagal'); }
-    finally { setLoading(false); }
-  };
-
   const handleOtpChange = (val, idx) => {
     const n = [...otp]; n[idx] = val.slice(-1); setOtp(n);
     if (val && idx < 5) document.getElementById(`otp-${idx + 1}`)?.focus();
@@ -135,69 +113,6 @@ export default function LoginPage() {
   const handleResendOTP = async () => {
     try { await api.post('/auth/resend-otp', { userId: pendingUserId }); toast.success('Kode baru sudah dikirim'); setOtp(['','','','','','']); }
     catch { toast.error('Gagal mengirim ulang kode'); }
-  };
-
-  useEffect(() => {
-    const script = document.createElement('script');
-    script.src = 'https://accounts.google.com/gsi/client';
-    script.async = true;
-    script.defer = true;
-    document.body.appendChild(script);
-    return () => {
-      document.body.removeChild(script);
-    };
-  }, []);
-
-  const handleGoogleLogin = () => {
-    if (typeof window.google === 'undefined') {
-      toast.error('Google Sign-In sedang memuat, silakan coba lagi');
-      return;
-    }
-    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || 'your_google_client_id';
-    if (clientId === 'your_google_client_id' || !clientId) {
-      toast.error('Google Client ID belum dikonfigurasi di file .env');
-      return;
-    }
-
-    window.google.accounts.id.initialize({
-      client_id: clientId,
-      callback: async (response) => {
-        setLoading(true);
-        try {
-          const { data } = await api.post('/auth/google', { token: response.credential });
-          if (data.needPhone) {
-            setPendingUserId(data.userId);
-            setDirection('left');
-            setMode('phone');
-            toast.success(data.message);
-            return;
-          }
-          localStorage.setItem('token', data.token);
-          localStorage.setItem('iware-auth', JSON.stringify({ user: data.user, token: data.token, isAuthenticated: true }));
-          setAuth(data.user, data.token);
-          toast.success('Berhasil masuk!');
-          setTimeout(() => {
-            window.location.href = ['superadmin', 'admin', 'hrd'].includes(data.user.role) ? '/admin' : '/dashboard';
-          }, 300);
-        } catch (err) {
-          toast.error(err.response?.data?.message || 'Gagal login Google');
-        } finally {
-          setLoading(false);
-        }
-      }
-    });
-
-    window.google.accounts.id.prompt();
-  };
-
-  const handleUpdatePhone = async (e) => {
-    e.preventDefault(); setLoading(true);
-    try {
-      const { data } = await api.post('/auth/update-phone', { userId: pendingUserId, phone: form.phone });
-      localStorage.setItem('token', data.token); setAuth(data.user, data.token);
-      toast.success('Berhasil!'); window.location.href = '/dashboard';
-    } catch { toast.error('Gagal menyimpan nomor'); }
-    finally { setLoading(false); }
   };
 
   const inputCls = 'w-full h-12 rounded-2xl border border-white/10 bg-white/5 pl-11 pr-4 text-sm text-white placeholder:text-white/35 outline-none transition-all duration-200 hover:bg-white/10 hover:border-white/15 focus:bg-white/10 focus:border-[#EF5350] focus:ring-2 focus:ring-[#EF5350]/20';
@@ -303,130 +218,6 @@ export default function LoginPage() {
                 <div className="flex-1 h-[1px] bg-white/15" />
               </div>
 
-              <button
-                onClick={handleGoogleLogin}
-                className="w-full h-12 flex items-center justify-center gap-2.5 rounded-2xl border border-white/10 bg-white/5 hover:bg-white/10 active:scale-[0.98] text-sm font-semibold text-white transition-all duration-200 shadow-sm"
-              >
-                <GoogleIcon /> Lanjutkan dengan Google
-              </button>
-
-              <div className="text-center mt-6">
-                <span className="text-white/60 text-xs">Belum punya akun? </span>
-                <button
-                  type="button"
-                  onClick={() => goTo('register')}
-                  className="text-white text-xs font-bold hover:underline"
-                >
-                  Daftar sekarang
-                </button>
-              </div>
-            </motion.div>
-          )}
-
-          {mode === 'register' && (
-            <motion.div key="register" custom={direction} variants={formVariants} initial="initial" animate="animate" exit="exit">
-              <div className="mb-7 text-left">
-                <h1 className="text-white text-[22px] font-extrabold tracking-tight">Buat Akun Baru</h1>
-                <p className="text-white/50 text-xs mt-1">isi data diri kamu untuk mendaftar.</p>
-              </div>
-
-              <button
-                onClick={handleGoogleLogin}
-                className="w-full h-12 flex items-center justify-center gap-2.5 rounded-2xl border border-white/10 bg-white/5 hover:bg-white/10 active:scale-[0.98] text-sm font-semibold text-white transition-all duration-200 shadow-sm"
-              >
-                <GoogleIcon /> Daftar dengan Google
-              </button>
-
-              <div className="flex items-center gap-3 my-5">
-                <div className="flex-1 h-[1px] bg-white/15" />
-                <span className="text-white/50 text-xs">atau daftar manual</span>
-                <div className="flex-1 h-[1px] bg-white/15" />
-              </div>
-
-              <form onSubmit={handleRegister} className="space-y-4">
-                <div className="relative">
-                  <User size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/50" />
-                  <input
-                    name="name"
-                    type="text"
-                    placeholder="Nama lengkap"
-                    value={form.name}
-                    onChange={handleChange}
-                    className={inputCls}
-                    required
-                  />
-                </div>
-                <div className="relative">
-                  <Mail size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/50" />
-                  <input
-                    name="email"
-                    type="email"
-                    placeholder="Alamat email"
-                    value={form.email}
-                    onChange={handleChange}
-                    className={inputCls}
-                    required
-                  />
-                </div>
-                <div className="relative">
-                  <Phone size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/50" />
-                  <input
-                    name="phone"
-                    type="tel"
-                    placeholder="Nomor WhatsApp (08xxx)"
-                    value={form.phone}
-                    onChange={handleChange}
-                    className={inputCls}
-                    required
-                  />
-                </div>
-                <div className="relative">
-                  <Lock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/50" />
-                  <input
-                    name="password"
-                    type={showPass ? 'text' : 'password'}
-                    placeholder="Buat password (min. 6 karakter)"
-                    value={form.password}
-                    onChange={handleChange}
-                    className={`${inputCls} pr-12`}
-                    required
-                    minLength={6}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPass(!showPass)}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-white/50 hover:text-white transition-colors"
-                  >
-                    {showPass ? <EyeOff size={18} /> : <Eye size={18} />}
-                  </button>
-                </div>
-
-                <div className="flex items-start gap-2.5 bg-white/5 border border-white/10 rounded-2xl px-4 py-3">
-                  <span className="text-sm mt-0.5">ℹ️</span>
-                  <p className="text-xs text-white/60 leading-relaxed">Kode verifikasi akan dikirim ke email kamu setelah daftar</p>
-                </div>
-
-                <div className="pt-2">
-                  <button type="submit" disabled={loading} className={btnCls}>
-                    {loading ? (
-                      <span className="w-5 h-5 border-2 border-[#5C0A0B]/30 border-t-[#5C0A0B] rounded-full animate-spin" />
-                    ) : (
-                      'Buat Akun Sekarang'
-                    )}
-                  </button>
-                </div>
-              </form>
-
-              <div className="text-center mt-6">
-                <span className="text-white/60 text-xs">Sudah punya akun? </span>
-                <button
-                  type="button"
-                  onClick={() => goTo('login')}
-                  className="text-white text-xs font-bold hover:underline"
-                >
-                  Masuk
-                </button>
-              </div>
             </motion.div>
           )}
 
@@ -477,40 +268,6 @@ export default function LoginPage() {
             </motion.div>
           )}
 
-          {mode === 'phone' && (
-            <motion.div key="phone" custom={direction} variants={formVariants} initial="initial" animate="animate" exit="exit">
-              <div className="mb-7 text-left">
-                <h1 className="text-white text-[22px] font-extrabold tracking-tight">Satu langkah lagi</h1>
-                <p className="text-white/50 text-xs mt-1">Masukkan nomor WhatsApp untuk melengkapi profil</p>
-              </div>
-
-              <form onSubmit={handleUpdatePhone} className="space-y-4">
-                <div className="relative">
-                  <Phone size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/50" />
-                  <input
-                    name="phone"
-                    type="tel"
-                    placeholder="Nomor WhatsApp (08xxx)"
-                    value={form.phone}
-                    onChange={handleChange}
-                    className={inputCls}
-                    required
-                  />
-                </div>
-
-                <div className="pt-2">
-                  <button type="submit" disabled={loading} className={btnCls}>
-                    {loading ? (
-                      <span className="w-5 h-5 border-2 border-[#5C0A0B]/30 border-t-[#5C0A0B] rounded-full animate-spin" />
-                    ) : (
-                      'Simpan & Lanjutkan'
-                    )}
-                  </button>
-                </div>
-              </form>
-            </motion.div>
-          )}
-
           {mode === 'forgot' && (
             <motion.div key="forgot" custom={direction} variants={formVariants} initial="initial" animate="animate" exit="exit">
               <div className="mb-7 text-left">
@@ -551,7 +308,7 @@ export default function LoginPage() {
 
               <button
                 type="button"
-                onClick={() => goTo('login')}
+                onClick={() => { setDirection('right'); setMode('login'); }}
                 className="flex items-center justify-center gap-2 text-white/50 hover:text-white text-xs font-semibold transition-colors w-full mt-5"
               >
                 ← Kembali ke Login
