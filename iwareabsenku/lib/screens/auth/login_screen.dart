@@ -478,6 +478,14 @@ class _LoginScreenState extends State<LoginScreen> {
 
                       const SizedBox(height: 24),
 
+                      // Belum punya akun
+                      Text(
+                        'Belum punya akun? Silakan hubungi HRD. Terima kasih.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 12),
+                      ),
+                      const SizedBox(height: 16),
+
                       // Info & Kebijakan Link
                       GestureDetector(
                         onTap: () => Navigator.push(
