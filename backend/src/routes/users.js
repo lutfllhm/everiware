@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { authenticate, authorize } = require('../middleware/auth');
 const { uploadSelfie, uploadAvatar } = require('../middleware/upload');
+const { compressUploadedImage } = require('../middleware/compressImage');
 const {
   getAllUsers, getUser, createUser, updateUser, deleteUser, permanentDeleteUser,
   updateProfile, changePassword, getNotifications, markNotificationRead,
@@ -13,8 +14,8 @@ const {
 router.use(authenticate);
 
 // Self routes
-router.put('/profile', uploadAvatar.single('avatar'), updateProfile);
-router.put('/register-face', uploadAvatar.single('face_photo'), registerFace);
+router.put('/profile', uploadAvatar.single('avatar'), compressUploadedImage(), updateProfile);
+router.put('/register-face', uploadAvatar.single('face_photo'), compressUploadedImage(), registerFace);
 router.put('/change-password', changePassword);
 router.get('/notifications', getNotifications);
 router.put('/notifications/read', markNotificationRead);
@@ -29,7 +30,7 @@ router.get('/dashboard', authorize('superadmin', 'admin', 'hrd'), getDashboardSt
 router.get('/settings', authorize('superadmin', 'admin'), getSettings);
 router.put('/settings', authorize('superadmin', 'admin'), updateSettings);
 router.get('/', authorize('superadmin', 'admin', 'hrd'), getAllUsers);
-router.post('/', authorize('superadmin', 'admin', 'hrd'), uploadAvatar.single('avatar'), createUser);
+router.post('/', authorize('superadmin', 'admin', 'hrd'), uploadAvatar.single('avatar'), compressUploadedImage(), createUser);
 router.get('/:id', authorize('superadmin', 'admin', 'hrd'), getUser);
 router.put('/:id', authorize('superadmin', 'admin', 'hrd'), updateUser);
 router.delete('/:id', authorize('superadmin', 'admin', 'hrd'), deleteUser);

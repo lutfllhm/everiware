@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { authenticate, authorize } = require('../middleware/auth');
 const { uploadSelfie } = require('../middleware/upload');
+const { compressUploadedImage } = require('../middleware/compressImage');
 const {
   checkIn, checkOut, getTodayAttendance, getMyAttendance,
   getAllAttendances, getAttendanceReport, getLocations,
@@ -11,8 +12,8 @@ const {
 router.use(authenticate);
 
 // Employee routes
-router.post('/check-in', uploadSelfie.single('photo'), checkIn);
-router.post('/check-out', uploadSelfie.single('photo'), checkOut);
+router.post('/check-in', uploadSelfie.single('photo'), compressUploadedImage(), checkIn);
+router.post('/check-out', uploadSelfie.single('photo'), compressUploadedImage(), checkOut);
 router.get('/today', getTodayAttendance);
 router.get('/my', getMyAttendance);
 
