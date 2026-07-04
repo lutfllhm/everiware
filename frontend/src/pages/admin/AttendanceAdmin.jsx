@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Eye, X, Trash2, AlertTriangle, Edit, ChevronDown } from 'lucide-react';
+import { Search, Eye, X, Trash2, AlertTriangle, Edit, ChevronRight } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../../api/axios';
 import { format } from 'date-fns';
@@ -20,7 +20,7 @@ export default function AttendanceAdmin() {
   const [editSaving, setEditSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
-  const [expanded, setExpanded] = useState(new Set());
+  const [detailEmployee, setDetailEmployee] = useState(null);
 
   useEffect(() => {
     fetchData();
@@ -93,14 +93,14 @@ export default function AttendanceAdmin() {
   ).sort((a, b) => (a.user_name || '').localeCompare(b.user_name || ''));
 
   const pagination = usePagination(grouped, 25);
+  const detailPagination = usePagination(detailEmployee?.records || [], 10);
 
-  const toggleExpand = (key) => {
-    setExpanded(prev => {
-      const next = new Set(prev);
-      next.has(key) ? next.delete(key) : next.add(key);
-      return next;
-    });
-  };
+  // Sinkronkan modal detail karyawan dengan data terbaru setelah edit/hapus
+  useEffect(() => {
+    if (!detailEmployee) return;
+    const fresh = grouped.find(g => g.key === detailEmployee.key);
+    if (fresh !== detailEmployee) setDetailEmployee(fresh || null);
+  }, [grouped]);
 
   const statusConfig = {
     present: { label: 'Hadir', cls: 'badge-success' },
@@ -164,7 +164,6 @@ export default function AttendanceAdmin() {
         ) : (
           <div className="divide-y divide-slate-100">
             {pagination.paged.map((grp) => {
-              const isOpen = expanded.has(grp.key);
               const counts = {
                 present: grp.records.filter(r => r.status === 'present').length,
                 late: grp.records.filter(r => r.status === 'late').length,
@@ -173,84 +172,106 @@ export default function AttendanceAdmin() {
                 sick: grp.records.filter(r => r.status === 'sick').length,
               };
               return (
-                <div key={grp.key}>
-                  <button onClick={() => toggleExpand(grp.key)}
-                    className="w-full flex items-center justify-between gap-3 px-4 py-3 hover:bg-slate-50 transition-colors text-left">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <UserAvatar name={grp.user_name} avatar={grp.user_avatar} size="md" />
-                      <div className="min-w-0">
-                        <div className="font-medium text-slate-900 text-sm">{grp.user_name}</div>
-                        <div className="text-xs text-slate-500 truncate">{grp.employee_id ? `${grp.employee_id}${grp.department ? ' · ' + grp.department : ''}${grp.position ? ' · ' + grp.position : ''}` : [grp.department, grp.position].filter(Boolean).join(' · ') || '-'}</div>
-                      </div>
+                <button key={grp.key} onClick={() => setDetailEmployee(grp)}
+                  className="w-full flex items-center justify-between gap-3 px-4 py-3 hover:bg-slate-50 transition-colors text-left">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <UserAvatar name={grp.user_name} avatar={grp.user_avatar} size="md" />
+                    <div className="min-w-0">
+                      <div className="font-medium text-slate-900 text-sm">{grp.user_name}</div>
+                      <div className="text-xs text-slate-500 truncate">{grp.employee_id ? `${grp.employee_id}${grp.department ? ' · ' + grp.department : ''}${grp.position ? ' · ' + grp.position : ''}` : [grp.department, grp.position].filter(Boolean).join(' · ') || '-'}</div>
                     </div>
-                    <div className="flex items-center gap-3 flex-shrink-0">
-                      <div className="hidden sm:flex items-center gap-2 text-xs">
-                        <span className="badge-success">{counts.present} Hadir</span>
-                        <span className="badge-warning">{counts.late} Terlambat</span>
-                        {counts.absent > 0 && <span className="badge-danger">{counts.absent} Absen</span>}
-                        {counts.leave > 0 && <span className="badge-info">{counts.leave} Cuti</span>}
-                        {counts.sick > 0 && <span className="badge-purple">{counts.sick} Sakit</span>}
-                      </div>
-                      <span className="text-xs text-slate-400">{grp.records.length} hari</span>
-                      <ChevronDown size={16} className={`text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                  </div>
+                  <div className="flex items-center gap-3 flex-shrink-0">
+                    <div className="hidden sm:flex items-center gap-2 text-xs">
+                      <span className="badge-success">{counts.present} Hadir</span>
+                      <span className="badge-warning">{counts.late} Terlambat</span>
+                      {counts.absent > 0 && <span className="badge-danger">{counts.absent} Absen</span>}
+                      {counts.leave > 0 && <span className="badge-info">{counts.leave} Cuti</span>}
+                      {counts.sick > 0 && <span className="badge-purple">{counts.sick} Sakit</span>}
                     </div>
-                  </button>
-
-                  <AnimatePresence>
-                    {isOpen && (
-                      <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
-                        className="overflow-hidden">
-                        <div className="overflow-x-auto bg-slate-50/50">
-                          <table className="w-full">
-                            <thead>
-                              <tr>
-                                {['Tanggal', 'Masuk', 'Pulang', 'Lokasi', 'Status', 'Aksi'].map(h => (
-                                  <th key={h} className="text-left px-4 py-2 text-xs font-semibold text-slate-500 uppercase tracking-wide">{h}</th>
-                                ))}
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100">
-                              {grp.records.map((att) => {
-                                const s = statusConfig[att.status] || statusConfig.present;
-                                return (
-                                  <tr key={att.id} className="hover:bg-white transition-colors">
-                                    <td className="px-4 py-2.5 text-sm text-slate-600">{format(new Date(att.date), 'dd MMM yyyy', { locale: id })}</td>
-                                    <td className="px-4 py-2.5 text-sm font-medium text-slate-900">{att.check_in ? format(new Date(att.check_in), 'HH:mm') : '-'}</td>
-                                    <td className="px-4 py-2.5 text-sm font-medium text-slate-900">{att.check_out ? format(new Date(att.check_out), 'HH:mm') : '-'}</td>
-                                    <td className="px-4 py-2.5 text-sm text-slate-500">{att.location_name || '-'}</td>
-                                    <td className="px-4 py-2.5"><span className={s.cls}>{s.label}</span></td>
-                                    <td className="px-4 py-2.5">
-                                      <div className="flex items-center gap-1">
-                                        <button onClick={() => setSelected(att)} title="Detail"
-                                          className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors">
-                                          <Eye size={15} className="text-slate-500" />
-                                        </button>
-                                        <button onClick={() => openEdit(att)} title="Edit"
-                                          className="p-1.5 hover:bg-blue-50 rounded-lg transition-colors">
-                                          <Edit size={15} className="text-blue-500" />
-                                        </button>
-                                        <button onClick={() => setDeleteTarget(att)} title="Hapus"
-                                          className="p-1.5 hover:bg-red-50 rounded-lg transition-colors">
-                                          <Trash2 size={15} className="text-red-500" />
-                                        </button>
-                                      </div>
-                                    </td>
-                                  </tr>
-                                );
-                              })}
-                            </tbody>
-                          </table>
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
+                    <span className="text-xs text-slate-400">{grp.records.length} hari</span>
+                    <ChevronRight size={16} className="text-slate-400" />
+                  </div>
+                </button>
               );
             })}
           </div>
         )}
         <Pagination {...pagination} />
       </div>
+
+      {/* Modal Detail Absensi per Karyawan */}
+      <AnimatePresence>
+        {detailEmployee && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+            onClick={() => setDetailEmployee(null)}>
+            <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }}
+              className="bg-white rounded-3xl w-full max-w-3xl max-h-[90vh] flex flex-col"
+              onClick={e => e.stopPropagation()}>
+              <div className="flex items-center justify-between gap-3 p-6 pb-4 border-b border-slate-100">
+                <div className="flex items-center gap-3 min-w-0">
+                  <UserAvatar name={detailEmployee.user_name} avatar={detailEmployee.user_avatar} size="md" />
+                  <div className="min-w-0">
+                    <h3 className="font-bold text-slate-900 truncate">{detailEmployee.user_name}</h3>
+                    <p className="text-xs text-slate-500 truncate">
+                      {detailEmployee.employee_id ? `${detailEmployee.employee_id}${detailEmployee.department ? ' · ' + detailEmployee.department : ''}${detailEmployee.position ? ' · ' + detailEmployee.position : ''}` : [detailEmployee.department, detailEmployee.position].filter(Boolean).join(' · ') || '-'}
+                    </p>
+                  </div>
+                </div>
+                <button onClick={() => setDetailEmployee(null)} className="p-2 rounded-xl hover:bg-slate-100 flex-shrink-0">
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="overflow-y-auto flex-1">
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr>
+                        {['Tanggal', 'Masuk', 'Pulang', 'Lokasi', 'Status', 'Aksi'].map(h => (
+                          <th key={h} className="text-left px-4 py-2 text-xs font-semibold text-slate-500 uppercase tracking-wide sticky top-0 bg-white">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {detailPagination.paged.map((att) => {
+                        const s = statusConfig[att.status] || statusConfig.present;
+                        return (
+                          <tr key={att.id} className="hover:bg-slate-50 transition-colors">
+                            <td className="px-4 py-2.5 text-sm text-slate-600">{format(new Date(att.date), 'dd MMM yyyy', { locale: id })}</td>
+                            <td className="px-4 py-2.5 text-sm font-medium text-slate-900">{att.check_in ? format(new Date(att.check_in), 'HH:mm') : '-'}</td>
+                            <td className="px-4 py-2.5 text-sm font-medium text-slate-900">{att.check_out ? format(new Date(att.check_out), 'HH:mm') : '-'}</td>
+                            <td className="px-4 py-2.5 text-sm text-slate-500">{att.location_name || '-'}</td>
+                            <td className="px-4 py-2.5"><span className={s.cls}>{s.label}</span></td>
+                            <td className="px-4 py-2.5">
+                              <div className="flex items-center gap-1">
+                                <button onClick={() => setSelected(att)} title="Detail"
+                                  className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors">
+                                  <Eye size={15} className="text-slate-500" />
+                                </button>
+                                <button onClick={() => openEdit(att)} title="Edit"
+                                  className="p-1.5 hover:bg-blue-50 rounded-lg transition-colors">
+                                  <Edit size={15} className="text-blue-500" />
+                                </button>
+                                <button onClick={() => setDeleteTarget(att)} title="Hapus"
+                                  className="p-1.5 hover:bg-red-50 rounded-lg transition-colors">
+                                  <Trash2 size={15} className="text-red-500" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <Pagination {...detailPagination} />
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Detail Modal */}
       <AnimatePresence>

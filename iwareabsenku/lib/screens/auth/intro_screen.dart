@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:camera/camera.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../services/api_service.dart';
@@ -31,6 +32,7 @@ class _IntroScreenState extends State<IntroScreen> with TickerProviderStateMixin
   final PageController _pageController = PageController();
   int _currentPage = 0;
   bool _cameraInitialized = false;
+  bool _cameraInitializing = false;
 
   String? _tempPassword;
   bool _canEnableLocalBiometric = false;
@@ -148,47 +150,60 @@ class _IntroScreenState extends State<IntroScreen> with TickerProviderStateMixin
   }
 
   Future<void> _initCamera() async {
-    if (_cameraInitialized) return;
+    if (_cameraInitialized || _cameraInitializing) return;
+    _cameraInitializing = true;
     setState(() {
       _cameraError = null;
     });
 
-    List<CameraDescription> cameras = [];
     try {
-      cameras = await availableCameras();
-    } catch (e) {
-      setState(() => _cameraError = 'Kamera tidak tersedia');
-      return;
-    }
+      final camStatus = await Permission.camera.request();
+      if (!camStatus.isGranted) {
+        if (mounted) {
+          setState(() => _cameraError = 'Izin kamera diperlukan untuk registrasi wajah');
+        }
+        return;
+      }
 
-    if (cameras.isEmpty) {
-      setState(() => _cameraError = 'Kamera tidak ditemukan');
-      return;
-    }
+      List<CameraDescription> cameras = [];
+      try {
+        cameras = await availableCameras();
+      } catch (e) {
+        if (mounted) setState(() => _cameraError = 'Kamera tidak tersedia');
+        return;
+      }
 
-    final frontCamera = cameras.firstWhere(
-      (c) => c.lensDirection == CameraLensDirection.front,
-      orElse: () => cameras.first,
-    );
+      if (cameras.isEmpty) {
+        if (mounted) setState(() => _cameraError = 'Kamera tidak ditemukan');
+        return;
+      }
 
-    try {
-      _cameraController = CameraController(
-        frontCamera,
-        ResolutionPreset.high,
-        enableAudio: false,
-        imageFormatGroup: ImageFormatGroup.jpeg,
+      final frontCamera = cameras.firstWhere(
+        (c) => c.lensDirection == CameraLensDirection.front,
+        orElse: () => cameras.first,
       );
-      await _cameraController!.initialize();
-      if (mounted) {
-        setState(() {
-          _cameraInitialized = true;
-        });
-        _triggerAutoCaptureLoop();
+
+      try {
+        _cameraController = CameraController(
+          frontCamera,
+          ResolutionPreset.high,
+          enableAudio: false,
+          imageFormatGroup: ImageFormatGroup.jpeg,
+        );
+        await _cameraController!.initialize();
+        if (mounted) {
+          setState(() {
+            _cameraInitialized = true;
+          });
+          _triggerAutoCaptureLoop();
+        }
+      } catch (e) {
+        if (mounted) {
+          setState(() => _cameraError = 'Gagal menginisialisasi kamera: $e');
+        }
       }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _cameraError = 'Gagal menginisialisasi kamera: $e');
-      }
+    } finally {
+      _cameraInitializing = false;
     }
   }
 
@@ -894,10 +909,6 @@ class _IntroScreenState extends State<IntroScreen> with TickerProviderStateMixin
   }
 
   Widget _buildCameraSlide() {
-    if (!_cameraInitialized && _cameraError == null) {
-      _initCamera();
-    }
-
     return LayoutBuilder(builder: (context, constraints) {
       final boxW = constraints.maxWidth;
 
@@ -1333,7 +1344,11 @@ class _IntroScreenState extends State<IntroScreen> with TickerProviderStateMixin
                       _currentPage = page;
                     });
                     if (page == 2) {
-                      _triggerAutoCaptureLoop();
+                      if (!_cameraInitialized && _cameraError == null) {
+                        _initCamera();
+                      } else {
+                        _triggerAutoCaptureLoop();
+                      }
                     }
                   },
                   children: [
