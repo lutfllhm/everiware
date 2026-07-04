@@ -212,10 +212,8 @@ export default function LoginPage() {
                 </div>
               </form>
 
-              <div className="flex items-center gap-3 my-5">
-                <div className="flex-1 h-[1px] bg-white/15" />
-                <span className="text-white/50 text-xs">atau</span>
-                <div className="flex-1 h-[1px] bg-white/15" />
+              <div className="text-center mt-6">
+                <span className="text-white/50 text-xs">Belum punya akun? Silakan hubungi HRD. Terima kasih.</span>
               </div>
 
             </motion.div>
