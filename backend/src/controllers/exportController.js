@@ -96,11 +96,12 @@ const exportAttendanceExcel = async (req, res) => {
       { width: 8 }, { width: 12 }, { width: 14 }, { width: 8 }, { width: 8 }
     ];
 
-    // ── Sheet 2: Detail (per karyawan, dikelompokkan agar bisa expand/collapse) ──
+    // ── Sheet 2: Detail (dikelompokkan per karyawan dengan section header) ──
     const ws2 = wb.addWorksheet('Detail Absensi');
-    const hdr2 = ws2.addRow(['Nama','ID Karyawan','Departemen','Jabatan','Tanggal','Jam Masuk','Jam Pulang','Status','Lokasi']);
-    hdr2.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-    hdr2.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E293B' } };
+    const detailCols = [{ width: 14 }, { width: 12 }, { width: 12 }, { width: 14 }, { width: 22 }];
+    ws2.columns = detailCols;
+    const thin = { style: 'thin', color: { argb: 'FFCBD5E1' } };
+    const colHeaders = ['Tanggal','Jam Masuk','Jam Pulang','Status','Lokasi'];
 
     const detailByUser = {};
     detail.forEach(r => {
@@ -109,23 +110,39 @@ const exportAttendanceExcel = async (req, res) => {
       detailByUser[key].records.push(r);
     });
 
-    Object.values(detailByUser).forEach(({ info, records }) => {
-      const summaryRow = ws2.addRow([
-        `${info.name} (${records.length} hari)`, info.employee_id||'-', info.department||'-', info.position||'-', '', '', '', '', ''
-      ]);
-      summaryRow.font = { bold: true };
-      summaryRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } };
+    Object.values(detailByUser).forEach(({ info, records }, idx) => {
+      if (idx > 0) ws2.addRow([]);
+
+      const titleRow = ws2.addRow([`${info.name}  •  ${info.employee_id||'-'}  •  ${info.department||'-'}  •  ${info.position||'-'}`]);
+      ws2.mergeCells(titleRow.number, 1, titleRow.number, 5);
+      titleRow.getCell(1).font = { bold: true, size: 11, color: { argb: 'FFFFFFFF' } };
+      titleRow.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E293B' } };
+      titleRow.getCell(1).alignment = { vertical: 'middle' };
+      titleRow.height = 20;
+
+      const summaryRow = ws2.addRow([`Total: ${records.length} hari tercatat pada periode ini`]);
+      ws2.mergeCells(summaryRow.number, 1, summaryRow.number, 5);
+      summaryRow.getCell(1).font = { italic: true, size: 9, color: { argb: 'FF64748B' } };
+      summaryRow.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
+
+      const hdrRow = ws2.addRow(colHeaders);
+      hdrRow.eachCell(cell => {
+        cell.font = { bold: true, size: 9, color: { argb: 'FF1E293B' } };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } };
+        cell.border = { top: thin, bottom: thin, left: thin, right: thin };
+        cell.alignment = { horizontal: 'center' };
+      });
 
       records.forEach((r, i) => {
-        const row = ws2.addRow(['', '', '', '', fmtDate(r.date), fmtTime(r.check_in), fmtTime(r.check_out), statusLabel(r.status), r.lokasi||'-']);
-        if (i % 2 === 0) row.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
-        row.outlineLevel = 1;
+        const row = ws2.addRow([fmtDate(r.date), fmtTime(r.check_in), fmtTime(r.check_out), statusLabel(r.status), r.lokasi||'-']);
+        row.eachCell(cell => {
+          cell.border = { top: thin, bottom: thin, left: thin, right: thin };
+          cell.alignment = { horizontal: 'center' };
+        });
+        row.getCell(5).alignment = { horizontal: 'left' };
+        if (i % 2 === 0) row.eachCell(cell => { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } }; });
       });
     });
-
-    ws2.columns = [{ width: 28 }, { width: 14 }, { width: 18 }, { width: 18 }, { width: 14 }, { width: 12 }, { width: 12 }, { width: 14 }, { width: 22 }];
-    ws2.properties.outlineLevelRow = 1;
-    ws2.views = [{ showOutlineSymbols: true }];
 
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename=rekap_absensi_${fileTag}.xlsx`);
