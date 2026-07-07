@@ -331,7 +331,7 @@ export default function LocationsAdmin() {
             className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
             onClick={() => setShowModal(false)}>
             <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }}
-              className="bg-white rounded-3xl p-6 w-full max-w-md"
+              className="bg-white rounded-3xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto"
               onClick={e => e.stopPropagation()}>
               <div className="flex items-center justify-between mb-6">
                 <h3 className="font-bold text-slate-900">{editLoc ? 'Edit Lokasi' : 'Tambah Lokasi'}</h3>

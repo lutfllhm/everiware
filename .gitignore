@@ -1,6 +1,8 @@
 .env.production
 .vscode/
 uploads/
+backups/
+backups-local/
 backend/node_modules/
 frontend/node_modules/
 iwareabsenku/build/
