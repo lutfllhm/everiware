@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Eye, X, Trash2, AlertTriangle, Edit, ChevronRight } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -83,14 +83,14 @@ export default function AttendanceAdmin() {
     !filters.search || a.user_name?.toLowerCase().includes(filters.search.toLowerCase()) || a.employee_id?.includes(filters.search)
   );
 
-  const grouped = Object.values(
+  const grouped = useMemo(() => Object.values(
     filtered.reduce((acc, a) => {
       const key = a.employee_id || a.user_name;
       if (!acc[key]) acc[key] = { key, user_name: a.user_name, user_avatar: a.user_avatar, employee_id: a.employee_id, department: a.department, position: a.position, records: [] };
       acc[key].records.push(a);
       return acc;
     }, {})
-  ).sort((a, b) => (a.user_name || '').localeCompare(b.user_name || ''));
+  ).sort((a, b) => (a.user_name || '').localeCompare(b.user_name || '')), [attendances, filters.search]);
 
   const pagination = usePagination(grouped, 25);
   const detailPagination = usePagination(detailEmployee?.records || [], 10);
