@@ -262,34 +262,42 @@ const exportAttendanceDetailPDF = async (req, res) => {
     const headers = ['Tanggal', 'Jam Masuk', 'Jam Pulang', 'Status', 'Lokasi'];
     const tableLeft = 40;
     const tableWidth = cols.reduce((a, b) => a + b, 0);
-    const rowHeight = 16;
+    const rowHeight = 18;
 
     const drawTableHeader = () => {
       let x = tableLeft;
       const y = doc.y;
+      doc.rect(tableLeft, y - 3, tableWidth, 20).fill('#E2E8F0').stroke('#CBD5E1');
       doc.fontSize(9).font('Helvetica-Bold');
       headers.forEach((h, i) => {
-        doc.fillColor('#1E293B').text(h, x, y, { width: cols[i], align: i === 0 ? 'left' : 'center', lineBreak: false });
+        doc.fillColor('#1E293B').text(h, x, y + 1, { width: cols[i], align: i === 0 ? 'left' : 'center', lineBreak: false });
         x += cols[i];
       });
-      doc.y = y + 14;
-      doc.moveTo(tableLeft, doc.y).lineTo(tableLeft + tableWidth, doc.y).stroke();
-      doc.y += 6;
+      doc.y = y + 20;
     };
 
     Object.entries(byUser).forEach(([name, { info, records }], userIdx) => {
       if (userIdx > 0) doc.addPage();
 
       doc.fontSize(16).font('Helvetica-Bold').fillColor('#000000').text(companyName, { align: 'center' });
-      doc.fontSize(12).font('Helvetica').text(`Detail Absensi ${label}`, { align: 'center' });
+      doc.fontSize(12).font('Helvetica').fillColor('#000000').text(`Detail Absensi ${label}`, { align: 'center' });
       doc.y += 10;
       doc.moveTo(40, doc.y).lineTo(doc.page.width - 40, doc.y).stroke();
-      doc.y += 10;
+      doc.y += 14;
 
-      doc.fontSize(11).font('Helvetica-Bold').text(name, 40, doc.y);
-      doc.fontSize(9).font('Helvetica').fillColor('#475569')
-        .text(`ID: ${info.employee_id || '-'}    Departemen: ${info.department || '-'}`, 40, doc.y + 14);
-      doc.y += 32;
+      // Section header per karyawan (kotak solid, senada dengan versi Excel)
+      const titleY = doc.y;
+      doc.rect(tableLeft, titleY, tableWidth, 26).fill('#1E293B');
+      doc.fontSize(11).font('Helvetica-Bold').fillColor('#FFFFFF')
+        .text(name, tableLeft + 10, titleY + 4, { width: tableWidth - 20, lineBreak: false });
+      doc.fontSize(8).font('Helvetica').fillColor('#CBD5E1')
+        .text(`ID: ${info.employee_id || '-'}    Departemen: ${info.department || '-'}    Jabatan: ${info.position || '-'}`, tableLeft + 10, titleY + 16, { width: tableWidth - 20, lineBreak: false });
+      doc.y = titleY + 26;
+
+      doc.rect(tableLeft, doc.y, tableWidth, 16).fill('#F1F5F9');
+      doc.fontSize(8).font('Helvetica-Oblique').fillColor('#64748B')
+        .text(`Total: ${records.length} hari tercatat pada periode ini`, tableLeft + 10, doc.y + 4);
+      doc.y += 16;
 
       drawTableHeader();
 
@@ -302,20 +310,19 @@ const exportAttendanceDetailPDF = async (req, res) => {
           doc.font('Helvetica').fontSize(8);
         }
         const rowY = doc.y;
-        if (idx % 2 === 0) {
-          doc.rect(tableLeft, rowY - 2, tableWidth, rowHeight).fill('#F8FAFC').stroke('#F8FAFC');
-        }
+        doc.rect(tableLeft, rowY - 3, tableWidth, rowHeight)
+          .fill(idx % 2 === 0 ? '#F8FAFC' : '#FFFFFF').stroke('#E2E8F0');
         let x = tableLeft;
         const vals = [fmtDate(r.date), fmtTime(r.check_in), fmtTime(r.check_out), statusLabel(r.status), r.lokasi || '-'];
         vals.forEach((v, i) => {
-          doc.fillColor('#1E293B').text(String(v), x, rowY, { width: cols[i], align: i === 0 ? 'left' : 'center', lineBreak: false });
+          doc.fillColor('#1E293B').text(String(v), x, rowY + 2, { width: cols[i], align: i === 0 ? 'left' : 'center', lineBreak: false });
           x += cols[i];
         });
         doc.y = rowY + rowHeight;
       });
 
       if (records.length === 0) {
-        doc.fontSize(9).fillColor('#94A3B8').text('Tidak ada data absensi pada periode ini.', 40, doc.y);
+        doc.fontSize(9).fillColor('#94A3B8').text('Tidak ada data absensi pada periode ini.', 40, doc.y + 6);
         doc.y += rowHeight;
       }
 
