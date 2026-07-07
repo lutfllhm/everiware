@@ -97,9 +97,11 @@ export default function AttendanceAdmin() {
 
   // Sinkronkan modal detail karyawan dengan data terbaru setelah edit/hapus
   useEffect(() => {
-    if (!detailEmployee) return;
-    const fresh = grouped.find(g => g.key === detailEmployee.key);
-    if (fresh !== detailEmployee) setDetailEmployee(fresh || null);
+    setDetailEmployee(prev => {
+      if (!prev) return prev;
+      const fresh = grouped.find(g => g.key === prev.key);
+      return fresh !== prev ? (fresh || null) : prev;
+    });
   }, [grouped]);
 
   const statusConfig = {

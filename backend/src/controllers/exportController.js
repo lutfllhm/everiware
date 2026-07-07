@@ -96,18 +96,36 @@ const exportAttendanceExcel = async (req, res) => {
       { width: 8 }, { width: 12 }, { width: 14 }, { width: 8 }, { width: 8 }
     ];
 
-    // ── Sheet 2: Detail ──
+    // ── Sheet 2: Detail (per karyawan, dikelompokkan agar bisa expand/collapse) ──
     const ws2 = wb.addWorksheet('Detail Absensi');
     const hdr2 = ws2.addRow(['Nama','ID Karyawan','Departemen','Jabatan','Tanggal','Jam Masuk','Jam Pulang','Status','Lokasi']);
     hdr2.font = { bold: true, color: { argb: 'FFFFFFFF' } };
     hdr2.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E293B' } };
 
-    detail.forEach((r, i) => {
-      const row = ws2.addRow([r.name, r.employee_id||'-', r.department||'-', r.position||'-', fmtDate(r.date), fmtTime(r.check_in), fmtTime(r.check_out), statusLabel(r.status), r.lokasi||'-']);
-      if (i % 2 === 0) row.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
+    const detailByUser = {};
+    detail.forEach(r => {
+      const key = r.employee_id || r.name;
+      if (!detailByUser[key]) detailByUser[key] = { info: r, records: [] };
+      detailByUser[key].records.push(r);
+    });
+
+    Object.values(detailByUser).forEach(({ info, records }) => {
+      const summaryRow = ws2.addRow([
+        `${info.name} (${records.length} hari)`, info.employee_id||'-', info.department||'-', info.position||'-', '', '', '', '', ''
+      ]);
+      summaryRow.font = { bold: true };
+      summaryRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } };
+
+      records.forEach((r, i) => {
+        const row = ws2.addRow(['', '', '', '', fmtDate(r.date), fmtTime(r.check_in), fmtTime(r.check_out), statusLabel(r.status), r.lokasi||'-']);
+        if (i % 2 === 0) row.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
+        row.outlineLevel = 1;
+      });
     });
 
     ws2.columns = [{ width: 28 }, { width: 14 }, { width: 18 }, { width: 18 }, { width: 14 }, { width: 12 }, { width: 12 }, { width: 14 }, { width: 22 }];
+    ws2.properties.outlineLevelRow = 1;
+    ws2.views = [{ showOutlineSymbols: true }];
 
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename=rekap_absensi_${fileTag}.xlsx`);
