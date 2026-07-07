@@ -15,6 +15,35 @@ const fmtDate = (d) => {
 };
 const statusLabel = (s) => ({ present:'Hadir', late:'Terlambat', absent:'Tidak Hadir', leave:'Cuti', sick:'Sakit' }[s] || s);
 const months = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+const fmtRupiah = (n) => `Rp ${n.toLocaleString('id-ID')}`;
+
+// ── Helper: ambil jam mulai kerja & toleransi dari app_settings ───────────────
+const getWorkStartSettings = async () => {
+  const [rows] = await pool.query(
+    "SELECT setting_key, setting_value FROM app_settings WHERE setting_key IN ('work_start_time','late_tolerance')"
+  );
+  const map = Object.fromEntries(rows.map(r => [r.setting_key, r.setting_value]));
+  return {
+    workStart: map.work_start_time || '08:00',
+    tolerance: parseInt(map.late_tolerance || '15'),
+  };
+};
+
+// ── Helper: hitung denda keterlambatan berjenjang ─────────────────────────────
+// Menit ke-1 s/d `tolerance` = gratis. Setelah itu, tiap blok 10 menit tambahan dikenakan Rp10.000 x nomor blok.
+const calcLateFine = (checkIn, date, workStart, tolerance) => {
+  if (!checkIn) return 0;
+  const [startH, startM] = workStart.split(':').map(Number);
+  const checkInDt = new Date(checkIn);
+  const scheduledDt = new Date(checkIn);
+  scheduledDt.setHours(startH, startM, 0, 0);
+
+  const lateMinutes = Math.round((checkInDt - scheduledDt) / 60000) - tolerance;
+  if (lateMinutes <= 0) return 0;
+
+  const block = Math.ceil(lateMinutes / 10);
+  return block * 10000;
+};
 
 // ── Helper: bangun filter tanggal (range atau bulan/tahun) ────────────────────
 const buildDateFilter = (query, tableAlias = 'a', dateCol = 'date') => {
@@ -43,6 +72,7 @@ const buildDateFilter = (query, tableAlias = 'a', dateCol = 'date') => {
 const exportAttendanceExcel = async (req, res) => {
   try {
     const { filter, params, label, fileTag } = buildDateFilter(req.query);
+    const { workStart, tolerance } = await getWorkStartSettings();
 
     const [report] = await pool.query(
       `SELECT u.name, u.employee_id, u.department, u.position,
@@ -69,39 +99,57 @@ const exportAttendanceExcel = async (req, res) => {
       params
     );
 
+    detail.forEach(r => { r.denda = calcLateFine(r.check_in, r.date, workStart, tolerance); });
+    const fineByEmployee = {};
+    detail.forEach(r => {
+      const key = r.employee_id || r.name;
+      fineByEmployee[key] = (fineByEmployee[key] || 0) + r.denda;
+    });
+
     const wb = new ExcelJS.Workbook();
     wb.creator = 'iWare Absenku';
     wb.created = new Date();
 
     // ── Sheet 1: Rekap ──
     const ws1 = wb.addWorksheet('Rekap Bulanan');
-    ws1.mergeCells('A1:I1');
+    ws1.mergeCells('A1:J1');
     ws1.getCell('A1').value = `REKAP ABSENSI ${label.toUpperCase()}`;
     ws1.getCell('A1').font = { bold: true, size: 14 };
     ws1.getCell('A1').alignment = { horizontal: 'center' };
 
     ws1.addRow([]);
-    const hdr = ws1.addRow(['No','Nama','ID Karyawan','Departemen','Jabatan','Hadir','Terlambat','Tidak Hadir','Cuti','Sakit']);
+    const hdr = ws1.addRow(['No','Nama','ID Karyawan','Departemen','Jabatan','Hadir','Terlambat','Tidak Hadir','Cuti','Sakit','Denda Keterlambatan']);
     hdr.font = { bold: true, color: { argb: 'FFFFFFFF' } };
     hdr.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E293B' } };
     hdr.alignment = { horizontal: 'center' };
 
+    let totalDendaKeseluruhan = 0;
     report.forEach((r, i) => {
-      const row = ws1.addRow([i+1, r.name, r.employee_id||'-', r.department||'-', r.position||'-', r.hadir, r.terlambat, r.tidak_hadir, r.cuti, r.sakit]);
+      const denda = fineByEmployee[r.employee_id || r.name] || 0;
+      totalDendaKeseluruhan += denda;
+      const row = ws1.addRow([i+1, r.name, r.employee_id||'-', r.department||'-', r.position||'-', r.hadir, r.terlambat, r.tidak_hadir, r.cuti, r.sakit, fmtRupiah(denda)]);
       if (i % 2 === 0) row.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
+      if (denda > 0) row.getCell(11).font = { color: { argb: 'FFB91C1C' }, bold: true };
     });
+
+    const totalRow = ws1.addRow(['', '', '', '', 'TOTAL DENDA', '', '', '', '', '', fmtRupiah(totalDendaKeseluruhan)]);
+    ws1.mergeCells(totalRow.number, 5, totalRow.number, 10);
+    totalRow.getCell(5).alignment = { horizontal: 'right' };
+    totalRow.getCell(5).font = { bold: true };
+    totalRow.getCell(11).font = { bold: true, color: { argb: 'FFB91C1C' } };
+    totalRow.getCell(11).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEE2E2' } };
 
     ws1.columns = [
       { width: 5 }, { width: 28 }, { width: 14 }, { width: 18 }, { width: 18 },
-      { width: 8 }, { width: 12 }, { width: 14 }, { width: 8 }, { width: 8 }
+      { width: 8 }, { width: 12 }, { width: 14 }, { width: 8 }, { width: 8 }, { width: 20 }
     ];
 
     // ── Sheet 2: Detail (dikelompokkan per karyawan dengan section header) ──
     const ws2 = wb.addWorksheet('Detail Absensi');
-    const detailCols = [{ width: 14 }, { width: 12 }, { width: 12 }, { width: 14 }, { width: 22 }];
+    const detailCols = [{ width: 14 }, { width: 12 }, { width: 12 }, { width: 14 }, { width: 22 }, { width: 16 }];
     ws2.columns = detailCols;
     const thin = { style: 'thin', color: { argb: 'FFCBD5E1' } };
-    const colHeaders = ['Tanggal','Jam Masuk','Jam Pulang','Status','Lokasi'];
+    const colHeaders = ['Tanggal','Jam Masuk','Jam Pulang','Status','Lokasi','Denda'];
 
     const detailByUser = {};
     detail.forEach(r => {
@@ -114,15 +162,16 @@ const exportAttendanceExcel = async (req, res) => {
       if (idx > 0) ws2.addRow([]);
 
       const titleRow = ws2.addRow([`${info.name}  •  ${info.employee_id||'-'}  •  ${info.department||'-'}  •  ${info.position||'-'}`]);
-      ws2.mergeCells(titleRow.number, 1, titleRow.number, 5);
+      ws2.mergeCells(titleRow.number, 1, titleRow.number, 6);
       titleRow.getCell(1).font = { bold: true, size: 11, color: { argb: 'FFFFFFFF' } };
       titleRow.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E293B' } };
       titleRow.getCell(1).alignment = { vertical: 'middle' };
       titleRow.height = 20;
 
-      const summaryRow = ws2.addRow([`Total: ${records.length} hari tercatat pada periode ini`]);
-      ws2.mergeCells(summaryRow.number, 1, summaryRow.number, 5);
-      summaryRow.getCell(1).font = { italic: true, size: 9, color: { argb: 'FF64748B' } };
+      const totalDendaUser = records.reduce((sum, r) => sum + r.denda, 0);
+      const summaryRow = ws2.addRow([`Total: ${records.length} hari tercatat  •  Denda keterlambatan: ${fmtRupiah(totalDendaUser)}`]);
+      ws2.mergeCells(summaryRow.number, 1, summaryRow.number, 6);
+      summaryRow.getCell(1).font = { italic: true, size: 9, color: { argb: totalDendaUser > 0 ? 'FFB91C1C' : 'FF64748B' } };
       summaryRow.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
 
       const hdrRow = ws2.addRow(colHeaders);
@@ -134,12 +183,13 @@ const exportAttendanceExcel = async (req, res) => {
       });
 
       records.forEach((r, i) => {
-        const row = ws2.addRow([fmtDate(r.date), fmtTime(r.check_in), fmtTime(r.check_out), statusLabel(r.status), r.lokasi||'-']);
+        const row = ws2.addRow([fmtDate(r.date), fmtTime(r.check_in), fmtTime(r.check_out), statusLabel(r.status), r.lokasi||'-', r.denda > 0 ? fmtRupiah(r.denda) : '-']);
         row.eachCell(cell => {
           cell.border = { top: thin, bottom: thin, left: thin, right: thin };
           cell.alignment = { horizontal: 'center' };
         });
         row.getCell(5).alignment = { horizontal: 'left' };
+        if (r.denda > 0) row.getCell(6).font = { color: { argb: 'FFB91C1C' }, bold: true };
         if (i % 2 === 0) row.eachCell(cell => { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } }; });
       });
     });
