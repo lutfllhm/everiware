@@ -100,11 +100,6 @@ const exportAttendanceExcel = async (req, res) => {
     );
 
     detail.forEach(r => { r.denda = calcLateFine(r.check_in, r.date, workStart, tolerance); });
-    const fineByEmployee = {};
-    detail.forEach(r => {
-      const key = r.employee_id || r.name;
-      fineByEmployee[key] = (fineByEmployee[key] || 0) + r.denda;
-    });
 
     const wb = new ExcelJS.Workbook();
     wb.creator = 'iWare Absenku';
@@ -112,36 +107,25 @@ const exportAttendanceExcel = async (req, res) => {
 
     // ── Sheet 1: Rekap ──
     const ws1 = wb.addWorksheet('Rekap Bulanan');
-    ws1.mergeCells('A1:J1');
+    ws1.mergeCells('A1:I1');
     ws1.getCell('A1').value = `REKAP ABSENSI ${label.toUpperCase()}`;
     ws1.getCell('A1').font = { bold: true, size: 14 };
     ws1.getCell('A1').alignment = { horizontal: 'center' };
 
     ws1.addRow([]);
-    const hdr = ws1.addRow(['No','Nama','ID Karyawan','Departemen','Jabatan','Hadir','Terlambat','Tidak Hadir','Cuti','Sakit','Denda Keterlambatan']);
+    const hdr = ws1.addRow(['No','Nama','ID Karyawan','Departemen','Jabatan','Hadir','Terlambat','Tidak Hadir','Cuti','Sakit']);
     hdr.font = { bold: true, color: { argb: 'FFFFFFFF' } };
     hdr.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E293B' } };
     hdr.alignment = { horizontal: 'center' };
 
-    let totalDendaKeseluruhan = 0;
     report.forEach((r, i) => {
-      const denda = fineByEmployee[r.employee_id || r.name] || 0;
-      totalDendaKeseluruhan += denda;
-      const row = ws1.addRow([i+1, r.name, r.employee_id||'-', r.department||'-', r.position||'-', r.hadir, r.terlambat, r.tidak_hadir, r.cuti, r.sakit, fmtRupiah(denda)]);
+      const row = ws1.addRow([i+1, r.name, r.employee_id||'-', r.department||'-', r.position||'-', r.hadir, r.terlambat, r.tidak_hadir, r.cuti, r.sakit]);
       if (i % 2 === 0) row.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
-      if (denda > 0) row.getCell(11).font = { color: { argb: 'FFB91C1C' }, bold: true };
     });
-
-    const totalRow = ws1.addRow(['', '', '', '', 'TOTAL DENDA', '', '', '', '', '', fmtRupiah(totalDendaKeseluruhan)]);
-    ws1.mergeCells(totalRow.number, 5, totalRow.number, 10);
-    totalRow.getCell(5).alignment = { horizontal: 'right' };
-    totalRow.getCell(5).font = { bold: true };
-    totalRow.getCell(11).font = { bold: true, color: { argb: 'FFB91C1C' } };
-    totalRow.getCell(11).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEE2E2' } };
 
     ws1.columns = [
       { width: 5 }, { width: 28 }, { width: 14 }, { width: 18 }, { width: 18 },
-      { width: 8 }, { width: 12 }, { width: 14 }, { width: 8 }, { width: 8 }, { width: 20 }
+      { width: 8 }, { width: 12 }, { width: 14 }, { width: 8 }, { width: 8 }
     ];
 
     // ── Sheet 2: Detail (dikelompokkan per karyawan dengan section header) ──
