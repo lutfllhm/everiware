@@ -31,8 +31,10 @@ const getWorkStartSettings = async () => {
 
 // ── Helper: hitung denda keterlambatan berjenjang ─────────────────────────────
 // Menit ke-1 s/d `tolerance` = gratis. Setelah itu, tiap blok 10 menit tambahan dikenakan Rp10.000 x nomor blok.
-const calcLateFine = (checkIn, date, workStart, tolerance) => {
+// Status selain 'late' (mis. 'present' karena izin terlambat disetujui) tidak dikenakan denda.
+const calcLateFine = (checkIn, date, workStart, tolerance, status) => {
   if (!checkIn) return 0;
+  if (status !== 'late') return 0;
   const [startH, startM] = workStart.split(':').map(Number);
   const checkInDt = new Date(checkIn);
   const scheduledDt = new Date(checkIn);
@@ -99,7 +101,7 @@ const exportAttendanceExcel = async (req, res) => {
       params
     );
 
-    detail.forEach(r => { r.denda = calcLateFine(r.check_in, r.date, workStart, tolerance); });
+    detail.forEach(r => { r.denda = calcLateFine(r.check_in, r.date, workStart, tolerance, r.status); });
 
     const wb = new ExcelJS.Workbook();
     wb.creator = 'iWare Absenku';

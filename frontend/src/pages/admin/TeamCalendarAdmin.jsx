@@ -16,10 +16,13 @@ import UserAvatar from '../../components/ui/UserAvatar';
 
 // ── Warna per jenis izin ──────────────────────────────────────────────────────
 const leaveColors = {
-  annual:     { dot: 'bg-sky-500',    pill: 'bg-sky-100 text-sky-700 border-sky-200',    label: 'Cuti Tahunan' },
-  sick:       { dot: 'bg-purple-500', pill: 'bg-purple-100 text-purple-700 border-purple-200', label: 'Izin Sakit' },
-  permission: { dot: 'bg-amber-500',  pill: 'bg-amber-100 text-amber-700 border-amber-200',  label: 'Izin' },
-  dinas:      { dot: 'bg-orange-500', pill: 'bg-orange-100 text-orange-700 border-orange-200', label: 'Dinas Luar' },
+  annual:         { dot: 'bg-sky-500',    pill: 'bg-sky-100 text-sky-700 border-sky-200',    label: 'Cuti Tahunan' },
+  sick:           { dot: 'bg-purple-500', pill: 'bg-purple-100 text-purple-700 border-purple-200', label: 'Izin Sakit' },
+  permission:     { dot: 'bg-amber-500',  pill: 'bg-amber-100 text-amber-700 border-amber-200',  label: 'Izin' },
+  dinas:          { dot: 'bg-orange-500', pill: 'bg-orange-100 text-orange-700 border-orange-200', label: 'Dinas Luar' },
+  late_permission:{ dot: 'bg-yellow-500', pill: 'bg-yellow-100 text-yellow-700 border-yellow-200', label: 'Izin Terlambat' },
+  early_leave:    { dot: 'bg-teal-500',   pill: 'bg-teal-100 text-teal-700 border-teal-200', label: 'Izin Pulang Cepat' },
+  leave_office:   { dot: 'bg-indigo-500', pill: 'bg-indigo-100 text-indigo-700 border-indigo-200', label: 'Izin Keluar Kantor' },
 };
 
 const DAY_HEADERS = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];

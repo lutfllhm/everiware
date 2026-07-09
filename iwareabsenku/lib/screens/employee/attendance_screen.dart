@@ -557,7 +557,7 @@ class _CameraScreenState extends State<CameraScreen> {
         enableLandmarks: false,
         enableContours: false,
         enableTracking: false,
-        minFaceSize: 0.05,
+        minFaceSize: 0.02,
         performanceMode: FaceDetectorMode.accurate,
       ),
     );
@@ -617,7 +617,7 @@ class _CameraScreenState extends State<CameraScreen> {
             if (await avatarFile.exists() && await avatarFile.length() > 0) {
               final refDetector = FaceDetector(
                 options: FaceDetectorOptions(
-                  minFaceSize: 0.05,
+                  minFaceSize: 0.02,
                   performanceMode: FaceDetectorMode.accurate,
                 ),
               );
