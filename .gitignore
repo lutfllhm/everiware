@@ -5,8 +5,8 @@ backups/
 backups-local/
 backend/node_modules/
 frontend/node_modules/
-iwareabsenku/build/
-mobile/build/
+iwareabsenku/
+mobile/
 **/node_modules/
 *.log
 npm-debug.log*
