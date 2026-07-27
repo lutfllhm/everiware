@@ -62,6 +62,21 @@ const testConnection = async () => {
       }
     }
     
+    // Migrasi additive: kolom deteksi anomali lokasi GPS pada tabel attendances
+    // (untuk DB yang sudah ada sebelum fitur ini ditambahkan)
+    const [anomalyCols] = await conn.query(`
+      SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'attendances' AND COLUMN_NAME = 'is_location_anomaly'
+    `);
+    if (anomalyCols.length === 0) {
+      await conn.query(`
+        ALTER TABLE attendances
+        ADD COLUMN is_location_anomaly BOOLEAN DEFAULT FALSE,
+        ADD COLUMN location_anomaly_note VARCHAR(255)
+      `);
+      console.log('✅ Migrasi kolom is_location_anomaly berhasil ditambahkan ke attendances.');
+    }
+
     // Create company_announcements table
     await conn.query(`
       CREATE TABLE IF NOT EXISTS company_announcements (

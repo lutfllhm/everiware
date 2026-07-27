@@ -82,4 +82,28 @@ const getWorkingDaysSync = (startDate, endDate) => {
   return count;
 };
 
-module.exports = { generateOTP, generateId, calculateDistance, formatDate, getWorkingDays, getWorkingDaysSync, nowWIBParts };
+// Deteksi "impossible travel": jarak antar dua titik GPS berturut-turut yang
+// mustahil ditempuh manusia/kendaraan dalam rentang waktu tsb (indikasi GPS
+// spoofing/fake GPS yang lolos dari deteksi isMocked). Ambang batas 150 km/jam
+// memberi ruang untuk perjalanan pesawat pendek/kereta cepat tanpa false-positive
+// berlebihan pada kasus commuting normal.
+const MAX_PLAUSIBLE_SPEED_KMH = 150;
+
+const detectImpossibleTravel = (lat1, lon1, lat2, lon2, fromTime, toTime) => {
+  const elapsedMs = new Date(toTime) - new Date(fromTime);
+  if (elapsedMs <= 0) return null;
+
+  const distanceMeters = calculateDistance(lat1, lon1, lat2, lon2);
+  const elapsedHours = elapsedMs / (1000 * 60 * 60);
+  const impliedSpeedKmh = (distanceMeters / 1000) / elapsedHours;
+
+  if (impliedSpeedKmh > MAX_PLAUSIBLE_SPEED_KMH) {
+    return {
+      distanceKm: distanceMeters / 1000,
+      impliedSpeedKmh,
+    };
+  }
+  return null;
+};
+
+module.exports = { generateOTP, generateId, calculateDistance, formatDate, getWorkingDays, getWorkingDaysSync, nowWIBParts, detectImpossibleTravel };

@@ -100,6 +100,8 @@ CREATE TABLE IF NOT EXISTS attendances (
   location_id VARCHAR(36),
   status ENUM('present','late','absent','leave','sick') DEFAULT 'present',
   notes TEXT,
+  is_location_anomaly BOOLEAN DEFAULT FALSE,
+  location_anomaly_note VARCHAR(255),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,

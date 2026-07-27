@@ -1,5 +1,5 @@
 const { pool } = require('../config/database');
-const { generateId, calculateDistance, nowWIBParts } = require('../utils/helpers');
+const { generateId, calculateDistance, nowWIBParts, detectImpossibleTravel } = require('../utils/helpers');
 const { auditLog } = require('../utils/auditLog');
 const { verifyFace } = require('../utils/faceVerification');
 
@@ -20,9 +20,17 @@ const todayWIB = () => {
 // Check in
 const checkIn = async (req, res) => {
   try {
-    const { latitude, longitude } = req.body;
+    const { latitude, longitude, is_mocked } = req.body;
     const userId = req.user.id;
     const today = todayWIB();
+
+    // ── Tolak jika device terdeteksi memakai mock/fake GPS ────────────────────
+    if (is_mocked === 'true' || is_mocked === true) {
+      return res.status(400).json({
+        success: false,
+        message: 'Lokasi palsu (fake GPS) terdeteksi. Nonaktifkan aplikasi mock location sebelum melakukan absensi.',
+      });
+    }
 
     // Cek apakah hari ini Sabtu dan apakah Sabtu masuk kerja
     const dayOfWeek = nowWIBParts().getUTCDay(); // 6 = Sabtu
@@ -177,15 +185,41 @@ const checkIn = async (req, res) => {
       status = nowMinutes > workStartMinutes ? 'late' : 'present';
     }
 
+    // ── Impossible-travel check: bandingkan dengan titik absensi terakhir ─────
+    // Tidak memblokir (GPS drift wajar bisa memicu false-positive), hanya
+    // ditandai untuk direview HRD di panel admin.
+    let anomalyNote = null;
+    const [lastAtt] = await pool.query(
+      `SELECT check_out_lat, check_out_lng, check_out, check_in_lat, check_in_lng, check_in
+       FROM attendances WHERE user_id = ? AND date < ? ORDER BY date DESC LIMIT 1`,
+      [userId, today]
+    );
+    if (lastAtt.length) {
+      const prevLat = lastAtt[0].check_out_lat ?? lastAtt[0].check_in_lat;
+      const prevLng = lastAtt[0].check_out_lng ?? lastAtt[0].check_in_lng;
+      const prevTime = lastAtt[0].check_out ?? lastAtt[0].check_in;
+      if (prevLat != null && prevLng != null && prevTime) {
+        const travel = detectImpossibleTravel(
+          parseFloat(prevLat), parseFloat(prevLng),
+          parseFloat(latitude), parseFloat(longitude),
+          prevTime, now
+        );
+        if (travel) {
+          anomalyNote = `Jarak ${travel.distanceKm.toFixed(1)}km dari absensi sebelumnya, ` +
+            `implikasi kecepatan ${travel.impliedSpeedKmh.toFixed(0)} km/jam`;
+        }
+      }
+    }
+
     if (existing.length) {
       await pool.query(
-        'UPDATE attendances SET check_in = ?, check_in_photo = ?, check_in_lat = ?, check_in_lng = ?, location_id = ?, status = ? WHERE id = ?',
-        [now, photoPath, latitude, longitude, validLocation.id, status, existing[0].id]
+        'UPDATE attendances SET check_in = ?, check_in_photo = ?, check_in_lat = ?, check_in_lng = ?, location_id = ?, status = ?, is_location_anomaly = ?, location_anomaly_note = ? WHERE id = ?',
+        [now, photoPath, latitude, longitude, validLocation.id, status, !!anomalyNote, anomalyNote, existing[0].id]
       );
     } else {
       await pool.query(
-        'INSERT INTO attendances (id, user_id, date, check_in, check_in_photo, check_in_lat, check_in_lng, location_id, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [id, userId, today, now, photoPath, latitude, longitude, validLocation.id, status]
+        'INSERT INTO attendances (id, user_id, date, check_in, check_in_photo, check_in_lat, check_in_lng, location_id, status, is_location_anomaly, location_anomaly_note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [id, userId, today, now, photoPath, latitude, longitude, validLocation.id, status, !!anomalyNote, anomalyNote]
       );
     }
 
@@ -225,9 +259,17 @@ const checkIn = async (req, res) => {
 // Check out
 const checkOut = async (req, res) => {
   try {
-    const { latitude, longitude } = req.body;
+    const { latitude, longitude, is_mocked } = req.body;
     const userId = req.user.id;
     const today = todayWIB();
+
+    // ── Tolak jika device terdeteksi memakai mock/fake GPS ────────────────────
+    if (is_mocked === 'true' || is_mocked === true) {
+      return res.status(400).json({
+        success: false,
+        message: 'Lokasi palsu (fake GPS) terdeteksi. Nonaktifkan aplikasi mock location sebelum melakukan absensi.',
+      });
+    }
 
     const [existing] = await pool.query('SELECT * FROM attendances WHERE user_id = ? AND date = ?', [userId, today]);
     if (!existing.length || !existing[0].check_in) return res.status(400).json({ success: false, message: 'Kamu belum absen masuk hari ini' });
@@ -344,9 +386,28 @@ const checkOut = async (req, res) => {
 
     const now = nowWIB();
 
+    // ── Impossible-travel check: bandingkan dengan titik check-in hari ini ────
+    let anomalyNote = null;
+    const prevLat = existing[0].check_in_lat;
+    const prevLng = existing[0].check_in_lng;
+    const prevTime = existing[0].check_in;
+    if (prevLat != null && prevLng != null && prevTime) {
+      const travel = detectImpossibleTravel(
+        parseFloat(prevLat), parseFloat(prevLng),
+        parseFloat(latitude), parseFloat(longitude),
+        prevTime, now
+      );
+      if (travel) {
+        anomalyNote = `Jarak ${travel.distanceKm.toFixed(1)}km dari absen masuk, ` +
+          `implikasi kecepatan ${travel.impliedSpeedKmh.toFixed(0)} km/jam`;
+      }
+    }
+    // Anomali check-in yang sudah ada (jika ada) tetap dipertahankan jika check-out normal
+    const finalAnomalyNote = anomalyNote || (existing[0].is_location_anomaly ? existing[0].location_anomaly_note : null);
+
     await pool.query(
-      'UPDATE attendances SET check_out = ?, check_out_photo = ?, check_out_lat = ?, check_out_lng = ? WHERE user_id = ? AND date = ?',
-      [now, photoPath, latitude, longitude, userId, today]
+      'UPDATE attendances SET check_out = ?, check_out_photo = ?, check_out_lat = ?, check_out_lng = ?, is_location_anomaly = ?, location_anomaly_note = ? WHERE user_id = ? AND date = ?',
+      [now, photoPath, latitude, longitude, !!finalAnomalyNote, finalAnomalyNote, userId, today]
     );
 
     const { broadcastEvent } = require('../utils/realtimeManager');
