@@ -204,33 +204,85 @@ const exportAttendanceExcel = async (req, res) => {
     ws1.views = [{ state: 'frozen', ySplit: hdr.number }];
     ws1.autoFilter = { from: { row: hdr.number, column: 1 }, to: { row: hdr.number, column: 10 } };
 
-    // ── Sheet 2: Detail (tabel datar, bisa difilter/dicari per nama) ──
+    // ── Sheet 2: Detail (dikelompokkan per karyawan, dengan Daftar Isi ber-hyperlink) ──
     const ws2 = wb.addWorksheet('Detail Absensi');
-    ws2.columns = [
-      { width: 26 }, { width: 13 }, { width: 17 }, { width: 17 },
-      { width: 12 }, { width: 11 }, { width: 11 }, { width: 12 }, { width: 20 }, { width: 14 }
-    ];
-    styleExcelTitle(ws2, 10, `DETAIL ABSENSI ${label.toUpperCase()}`);
+    const SHEET2 = 'Detail Absensi';
+    ws2.columns = [{ width: 14 }, { width: 12 }, { width: 12 }, { width: 14 }, { width: 22 }, { width: 16 }];
+    styleExcelTitle(ws2, 6, `DETAIL ABSENSI ${label.toUpperCase()}`);
     ws2.addRow([]);
+    const thin = { style: 'thin', color: { argb: 'FFCBD5E1' } };
+    const colHeaders = ['Tanggal','Jam Masuk','Jam Pulang','Status','Lokasi','Denda'];
 
-    const hdr2 = ws2.addRow(['Nama','ID Karyawan','Departemen','Jabatan','Tanggal','Jam Masuk','Jam Pulang','Status','Lokasi','Denda']);
-    styleExcelHeaderRow(hdr2);
+    const detailByUser = {};
+    detail.forEach(r => {
+      const key = r.employee_id || r.name;
+      if (!detailByUser[key]) detailByUser[key] = { info: r, records: [] };
+      detailByUser[key].records.push(r);
+    });
+    const users = Object.values(detailByUser);
 
-    detail.forEach((r, i) => {
-      const row = ws2.addRow([
-        r.name, r.employee_id||'-', r.department||'-', r.position||'-',
-        fmtDate(r.date), fmtTime(r.check_in), fmtTime(r.check_out), statusLabel(r.status), r.lokasi||'-',
-        r.denda > 0 ? fmtRupiah(r.denda) : '-'
-      ]);
-      if (i % 2 === 0) row.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
-      row.eachCell(borderThinCell);
-      row.getCell(1).alignment = { horizontal: 'left' };
-      row.getCell(9).alignment = { horizontal: 'left' };
-      if (r.denda > 0) row.getCell(10).font = { color: { argb: 'FFB91C1C' }, bold: true };
+    // ── Pass 1: hitung baris awal (title row) tiap section ──
+    const tocLabelRow = ws2.rowCount + 1;
+    let cursor = tocLabelRow + users.length + 2; // +1 label TOC, +N baris nama, +1 spacer setelah TOC = baris title section pertama
+    const startRows = users.map(({ records }) => {
+      const start = cursor;
+      cursor += 3 + records.length + 1; // title + summary + header + data rows + spacer
+      return start;
     });
 
-    ws2.views = [{ state: 'frozen', ySplit: hdr2.number }];
-    ws2.autoFilter = { from: { row: hdr2.number, column: 1 }, to: { row: hdr2.number, column: 10 } };
+    // ── Daftar Isi ──
+    const tocLabel = ws2.addRow([`Daftar Karyawan (klik nama untuk lompat ke data) — ${users.length} orang`]);
+    ws2.mergeCells(tocLabel.number, 1, tocLabel.number, 6);
+    tocLabel.getCell(1).font = { italic: true, size: 9, color: { argb: 'FF64748B' } };
+
+    users.forEach(({ info }, idx) => {
+      const row = ws2.addRow([]);
+      const cell = row.getCell(1);
+      cell.value = { text: `→ ${info.name}  (${info.employee_id || '-'})`, hyperlink: `#'${SHEET2}'!A${startRows[idx]}` };
+      cell.font = { color: { argb: 'FF2563EB' }, underline: true, size: 10 };
+    });
+    ws2.addRow([]);
+
+    // ── Pass 2: render section per karyawan ──
+    users.forEach(({ info, records }, idx) => {
+      const titleRow = ws2.addRow([`${info.name}  •  ${info.employee_id||'-'}  •  ${info.department||'-'}  •  ${info.position||'-'}`]);
+      ws2.mergeCells(titleRow.number, 1, titleRow.number, 5);
+      titleRow.getCell(1).font = { bold: true, size: 11, color: { argb: 'FFFFFFFF' } };
+      titleRow.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E293B' } };
+      titleRow.getCell(1).alignment = { vertical: 'middle' };
+      titleRow.getCell(6).value = { text: '↑ Daftar Isi', hyperlink: `#'${SHEET2}'!A${tocLabel.number}` };
+      titleRow.getCell(6).font = { size: 8, color: { argb: 'FFCBD5E1' }, underline: true };
+      titleRow.getCell(6).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E293B' } };
+      titleRow.getCell(6).alignment = { vertical: 'middle', horizontal: 'right' };
+      titleRow.height = 20;
+
+      const totalDendaUser = records.reduce((sum, r) => sum + r.denda, 0);
+      const summaryRow = ws2.addRow([`Total: ${records.length} hari tercatat  •  Denda keterlambatan: ${fmtRupiah(totalDendaUser)}`]);
+      ws2.mergeCells(summaryRow.number, 1, summaryRow.number, 6);
+      summaryRow.getCell(1).font = { italic: true, size: 9, color: { argb: totalDendaUser > 0 ? 'FFB91C1C' : 'FF64748B' } };
+      summaryRow.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
+
+      const hdrRow = ws2.addRow(colHeaders);
+      hdrRow.eachCell(cell => {
+        cell.font = { bold: true, size: 9, color: { argb: 'FF1E293B' } };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } };
+        cell.border = { top: thin, bottom: thin, left: thin, right: thin };
+        cell.alignment = { horizontal: 'center' };
+      });
+
+      records.forEach((r, i) => {
+        const row = ws2.addRow([fmtDate(r.date), fmtTime(r.check_in), fmtTime(r.check_out), statusLabel(r.status), r.lokasi||'-', r.denda > 0 ? fmtRupiah(r.denda) : '-']);
+        row.eachCell(cell => {
+          cell.border = { top: thin, bottom: thin, left: thin, right: thin };
+          cell.alignment = { horizontal: 'center' };
+        });
+        row.getCell(5).alignment = { horizontal: 'left' };
+        if (r.denda > 0) row.getCell(6).font = { color: { argb: 'FFB91C1C' }, bold: true };
+        if (i % 2 === 0) row.eachCell(cell => { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } }; });
+      });
+
+      if (idx < users.length - 1) ws2.addRow([]);
+    });
 
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename=rekap_absensi_${fileTag}.xlsx`);
