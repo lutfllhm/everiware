@@ -8,7 +8,7 @@
 | Izin Pulang Cepat | `early_leave` | ✅ Bisa absen PULANG (tidak diblokir) | Minimal jam 13:00 WIB (configurable) |
 | Izin Keluar Kantor | `leave_office` | ✅ Bisa absen MASUK & PULANG normal | Maksimal 2 jam (120 menit, configurable) |
 | Izin/Cuti lainnya | `annual`, `sick`, dll | ❌ Tidak bisa absen (diblokir) | Tidak ada |
-
+ 
 ## 2. Arsitektur Solusi
 
 ```mermaid
