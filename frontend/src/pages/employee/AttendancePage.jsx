@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Camera, MapPin, CheckCircle, AlertCircle, Clock, RefreshCw, X } from 'lucide-react';
+import { Camera, MapPin, CheckCircle, AlertCircle, Clock, RefreshCw, X, Calendar } from 'lucide-react';
 import Webcam from 'react-webcam';
 import toast from 'react-hot-toast';
 import api from '../../api/axios';
@@ -21,6 +21,11 @@ export default function AttendancePage() {
   const [capturedPhoto, setCapturedPhoto] = useState(null);
   const webcamRef = useRef(null);
 
+  const [history, setHistory] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+
   const fetchToday = async () => {
     try {
       const { data } = await api.get('/attendance/today');
@@ -32,6 +37,16 @@ export default function AttendancePage() {
   };
 
   useEffect(() => { fetchToday(); }, []);
+
+  const fetchHistory = async () => {
+    setHistoryLoading(true);
+    try {
+      const { data } = await api.get(`/attendance/my?month=${selectedMonth}&year=${selectedYear}`);
+      setHistory(data.attendances || []);
+    } catch {} finally { setHistoryLoading(false); }
+  };
+
+  useEffect(() => { fetchHistory(); }, [selectedMonth, selectedYear]);
 
   const getLocation = () => {
     setGettingLocation(true);
@@ -96,12 +111,16 @@ export default function AttendancePage() {
   };
 
   const statusConfig = {
-    present: { label: 'Hadir', color: 'text-emerald-600', bg: 'bg-emerald-50 border-emerald-200' },
-    late: { label: 'Terlambat', color: 'text-amber-600', bg: 'bg-amber-50 border-amber-200' },
-    absent: { label: 'Tidak Hadir', color: 'text-red-600', bg: 'bg-red-50 border-red-200' },
-    leave: { label: 'Cuti', color: 'text-blue-600', bg: 'bg-blue-50 border-blue-200' },
-    sick: { label: 'Sakit', color: 'text-purple-600', bg: 'bg-purple-50 border-purple-200' },
+    present: { label: 'Hadir',       color: 'text-emerald-600', bg: 'bg-emerald-50 border-emerald-200', dot: 'bg-emerald-500' },
+    late:    { label: 'Terlambat',   color: 'text-amber-600',   bg: 'bg-amber-50 border-amber-200',   dot: 'bg-amber-500' },
+    absent:  { label: 'Tidak Hadir', color: 'text-red-600',     bg: 'bg-red-50 border-red-200',     dot: 'bg-red-500' },
+    leave:   { label: 'Cuti',        color: 'text-blue-600',    bg: 'bg-blue-50 border-blue-200',    dot: 'bg-blue-500' },
+    sick:    { label: 'Sakit',       color: 'text-purple-600',  bg: 'bg-purple-50 border-purple-200',  dot: 'bg-purple-500' },
   };
+
+  const months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+  const currentYear = new Date().getFullYear();
+  const years = Array.from({ length: 3 }, (_, i) => currentYear - i);
 
   const hasLatePermission = activePermits.some(p => p.leave_type_code === 'late_permission');
   const hasEarlyLeave = activePermits.some(p => p.leave_type_code === 'early_leave');
@@ -178,6 +197,63 @@ export default function AttendancePage() {
           <div className="text-center py-6 bg-slate-50 rounded-2xl">
             <Clock size={32} className="text-slate-300 mx-auto mb-2" />
             <p className="text-slate-500">Belum ada absensi hari ini</p>
+          </div>
+        )}
+      </div>
+
+      {/* Riwayat Absensi */}
+      <div className="card p-5">
+        <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
+          <h3 className="font-bold text-slate-900">Riwayat Absensi</h3>
+          <div className="flex gap-2">
+            <select value={selectedMonth} onChange={(e) => setSelectedMonth(Number(e.target.value))}
+              className="input-field py-2 text-sm w-auto">
+              {months.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
+            </select>
+            <select value={selectedYear} onChange={(e) => setSelectedYear(Number(e.target.value))}
+              className="input-field py-2 text-sm w-auto">
+              {years.map(y => <option key={y} value={y}>{y}</option>)}
+            </select>
+          </div>
+        </div>
+
+        {historyLoading ? (
+          <div className="flex items-center justify-center gap-2 text-slate-400 text-sm py-8">
+            <RefreshCw size={14} className="animate-spin" /> Memuat riwayat...
+          </div>
+        ) : history.length > 0 ? (
+          <div className="divide-y divide-slate-50">
+            {history.map((att) => {
+              const s = statusConfig[att.status] || statusConfig.present;
+              return (
+                <div key={att.id} className="flex items-center justify-between py-3 first:pt-0 last:pb-0">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-gradient-to-br from-slate-100 to-slate-50 border border-slate-200/60 rounded-xl flex flex-col items-center justify-center flex-shrink-0">
+                      <span className="text-xs font-bold text-slate-800 leading-none">{format(new Date(att.date), 'd')}</span>
+                      <span className="text-[9px] text-slate-400 font-semibold uppercase tracking-wide">{format(new Date(att.date), 'MMM', { locale: id })}</span>
+                    </div>
+                    <div>
+                      <div className="font-semibold text-slate-900 text-sm">{format(new Date(att.date), 'EEEE', { locale: id })}</div>
+                      <div className="text-xs text-slate-400 flex items-center gap-1.5 mt-0.5">
+                        <Clock size={10} />
+                        <span className="font-mono">{att.check_in ? format(new Date(att.check_in), 'HH:mm') : '-'}</span>
+                        <span>–</span>
+                        <span className="font-mono">{att.check_out ? format(new Date(att.check_out), 'HH:mm') : '-'}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <span className={`${s.bg} ${s.color} border px-2.5 py-1 rounded-xl text-xs font-semibold flex items-center gap-1.5`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />
+                    {s.label}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="text-center py-6 bg-slate-50 rounded-2xl">
+            <Calendar size={32} className="text-slate-300 mx-auto mb-2" />
+            <p className="text-slate-500 text-sm">Tidak ada data absensi pada periode ini</p>
           </div>
         )}
       </div>
