@@ -56,6 +56,20 @@ export default function DashboardPage() {
     return () => clearInterval(timer);
   }, []);
 
+  const fetchData = useCallback(async () => {
+    try {
+      const [attRes, quotaRes, histRes] = await Promise.all([
+        api.get('/attendance/today'),
+        api.get('/leave/quota'),
+        api.get('/attendance/my'),
+      ]);
+      setTodayAtt(attRes.data.attendance);
+      setQuota(quotaRes.data.quota);
+      setRecentAtt(histRes.data.attendances.slice(0, 7));
+      setLastUpdated(new Date());
+    } catch {}
+  }, []);
+
   useEffect(() => {
     const handleUpdate = () => fetchData();
     window.addEventListener('realtime-attendance', handleUpdate);
@@ -70,20 +84,6 @@ export default function DashboardPage() {
       window.removeEventListener('realtime-notification', handleUpdate);
     };
   }, [fetchData]);
-
-  const fetchData = useCallback(async () => {
-    try {
-      const [attRes, quotaRes, histRes] = await Promise.all([
-        api.get('/attendance/today'),
-        api.get('/leave/quota'),
-        api.get('/attendance/my'),
-      ]);
-      setTodayAtt(attRes.data.attendance);
-      setQuota(quotaRes.data.quota);
-      setRecentAtt(histRes.data.attendances.slice(0, 7));
-      setLastUpdated(new Date());
-    } catch {}
-  }, []);
 
   useAutoRefresh(fetchData, 30_000);
 

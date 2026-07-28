@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="64" height="64" fill="none" stroke="#4F46E5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Lingkaran Jam Utama -->
+  <circle cx="12" cy="12" r="9" />
+  
+  <!-- Jarum Menit (Berputar Penuh) -->
+  <path d="M12 6v6l4 2">
+    <animateTransform 
+      attributeName="transform" 
+      type="rotate" 
+      from="0 12 12" 
+      to="360 12 12" 
+      dur="4s" 
+      repeatCount="indefinite" />
+  </path>
+  
+  <!-- Indikator Panah Shift / Rotasi di Luar (Opsional untuk kesan dinamis) -->
+  <path d="M19 10.5a7 7 0 1 1-1.35-4" stroke="#10B981" stroke-dasharray="3 3">
+    <animateTransform 
+      attributeName="transform" 
+      type="rotate" 
+      from="360 12 12" 
+      to="0 12 12" 
+      dur="8s" 
+      repeatCount="indefinite" />
+  </path>
+</svg>
