@@ -141,14 +141,15 @@ const checkIn = async (req, res) => {
     // ── Face Verification ─────────────────────────────────────────────────────
     const [userRows] = await pool.query('SELECT face_photo, avatar FROM users WHERE id = ?', [userId]);
     const facePhotoFilename = userRows[0]?.face_photo;
-    const localVerified = req.body.local_verified === 'true';
-    if (facePhotoFilename && facePhotoFilename.trim() !== '' && !localVerified) {
+    if (facePhotoFilename && facePhotoFilename.trim() !== '') {
       // face_bbox dikirim dari Flutter sebagai JSON string: {"x":..,"y":..,"width":..,"height":..}
+      // Catatan: verifikasi WAJIB dijalankan di server terlepas dari klaim `local_verified`
+      // dari client — flag itu mudah dipalsukan (mis. lewat proxy/APK yang dimodifikasi).
       let selfieBbox = null;
       try { selfieBbox = req.body.face_bbox ? JSON.parse(req.body.face_bbox) : null; } catch (_) {}
       const faceResult = await verifyFace(photoPath, facePhotoFilename, selfieBbox);
       console.log(`[Attendance CheckIn] Face verification for user ${userId}: match=${faceResult.match}, similarity=${faceResult.similarity}, message=${faceResult.message}`);
-      if (!faceResult.match && !faceResult.message.startsWith('skip')) {
+      if (!faceResult.match) {
         const fs = require('fs');
         const path = require('path');
         fs.unlink(path.join(__dirname, '../../uploads/selfie', photoPath), () => {});
@@ -158,8 +159,6 @@ const checkIn = async (req, res) => {
           face_similarity: faceResult.similarity,
         });
       }
-    } else {
-      console.log(`[Attendance CheckIn] Face verification bypassed for user ${userId}: localVerified=${localVerified}, hasFacePhoto=${!!facePhotoFilename}`);
     }
     // ─────────────────────────────────────────────────────────────────────────
 
@@ -363,13 +362,13 @@ const checkOut = async (req, res) => {
     // ── Face Verification ─────────────────────────────────────────────────────
     const [userRowsOut] = await pool.query('SELECT face_photo, avatar FROM users WHERE id = ?', [userId]);
     const facePhotoFilenameOut = userRowsOut[0]?.face_photo;
-    const localVerifiedOut = req.body.local_verified === 'true';
-    if (facePhotoFilenameOut && facePhotoFilenameOut.trim() !== '' && !localVerifiedOut) {
+    if (facePhotoFilenameOut && facePhotoFilenameOut.trim() !== '') {
+      // Verifikasi WAJIB dijalankan di server terlepas dari klaim `local_verified` client.
       let selfieBbox = null;
       try { selfieBbox = req.body.face_bbox ? JSON.parse(req.body.face_bbox) : null; } catch (_) {}
       const faceResult = await verifyFace(photoPath, facePhotoFilenameOut, selfieBbox);
       console.log(`[Attendance CheckOut] Face verification for user ${userId}: match=${faceResult.match}, similarity=${faceResult.similarity}, message=${faceResult.message}`);
-      if (!faceResult.match && !faceResult.message.startsWith('skip')) {
+      if (!faceResult.match) {
         const fs = require('fs');
         const path = require('path');
         fs.unlink(path.join(__dirname, '../../uploads/selfie', photoPath), () => {});
@@ -379,8 +378,6 @@ const checkOut = async (req, res) => {
           face_similarity: faceResult.similarity,
         });
       }
-    } else {
-      console.log(`[Attendance CheckOut] Face verification bypassed for user ${userId}: localVerified=${localVerifiedOut}, hasFacePhoto=${!!facePhotoFilenameOut}`);
     }
     // ─────────────────────────────────────────────────────────────────────────
 

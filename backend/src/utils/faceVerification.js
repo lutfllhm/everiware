@@ -1,15 +1,13 @@
 /**
- * Face Verification Utility — menggunakan sharp (pure JS, no native AI)
+ * Face Verification Utility
  *
- * Cara kerja:
- * 1. Flutter mengirim koordinat bounding box wajah dari ML Kit (selfie)
- * 2. Backend crop region wajah dari selfie dan avatar profil
- * 3. Bandingkan histogram warna (HSV) dari kedua crop
- * 4. Jika similarity cukup tinggi → wajah dianggap cocok
+ * Verifikasi kecocokan wajah (attendance) dilakukan sepenuhnya oleh AI Microservice
+ * (InsightFace/ArcFace, lihat verifyFace()). Kebijakannya fail-closed: jika AI service
+ * tidak bisa dihubungi, absensi ditolak — bukan diturunkan ke perbandingan gambar
+ * non-AI yang mudah dikelabui.
  *
- * Ini bukan face recognition berbasis AI, tapi cukup untuk mendeteksi
- * perbedaan orang yang jelas (warna kulit, rambut, proporsi wajah berbeda).
- * Untuk keamanan lebih tinggi, bisa diganti dengan AI di masa depan.
+ * Deteksi wajah saat registrasi (validateRegistrationFace) tetap memakai sharp
+ * sebagai fallback ringan karena risikonya lebih rendah (bukan gerbang matching identitas).
  */
 
 const sharp = require('sharp');
@@ -17,63 +15,6 @@ const path  = require('path');
 const fs    = require('fs');
 
 const UPLOADS_DIR = path.join(__dirname, '../../uploads');
-
-// Threshold keamanan wajah (makin tinggi makin ketat)
-const PEARSON_THRESHOLD   = 0.48; // Membandingkan posisi struktural wajah (mata, hidung, mulut)
-const HISTOGRAM_THRESHOLD = 0.45; // Membandingkan kemiripan warna kulit, kontras, dan pencahayaan (diturunkan agar toleran cahaya)
-
-/**
- * Hitung histogram channel (array 256 bucket) dari buffer grayscale
- */
-function computeHistogram(buffer) {
-  const hist = new Array(256).fill(0);
-  for (const val of buffer) hist[val]++;
-  // Normalisasi
-  const total = buffer.length;
-  return hist.map(v => v / total);
-}
-
-/**
- * Hitung Bhattacharyya coefficient antara dua histogram (0–1, makin tinggi makin mirip)
- */
-function bhattacharyyaCoeff(h1, h2) {
-  let sum = 0;
-  for (let i = 0; i < 256; i++) {
-    sum += Math.sqrt(h1[i] * h2[i]);
-  }
-  return sum;
-}
-
-/**
- * Hitung Pearson Correlation Coefficient (Korelasi Spasial) antara dua buffer grayscale
- * Menghasilkan nilai antara -1 hingga 1. Nilai >= 0.50 menandakan kemiripan struktur wajah yang kuat.
- */
-function pearsonCorrelation(buf1, buf2) {
-  if (buf1.length !== buf2.length) return 0;
-  const n = buf1.length;
-  let sum1 = 0, sum2 = 0;
-  for (let i = 0; i < n; i++) {
-    sum1 += buf1[i];
-    sum2 += buf2[i];
-  }
-  const mean1 = sum1 / n;
-  const mean2 = sum2 / n;
-
-  let num = 0;
-  let den1 = 0;
-  let den2 = 0;
-
-  for (let i = 0; i < n; i++) {
-    const diff1 = buf1[i] - mean1;
-    const diff2 = buf2[i] - mean2;
-    num += diff1 * diff2;
-    den1 += diff1 * diff1;
-    den2 += diff2 * diff2;
-  }
-
-  if (den1 === 0 || den2 === 0) return 0;
-  return num / Math.sqrt(den1 * den2);
-}
 
 /**
  * Resize dan crop gambar ke ukuran standar, return buffer grayscale
@@ -197,52 +138,16 @@ async function verifyFace(selfieFilename, avatarFilename, selfieBbox = null) {
       message: data.message || (data.match ? 'Wajah terverifikasi' : 'Wajah tidak cocok'),
     };
   } catch (err) {
-    console.warn(`[FaceVerification] AI Service error/offline: ${err.message}. Falling back to local Sharp-based comparison.`);
-
-    // --- FALLBACK TO LOCAL SHARP COMPARISON ---
-    try {
-      // Extract region wajah dari selfie (pakai bbox jika ada)
-      const selfieBuffer = await extractFaceRegion(selfiePath, selfieBbox);
-      
-      // Putar avatar terlebih dahulu dan baca metadatanya agar pembagian koordinat bbox akurat
-      const rotatedAvatarBuffer = await sharp(avatarPath).rotate().toBuffer();
-      const avatarMeta = await sharp(rotatedAvatarBuffer).metadata();
-      const avatarBbox = avatarMeta ? {
-        x:      Math.round(avatarMeta.width  * 0.15),
-        y:      Math.round(avatarMeta.height * 0.05),
-        width:  Math.round(avatarMeta.width  * 0.70),
-        height: Math.round(avatarMeta.height * 0.65),
-      } : null;
-      const avatarBuffer = await extractFaceRegion(rotatedAvatarBuffer, avatarBbox);
-
-      if (!selfieBuffer || !avatarBuffer) {
-        return { match: false, similarity: 0, message: 'Gagal mengekstrak area wajah dari foto (Fallback)' };
-      }
-
-      // Hitung histogram dan similarity
-      const h1 = computeHistogram(selfieBuffer);
-      const h2 = computeHistogram(avatarBuffer);
-      const histSim = bhattacharyyaCoeff(h1, h2);
-      
-      // Hitung korelasi spasial Pearson
-      const pearsonSim = pearsonCorrelation(selfieBuffer, avatarBuffer);
-
-      // Wajah dianggap cocok jika korelasi spasial AND kemiripan histogram memenuhi batas
-      const match = pearsonSim >= PEARSON_THRESHOLD && histSim >= HISTOGRAM_THRESHOLD;
-
-      console.log(`[FaceVerification] Fallback similarity_pearson=${pearsonSim.toFixed(4)} (th=${PEARSON_THRESHOLD}) similarity_histogram=${histSim.toFixed(4)} (th=${HISTOGRAM_THRESHOLD}) match=${match}`);
-
-      return {
-        match,
-        similarity: parseFloat(((pearsonSim + histSim) / 2).toFixed(4)),
-        message: match
-          ? 'Wajah terverifikasi (Local Fallback)'
-          : 'Wajah tidak cocok dengan akun kamu. Pastikan kamu yang melakukan absensi.',
-      };
-    } catch (fallbackErr) {
-      console.error('[FaceVerification] Fallback verifyFace error:', fallbackErr.message);
-      return { match: false, similarity: 0, message: 'Terjadi kesalahan sistem saat memproses verifikasi wajah' };
-    }
+    // Fail-closed: AI service adalah satu-satunya sumber verifikasi wajah yang bisa diandalkan.
+    // Fallback histogram warna (non-AI) terlalu mudah dikelabui untuk dipakai meloloskan absensi,
+    // jadi ketika AI service tidak bisa dihubungi, absensi ditolak alih-alih diam-diam
+    // menurunkan standar verifikasi.
+    console.error(`[FaceVerification] AI Service error/offline: ${err.message}. Menolak absensi (fail-closed).`);
+    return {
+      match: false,
+      similarity: 0,
+      message: 'Layanan verifikasi wajah sedang tidak tersedia. Silakan coba lagi dalam beberapa saat atau hubungi HRD.',
+    };
   }
 }
 
