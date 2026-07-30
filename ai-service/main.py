@@ -77,8 +77,8 @@ async def verify(selfie: UploadFile = File(...), reference: UploadFile = File(..
         similarity = float(np.dot(feat_selfie, feat_ref))
 
         # Recommended Cosine Similarity threshold for ArcFace (buffalo_l model) is typically 0.40 - 0.45.
-        # 0.40 matches very well across various lighting and minor head angle deviations.
-        threshold = 0.40
+        # Lowered to 0.30 to reduce false rejections under varied lighting/angle at the cost of stricter false-accept protection.
+        threshold = 0.30
         match = similarity >= threshold
 
         logger.info(f"Verification completed. Cosine similarity: {similarity:.4f} (threshold: {threshold}) -> match={match}")
