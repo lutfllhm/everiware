@@ -139,7 +139,7 @@ const checkIn = async (req, res) => {
     const photoPath = req.file.filename;
 
     // ── Face Verification ─────────────────────────────────────────────────────
-    const [userRows] = await pool.query('SELECT face_photo, avatar FROM users WHERE id = ?', [userId]);
+    const [userRows] = await pool.query('SELECT face_photo, face_photo_left, face_photo_right, avatar FROM users WHERE id = ?', [userId]);
     const facePhotoFilename = userRows[0]?.face_photo;
     if (facePhotoFilename && facePhotoFilename.trim() !== '') {
       // face_bbox dikirim dari Flutter sebagai JSON string: {"x":..,"y":..,"width":..,"height":..}
@@ -147,7 +147,8 @@ const checkIn = async (req, res) => {
       // dari client — flag itu mudah dipalsukan (mis. lewat proxy/APK yang dimodifikasi).
       let selfieBbox = null;
       try { selfieBbox = req.body.face_bbox ? JSON.parse(req.body.face_bbox) : null; } catch (_) {}
-      const faceResult = await verifyFace(photoPath, facePhotoFilename, selfieBbox);
+      const extraReferences = [userRows[0]?.face_photo_left, userRows[0]?.face_photo_right].filter(Boolean);
+      const faceResult = await verifyFace(photoPath, facePhotoFilename, selfieBbox, extraReferences);
       console.log(`[Attendance CheckIn] Face verification for user ${userId}: match=${faceResult.match}, similarity=${faceResult.similarity}, message=${faceResult.message}`);
       if (!faceResult.match) {
         const fs = require('fs');
@@ -360,13 +361,14 @@ const checkOut = async (req, res) => {
     const photoPath = req.file.filename;
 
     // ── Face Verification ─────────────────────────────────────────────────────
-    const [userRowsOut] = await pool.query('SELECT face_photo, avatar FROM users WHERE id = ?', [userId]);
+    const [userRowsOut] = await pool.query('SELECT face_photo, face_photo_left, face_photo_right, avatar FROM users WHERE id = ?', [userId]);
     const facePhotoFilenameOut = userRowsOut[0]?.face_photo;
     if (facePhotoFilenameOut && facePhotoFilenameOut.trim() !== '') {
       // Verifikasi WAJIB dijalankan di server terlepas dari klaim `local_verified` client.
       let selfieBbox = null;
       try { selfieBbox = req.body.face_bbox ? JSON.parse(req.body.face_bbox) : null; } catch (_) {}
-      const faceResult = await verifyFace(photoPath, facePhotoFilenameOut, selfieBbox);
+      const extraReferencesOut = [userRowsOut[0]?.face_photo_left, userRowsOut[0]?.face_photo_right].filter(Boolean);
+      const faceResult = await verifyFace(photoPath, facePhotoFilenameOut, selfieBbox, extraReferencesOut);
       console.log(`[Attendance CheckOut] Face verification for user ${userId}: match=${faceResult.match}, similarity=${faceResult.similarity}, message=${faceResult.message}`);
       if (!faceResult.match) {
         const fs = require('fs');

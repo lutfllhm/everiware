@@ -489,38 +489,63 @@ const removeFcmToken = async (req, res) => {
 };
 
 // Register face (self)
+// Menerima hingga 3 foto: face_photo (frontal, wajib), face_photo_left, face_photo_right (opsional).
+// Menyimpan ketiganya sebagai referensi supaya verifikasi absensi bisa membandingkan terhadap
+// beberapa sudut wajah alih-alih satu foto frontal saja — mengurangi false-reject akibat variasi
+// sudut/pencahayaan yang wajar terjadi saat absensi.
 const registerFace = async (req, res) => {
+  const fs = require('fs');
+  const path = require('path');
+  const uploadedFiles = req.files || {};
+  const facePhoto = uploadedFiles.face_photo?.[0]?.filename;
+  const facePhotoLeft = uploadedFiles.face_photo_left?.[0]?.filename;
+  const facePhotoRight = uploadedFiles.face_photo_right?.[0]?.filename;
+
+  const cleanupUploaded = () => {
+    for (const f of [facePhoto, facePhotoLeft, facePhotoRight]) {
+      if (f) fs.unlink(path.join(__dirname, '../../uploads/avatar', f), () => {});
+    }
+  };
+
   try {
-    const facePhoto = req.file ? req.file.filename : undefined;
     if (!facePhoto) {
       return res.status(400).json({ success: false, message: 'File foto wajah tidak ditemukan' });
     }
 
-    console.log('[registerFace] user:', req.user.id, '| file:', facePhoto);
+    console.log('[registerFace] user:', req.user.id, '| files:', { facePhoto, facePhotoLeft, facePhotoRight });
 
-    // Validasi foto wajah menggunakan Python AI Service (atau fallback)
+    // Validasi foto wajah utama (frontal) menggunakan Python AI Service (atau fallback)
     const detectResult = await validateRegistrationFace(facePhoto);
     if (!detectResult.success) {
-      // Hapus file yang terunggah karena tidak valid
-      const fs = require('fs');
-      const path = require('path');
-      const filePath = path.join(__dirname, '../../uploads/avatar', facePhoto);
-      fs.unlink(filePath, () => {});
-
+      cleanupUploaded();
       return res.status(400).json({ success: false, message: detectResult.message });
     }
 
-    // Update face_photo and set face_registered = TRUE
-    await pool.query('UPDATE users SET face_photo = ?, face_registered = TRUE WHERE id = ?', [facePhoto, req.user.id]);
+    // Foto sudut kiri/kanan bersifat opsional (mis. app versi lama) — kalau dikirim, wajahnya
+    // divalidasi juga agar tidak menyimpan file kosong/tanpa wajah sebagai referensi.
+    for (const [label, filename] of [['kiri', facePhotoLeft], ['kanan', facePhotoRight]]) {
+      if (!filename) continue;
+      const sideResult = await validateRegistrationFace(filename);
+      if (!sideResult.success) {
+        cleanupUploaded();
+        return res.status(400).json({ success: false, message: `Foto wajah sudut ${label}: ${sideResult.message}` });
+      }
+    }
+
+    await pool.query(
+      'UPDATE users SET face_photo = ?, face_photo_left = ?, face_photo_right = ?, face_registered = TRUE WHERE id = ?',
+      [facePhoto, facePhotoLeft || null, facePhotoRight || null, req.user.id]
+    );
 
     // Return updated user data including face_photo
     const [rows] = await pool.query(
-      'SELECT id, name, email, phone, avatar, face_photo, role, department, position, employee_id, face_registered FROM users WHERE id = ?',
+      'SELECT id, name, email, phone, avatar, face_photo, face_photo_left, face_photo_right, role, department, position, employee_id, face_registered FROM users WHERE id = ?',
       [req.user.id]
     );
     res.json({ success: true, message: 'Verifikasi wajah berhasil diaktifkan', user: rows[0] });
   } catch (err) {
     console.error('[registerFace] error:', err);
+    cleanupUploaded();
     res.status(500).json({ success: false, message: 'Terjadi kesalahan server' });
   }
 };

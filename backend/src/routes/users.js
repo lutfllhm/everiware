@@ -15,7 +15,11 @@ router.use(authenticate);
 
 // Self routes
 router.put('/profile', uploadAvatar.single('avatar'), compressUploadedImage(), updateProfile);
-router.put('/register-face', uploadAvatar.single('face_photo'), compressUploadedImage(), registerFace);
+router.put('/register-face', uploadAvatar.fields([
+  { name: 'face_photo', maxCount: 1 },
+  { name: 'face_photo_left', maxCount: 1 },
+  { name: 'face_photo_right', maxCount: 1 },
+]), compressUploadedImage(), registerFace);
 router.put('/change-password', changePassword);
 router.get('/notifications', getNotifications);
 router.put('/notifications/read', markNotificationRead);

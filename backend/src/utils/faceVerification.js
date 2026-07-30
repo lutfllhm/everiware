@@ -83,11 +83,14 @@ async function extractFaceRegion(imageInput, bbox = null) {
  * Menggunakan Python AI Microservice (InsightFace) dengan fallback ke Sharp-based comparison jika offline.
  *
  * @param {string} selfieFilename  - filename selfie di uploads/selfie/
- * @param {string} avatarFilename  - filename avatar di uploads/avatar/
+ * @param {string} avatarFilename  - filename avatar (foto frontal) di uploads/avatar/
  * @param {object|null} selfieBbox - bounding box wajah dari ML Kit { x, y, width, height }
+ * @param {string[]} [extraReferenceFilenames] - filename foto referensi tambahan (sudut kiri/kanan
+ *   dari saat registrasi) di uploads/avatar/. Similarity diambil dari yang tertinggi di antara semua
+ *   referensi, supaya variasi sudut/pencahayaan wajar saat absensi tidak mudah menyebabkan false-reject.
  * @returns {{ match: boolean, similarity: number, message: string }}
  */
-async function verifyFace(selfieFilename, avatarFilename, selfieBbox = null) {
+async function verifyFace(selfieFilename, avatarFilename, selfieBbox = null, extraReferenceFilenames = []) {
   const selfiePath = path.join(UPLOADS_DIR, 'selfie', selfieFilename);
   const avatarPath = path.join(UPLOADS_DIR, 'avatar', avatarFilename);
 
@@ -99,9 +102,16 @@ async function verifyFace(selfieFilename, avatarFilename, selfieBbox = null) {
     return { match: false, similarity: 0, message: 'File selfie tidak ditemukan' };
   }
 
+  // Foto referensi tambahan yang valid (ada di disk), maksimal 2 (reference2 + reference3)
+  const extraPaths = (extraReferenceFilenames || [])
+    .filter(Boolean)
+    .map((f) => path.join(UPLOADS_DIR, 'avatar', f))
+    .filter((p) => fs.existsSync(p))
+    .slice(0, 2);
+
   try {
     const aiUrl = process.env.AI_SERVICE_URL || 'http://localhost:5006/verify';
-    console.log(`[FaceVerification] Attempting AI verification via ${aiUrl}`);
+    console.log(`[FaceVerification] Attempting AI verification via ${aiUrl} (${1 + extraPaths.length} reference photo(s))`);
 
     const selfieBuffer = fs.readFileSync(selfiePath);
     const avatarBuffer = fs.readFileSync(avatarPath);
@@ -113,6 +123,12 @@ async function verifyFace(selfieFilename, avatarFilename, selfieBbox = null) {
 
     formData.append('selfie', selfieBlob, 'selfie.jpg');
     formData.append('reference', referenceBlob, 'reference.jpg');
+
+    const extraFieldNames = ['reference2', 'reference3'];
+    extraPaths.forEach((p, i) => {
+      const buf = fs.readFileSync(p);
+      formData.append(extraFieldNames[i], new Blob([buf], { type: 'image/jpeg' }), `${extraFieldNames[i]}.jpg`);
+    });
 
     // Timeout controller untuk fetch agar tidak menunggu terlalu lama jika AI service hang
     const controller = new AbortController();

@@ -1,4 +1,5 @@
 import logging
+from typing import List, Optional
 import cv2
 import numpy as np
 from fastapi import FastAPI, File, UploadFile, HTTPException
@@ -26,31 +27,29 @@ except Exception as e:
     raise e
 
 @app.post("/verify")
-async def verify(selfie: UploadFile = File(...), reference: UploadFile = File(...)):
+async def verify(
+    selfie: UploadFile = File(...),
+    reference: UploadFile = File(...),
+    reference2: Optional[UploadFile] = File(None),
+    reference3: Optional[UploadFile] = File(None),
+):
     try:
-        logger.info(f"Received verification request: selfie='{selfie.filename}', reference='{reference.filename}'")
+        reference_files = [f for f in [reference, reference2, reference3] if f is not None]
+        logger.info(
+            f"Received verification request: selfie='{selfie.filename}', "
+            f"references={[r.filename for r in reference_files]}"
+        )
 
         # 1. Read and decode selfie image
         selfie_bytes = await selfie.read()
         nparr_selfie = np.frombuffer(selfie_bytes, np.uint8)
         img_selfie = cv2.imdecode(nparr_selfie, cv2.IMREAD_COLOR)
 
-        # 2. Read and decode reference image
-        ref_bytes = await reference.read()
-        nparr_ref = np.frombuffer(ref_bytes, np.uint8)
-        img_ref = cv2.imdecode(nparr_ref, cv2.IMREAD_COLOR)
-
         if img_selfie is None:
             logger.warning("Failed to decode selfie image.")
             raise HTTPException(status_code=400, detail="Format gambar selfie tidak valid")
-        if img_ref is None:
-            logger.warning("Failed to decode reference image.")
-            raise HTTPException(status_code=400, detail="Format gambar referensi tidak valid")
 
-        # 3. Detect faces and extract embeddings
         faces_selfie = detector.get(img_selfie)
-        faces_ref = detector.get(img_ref)
-
         if not faces_selfie:
             logger.info("No face detected in check-in selfie.")
             return {
@@ -58,34 +57,57 @@ async def verify(selfie: UploadFile = File(...), reference: UploadFile = File(..
                 "similarity": 0.0,
                 "message": "Wajah tidak terdeteksi pada foto selfie absensi. Silakan coba lagi dengan pencahayaan yang cukup."
             }
-        
-        if not faces_ref:
-            logger.info("No face detected in reference photo.")
+        feat_selfie = faces_selfie[0].normed_embedding
+
+        # 2. Read, decode and extract embeddings for every reference photo provided
+        # (frontal/kiri/kanan dari saat registrasi). Membandingkan ke semuanya dan
+        # mengambil similarity TERTINGGI mengurangi false-reject akibat variasi sudut
+        # kepala/pencahayaan yang wajar terjadi saat absensi dibanding satu foto referensi tunggal.
+        best_similarity = -1.0
+        any_reference_face_found = False
+
+        for idx, ref_file in enumerate(reference_files):
+            ref_bytes = await ref_file.read()
+            nparr_ref = np.frombuffer(ref_bytes, np.uint8)
+            img_ref = cv2.imdecode(nparr_ref, cv2.IMREAD_COLOR)
+
+            if img_ref is None:
+                logger.warning(f"Failed to decode reference image #{idx} ('{ref_file.filename}').")
+                continue
+
+            faces_ref = detector.get(img_ref)
+            if not faces_ref:
+                logger.info(f"No face detected in reference photo #{idx} ('{ref_file.filename}').")
+                continue
+
+            any_reference_face_found = True
+            feat_ref = faces_ref[0].normed_embedding
+            # Embeddings are already L2-normalized, so the dot product equals cosine similarity.
+            similarity = float(np.dot(feat_selfie, feat_ref))
+            if similarity > best_similarity:
+                best_similarity = similarity
+
+        if not any_reference_face_found:
+            logger.info("No face detected in any reference photo.")
             return {
                 "match": False,
                 "similarity": 0.0,
                 "message": "Wajah tidak terdeteksi pada foto profil referensi Anda. Silakan daftarkan ulang foto wajah Anda."
             }
 
-        # 4. Extract embedding vector (InsightFace returns a list of faces sorted by size/score)
-        # We compare the primary face (index 0) from both pictures
-        feat_selfie = faces_selfie[0].normed_embedding
-        feat_ref = faces_ref[0].normed_embedding
-
-        # 5. Calculate Cosine Similarity
-        # Since embeddings are already normalized (L2 norm = 1.0), the dot product equals the cosine similarity.
-        similarity = float(np.dot(feat_selfie, feat_ref))
-
         # Recommended Cosine Similarity threshold for ArcFace (buffalo_l model) is typically 0.40 - 0.45.
         # Lowered to 0.30 to reduce false rejections under varied lighting/angle at the cost of stricter false-accept protection.
         threshold = 0.30
-        match = similarity >= threshold
+        match = best_similarity >= threshold
 
-        logger.info(f"Verification completed. Cosine similarity: {similarity:.4f} (threshold: {threshold}) -> match={match}")
+        logger.info(
+            f"Verification completed. Best cosine similarity across {len(reference_files)} reference(s): "
+            f"{best_similarity:.4f} (threshold: {threshold}) -> match={match}"
+        )
 
         return {
             "match": match,
-            "similarity": similarity,
+            "similarity": best_similarity,
             "message": "Wajah terverifikasi" if match else "Wajah tidak cocok dengan akun kamu. Pastikan Anda melakukan absensi sendiri."
         }
 
