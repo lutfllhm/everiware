@@ -89,6 +89,16 @@ const EmployeeRoute = ({ children }) => {
   return <EmployeeLayout>{children}</EmployeeLayout>;
 };
 
+// Ke mana user diarahkan setelah login/buka root path.
+// Admin-tier -> /admin. Employee dengan grant fitur (mis. shifts.manage) -> langsung ke
+// halaman fitur pertama yang dia pegang, bukan /admin (yang akan redirect balik ke situ juga).
+// Employee biasa tanpa grant apa pun -> /dashboard (portal karyawan).
+const getHomeRoute = (currentUser) => {
+  if (['superadmin', 'admin', 'hrd'].includes(currentUser?.role)) return '/admin';
+  if (Array.isArray(currentUser?.permissions) && currentUser.permissions.includes('shifts.manage')) return '/admin/shifts';
+  return '/dashboard';
+};
+
 export default function App() {
   const { isAuthenticated, user } = useAuthStore();
   const stored = (() => { try { return JSON.parse(localStorage.getItem('iware-auth') || '{}'); } catch { return {}; } })();
@@ -105,8 +115,8 @@ export default function App() {
           error: { iconTheme: { primary: '#ef4444', secondary: '#fff' } },
         }} />
         <Routes>
-          <Route path="/" element={auth ? <Navigate to={['superadmin','admin','hrd'].includes(currentUser?.role) ? '/admin' : '/dashboard'} replace /> : <LoginPage />} />
-          <Route path="/login" element={auth ? <Navigate to={['superadmin','admin','hrd'].includes(currentUser?.role) ? '/admin' : '/dashboard'} replace /> : <LoginPage />} />
+          <Route path="/" element={auth ? <Navigate to={getHomeRoute(currentUser)} replace /> : <LoginPage />} />
+          <Route path="/login" element={auth ? <Navigate to={getHomeRoute(currentUser)} replace /> : <LoginPage />} />
           
           {/* Aktivasi akun karyawan baru */}
           <Route path="/activate/:token" element={<ActivateAccountPage />} />

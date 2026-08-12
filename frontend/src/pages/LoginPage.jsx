@@ -23,6 +23,14 @@ const formVariants = {
   exit: (dir) => ({ x: dir === 'left' ? -36 : 36, opacity: 0, scale: 0.97, transition: { duration: 0.2, ease: [0.55, 0, 1, 0.45] } }),
 };
 
+// Admin-tier -> /admin. Employee dengan grant fitur (mis. shifts.manage) -> langsung ke
+// halaman fitur yang dia pegang. Employee biasa -> /dashboard (portal karyawan).
+const getHomeRoute = (user) => {
+  if (['superadmin', 'admin', 'hrd'].includes(user?.role)) return '/admin';
+  if (Array.isArray(user?.permissions) && user.permissions.includes('shifts.manage')) return '/admin/shifts';
+  return '/dashboard';
+};
+
 export default function LoginPage() {
   const { setAuth } = useAuthStore();
   const [mode, setMode] = useState('login');
@@ -84,7 +92,7 @@ export default function LoginPage() {
       localStorage.setItem('iware-auth', JSON.stringify({ user: data.user, token: data.token, isAuthenticated: true }));
       setAuth(data.user, data.token);
       toast.success('Berhasil masuk!');
-      setTimeout(() => { window.location.href = ['superadmin','admin','hrd'].includes(data.user.role) ? '/admin' : '/dashboard'; }, 300);
+      setTimeout(() => { window.location.href = getHomeRoute(data.user); }, 300);
     } catch (err) { toast.error(err.response?.data?.message || 'Email atau password salah'); }
     finally { setLoading(false); }
   };
@@ -105,7 +113,7 @@ export default function LoginPage() {
       const { data } = await api.post('/auth/verify-otp', { userId: pendingUserId, otp: code });
       localStorage.setItem('token', data.token); setAuth(data.user, data.token);
       toast.success('Verifikasi berhasil!');
-      window.location.href = ['superadmin','admin','hrd'].includes(data.user.role) ? '/admin' : '/dashboard';
+      window.location.href = getHomeRoute(data.user);
     } catch (err) { toast.error(err.response?.data?.message || 'Kode OTP salah atau sudah kadaluarsa'); }
     finally { setLoading(false); }
   };
