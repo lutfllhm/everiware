@@ -64,7 +64,7 @@ const getUserShift = async (req, res) => {
       `SELECT us.*, ws.name as shift_name, ws.start_time, ws.end_time, ws.late_tolerance
        FROM user_shifts us
        JOIN work_shifts ws ON us.shift_id = ws.id
-       WHERE us.user_id = ?
+       WHERE us.user_id = ? AND us.effective_date <= CURDATE()
        ORDER BY us.effective_date DESC LIMIT 1`,
       [userId]
     );

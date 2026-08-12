@@ -113,7 +113,13 @@ const getTopLate = async (req, res) => {
       `SELECT u.id, u.name, u.employee_id, u.department, u.avatar,
               COUNT(*) as late_count,
               AVG(TIME_TO_SEC(TIMEDIFF(a.check_in, CONCAT(a.date,' ',
-                (SELECT setting_value FROM app_settings WHERE setting_key='work_start_time')
+                COALESCE(
+                  (SELECT ws.start_time FROM user_shifts us
+                   JOIN work_shifts ws ON us.shift_id = ws.id
+                   WHERE us.user_id = a.user_id AND us.effective_date <= a.date
+                   ORDER BY us.effective_date DESC LIMIT 1),
+                  (SELECT setting_value FROM app_settings WHERE setting_key='work_start_time')
+                )
               ))) / 60) as avg_late_minutes
        FROM attendances a
        JOIN users u ON a.user_id = u.id

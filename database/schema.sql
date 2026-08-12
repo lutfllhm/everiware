@@ -20,6 +20,8 @@ CREATE TABLE IF NOT EXISTS users (
   google_id VARCHAR(100),
   avatar VARCHAR(255),
   face_photo VARCHAR(255),
+  face_photo_left VARCHAR(255),
+  face_photo_right VARCHAR(255),
   role ENUM('superadmin','admin','hrd','employee') DEFAULT 'employee',
   department VARCHAR(100),
   position VARCHAR(100),

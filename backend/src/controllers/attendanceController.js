@@ -17,6 +17,39 @@ const todayWIB = () => {
   return `${y}-${m}-${d}`;
 };
 
+// Resolve shift kerja efektif seorang user pada tanggal tertentu.
+// Prioritas: assignment di user_shifts (effective_date <= date terbaru) →
+// fallback ke app_settings global (dianggap "Shift Reguler").
+const resolveUserShift = async (userId, date) => {
+  const [rows] = await pool.query(
+    `SELECT ws.name, ws.start_time, ws.end_time, ws.late_tolerance
+     FROM user_shifts us
+     JOIN work_shifts ws ON us.shift_id = ws.id
+     WHERE us.user_id = ? AND us.effective_date <= ? AND ws.is_active = TRUE
+     ORDER BY us.effective_date DESC LIMIT 1`,
+    [userId, date]
+  );
+  if (rows.length) {
+    return {
+      name: rows[0].name,
+      start_time: rows[0].start_time,
+      end_time: rows[0].end_time,
+      late_tolerance: rows[0].late_tolerance,
+    };
+  }
+
+  const [settings] = await pool.query(
+    "SELECT setting_key, setting_value FROM app_settings WHERE setting_key IN ('work_start_time','work_end_time','late_tolerance')"
+  );
+  const s = Object.fromEntries(settings.map(r => [r.setting_key, r.setting_value]));
+  return {
+    name: 'Shift Reguler',
+    start_time: s.work_start_time || '08:00',
+    end_time: s.work_end_time || '17:00',
+    late_tolerance: parseInt(s.late_tolerance || '10'),
+  };
+};
+
 // Check in
 const checkIn = async (req, res) => {
   try {
@@ -166,11 +199,10 @@ const checkIn = async (req, res) => {
     const now = nowWIB();
     const id = generateId();
 
-    // Determine status (late check)
-    const [settings] = await pool.query("SELECT setting_value FROM app_settings WHERE setting_key = 'work_start_time'");
-    const workStart = settings[0]?.setting_value || '08:00';
-    const [toleranceRow] = await pool.query("SELECT setting_value FROM app_settings WHERE setting_key = 'late_tolerance'");
-    const tolerance = parseInt(toleranceRow[0]?.setting_value || '15');
+    // Determine status (late check) — berdasarkan shift yang ditetapkan untuk karyawan ini
+    const myShift = await resolveUserShift(userId, today);
+    const workStart = myShift.start_time;
+    const tolerance = myShift.late_tolerance;
 
     const [startH, startM] = workStart.split(':').map(Number);
     const workStartMinutes = startH * 60 + startM + tolerance;
@@ -456,17 +488,18 @@ const getTodayAttendance = async (req, res) => {
     );
     const ps = Object.fromEntries(permissionSettings.map(r => [r.setting_key, r.setting_value]));
 
-    // Kirim info jam kerja hari ini (termasuk Sabtu)
+    // Kirim info jam kerja hari ini (termasuk Sabtu), berdasarkan shift karyawan
     const dayOfWeek = nowWIBParts().getUTCDay();
-    const [workSettings] = await pool.query(
-      "SELECT setting_key, setting_value FROM app_settings WHERE setting_key IN ('work_start_time','work_end_time','saturday_work_enabled','saturday_end_time')"
+    const [satSettings2] = await pool.query(
+      "SELECT setting_key, setting_value FROM app_settings WHERE setting_key IN ('saturday_work_enabled','saturday_end_time')"
     );
-    const ws = Object.fromEntries(workSettings.map(r => [r.setting_key, r.setting_value]));
+    const ss = Object.fromEntries(satSettings2.map(r => [r.setting_key, r.setting_value]));
+    const myShift = await resolveUserShift(req.user.id, today);
 
     const isSaturday = dayOfWeek === 6;
     const isSunday   = dayOfWeek === 0;
-    const satEnabled = ws.saturday_work_enabled !== 'false';
-    const endTime    = isSaturday && satEnabled ? (ws.saturday_end_time || '15:00') : (ws.work_end_time || '17:00');
+    const satEnabled = ss.saturday_work_enabled !== 'false';
+    const endTime    = isSaturday && satEnabled ? (ss.saturday_end_time || '15:00') : myShift.end_time;
 
     res.json({
       success: true,
@@ -477,12 +510,13 @@ const getTodayAttendance = async (req, res) => {
         early_leave_min_time: ps.early_leave_min_time || '13:00',
       },
       work_info: {
-        start_time:       ws.work_start_time || '08:00',
+        shift_name:       myShift.name,
+        start_time:       myShift.start_time,
         end_time:         endTime,
         is_saturday:      isSaturday,
         is_sunday:        isSunday,
         saturday_enabled: satEnabled,
-        saturday_end_time: ws.saturday_end_time || '15:00',
+        saturday_end_time: ss.saturday_end_time || '15:00',
       }
     });
   } catch (err) {
@@ -683,12 +717,9 @@ const updateAttendance = async (req, res) => {
     // Hitung ulang status jika check_in berubah
     let newStatus = status || att.status;
     if (check_in && ['present', 'late'].includes(newStatus)) {
-      const [settings] = await pool.query(
-        "SELECT setting_value FROM app_settings WHERE setting_key IN ('work_start_time','late_tolerance')"
-      );
-      const ws = Object.fromEntries(settings.map(r => [r.setting_key, r.setting_value]));
-      const [wh, wm] = (ws.work_start_time || '08:00').split(':').map(Number);
-      const tolerance = parseInt(ws.late_tolerance || '10');
+      const myShift = await resolveUserShift(att.user_id, dateStr);
+      const [wh, wm] = myShift.start_time.split(':').map(Number);
+      const tolerance = myShift.late_tolerance;
       const [ih, im] = check_in.split(':').map(Number);
       const workMins = wh * 60 + wm + tolerance;
       const inMins   = ih * 60 + im;
