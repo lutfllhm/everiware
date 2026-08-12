@@ -3,6 +3,7 @@ const { pool } = require('../config/database');
 const { generateId } = require('../utils/helpers');
 const { auditLog } = require('../utils/auditLog');
 const { validateRegistrationFace } = require('../utils/faceVerification');
+const { sendPushToMany } = require('../utils/fcm');
 
 
 // Get all users (admin)
@@ -398,6 +399,8 @@ const broadcastNotification = async (req, res) => {
 
     const { broadcastEvent } = require('../utils/realtimeManager');
     broadcastEvent('notification_update', { event: 'notification_update' });
+
+    sendPushToMany(employees.map(e => e.id), title, message, { category: 'broadcast' }).catch(() => {});
 
     res.json({ success: true, message: `Notifikasi berhasil dikirim ke ${employees.length} karyawan` });
   } catch (err) {

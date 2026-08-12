@@ -1,4 +1,5 @@
 .env.production
+backend/firebase-service-account.json
 .vscode/
 uploads/
 backups/

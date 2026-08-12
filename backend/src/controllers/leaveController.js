@@ -11,7 +11,7 @@ const notify = async (userId, title, message, type = 'info') => {
     'INSERT INTO notifications (id, user_id, title, message, type) VALUES (?, ?, ?, ?, ?)',
     [id, userId, title, message, type]
   );
-  await sendPushNotification(userId, title, message).catch(() => {});
+  await sendPushNotification(userId, title, message, { category: 'leave' }).catch(() => {});
 };
 
 // ── Helper: finalize approved leave (quota + attendance) ──────────────────────
