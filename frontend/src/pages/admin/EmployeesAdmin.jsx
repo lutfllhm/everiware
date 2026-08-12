@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Plus, Edit, Trash2, X, User, Mail, Phone, Building, Briefcase, Calendar, AlertTriangle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../../api/axios';
+import { FEATURES } from '../../constants/features';
 
 export default function EmployeesAdmin() {
   const [users, setUsers] = useState([]);
@@ -20,6 +21,7 @@ export default function EmployeesAdmin() {
   const [quotaForm, setQuotaForm] = useState({ total_days: 12, year: new Date().getFullYear() });
   const [locations, setLocations] = useState([]);
   const [locationFilter, setLocationFilter] = useState('');
+  const [permissions, setPermissions] = useState([]);
 
   useEffect(() => { fetchUsers(); fetchManagers(); fetchDepartments(); fetchLocations(); }, [locationFilter]);
 
@@ -34,8 +36,11 @@ export default function EmployeesAdmin() {
 
   const fetchManagers = async () => {
     try {
-      const { data } = await api.get('/users');
-      setManagers(data.users.filter(u => ['superadmin','admin','hrd'].includes(u.role) || u.role === 'employee'));
+      const { data } = await api.get('/users?limit=1000');
+      setManagers(data.users.filter(u =>
+        ['superadmin','admin','hrd'].includes(u.role) ||
+        (Array.isArray(u.permissions) && u.permissions.length > 0)
+      ));
     } catch {}
   };
 
@@ -61,6 +66,9 @@ export default function EmployeesAdmin() {
     try {
       if (editUser) {
         await api.put(`/users/${editUser.id}`, form);
+        if (form.role === 'employee') {
+          await api.put(`/users/${editUser.id}/permissions`, { feature_keys: permissions });
+        }
         toast.success('Data karyawan berhasil diperbarui');
       } else {
         // Create user with avatar upload
@@ -84,6 +92,7 @@ export default function EmployeesAdmin() {
       setForm({ name: '', email: '', password: '', phone: '', role: 'employee', department: '', position: '', employee_id: '', join_date: '', manager_id: '', send_invitation: true, location_id: '' });
       setAvatarFile(null);
       setAvatarPreview(null);
+      setPermissions([]);
       fetchUsers();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Gagal menyimpan data');
@@ -129,10 +138,23 @@ export default function EmployeesAdmin() {
     setForm({ name: user.name, email: user.email, password: '', phone: user.phone || '', role: user.role, department: user.department || '', position: user.position || '', employee_id: user.employee_id || '', join_date: user.join_date?.split('T')[0] || '', manager_id: user.manager_id || '', send_invitation: false, location_id: user.location_id || '' });
     setAvatarFile(null);
     setAvatarPreview(null);
+    setPermissions([]);
     setShowModal(true);
     // Refresh lokasi & manager agar tidak ada opsi usang yang sudah dihapus di database
     fetchLocations();
     fetchManagers();
+    fetchPermissions(user.id);
+  };
+
+  const fetchPermissions = async (userId) => {
+    try {
+      const { data } = await api.get(`/users/${userId}/permissions`);
+      setPermissions(data.permissions || []);
+    } catch {}
+  };
+
+  const togglePermission = (key) => {
+    setPermissions(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]);
   };
 
   const handleAvatarChange = (e) => {
@@ -173,7 +195,7 @@ export default function EmployeesAdmin() {
             ))}
           </select>
         </div>
-        <button onClick={() => { setEditUser(null); setForm({ name: '', email: '', password: '', phone: '', role: 'employee', department: '', position: '', employee_id: '', join_date: '', manager_id: '', send_invitation: true, location_id: '' }); setAvatarFile(null); setAvatarPreview(null); setShowModal(true); }}
+        <button onClick={() => { setEditUser(null); setForm({ name: '', email: '', password: '', phone: '', role: 'employee', department: '', position: '', employee_id: '', join_date: '', manager_id: '', send_invitation: true, location_id: '' }); setAvatarFile(null); setAvatarPreview(null); setPermissions([]); setShowModal(true); }}
           className="btn-primary py-2.5 flex items-center gap-2 text-sm">
           <Plus size={16} /> Tambah Karyawan
         </button>
@@ -384,11 +406,36 @@ export default function EmployeesAdmin() {
                   <label className="text-xs font-medium text-slate-600 mb-1 block">Atasan / Manager (untuk multi-level approval)</label>
                   <select value={form.manager_id} onChange={e => setForm({ ...form, manager_id: e.target.value })} className="input-field text-sm">
                     <option value="">Tidak ada atasan</option>
-                    {managers.filter(m => m.id !== editUser?.id).map(m => (
-                      <option key={m.id} value={m.id}>{m.name} ({m.role})</option>
-                    ))}
+                    {managers
+                      .filter(m => m.id !== editUser?.id)
+                      .filter(m => !form.department || m.department === form.department)
+                      .map(m => (
+                        <option key={m.id} value={m.id}>{m.name} ({m.role})</option>
+                      ))}
                   </select>
+                  <p className="text-xs text-slate-400 mt-1">Menampilkan akun HRD/Admin serta karyawan yang sudah diberi akses, di divisi yang sama{!form.department && ' (pilih divisi karyawan dulu untuk menyaring)'}</p>
                 </div>
+                {editUser && form.role === 'employee' && (
+                  <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+                    <label className="text-xs font-medium text-slate-600 mb-2 block">Kelola Akses (fitur admin yang diberikan)</label>
+                    <div className="space-y-2">
+                      {FEATURES.map(f => (
+                        <label key={f.key} className="flex items-start gap-2.5 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={permissions.includes(f.key)}
+                            onChange={() => togglePermission(f.key)}
+                            className="w-4 h-4 mt-0.5 text-blue-600 rounded"
+                          />
+                          <span>
+                            <span className="text-sm font-medium text-slate-700 block">{f.label}</span>
+                            <span className="text-xs text-slate-400">{f.description}</span>
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 {!editUser && (
                   <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4">
                     <div className="flex items-start gap-3">

@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const { pool } = require('../config/database');
+const { hasFeaturePermission } = require('../utils/permissionScope');
 
 const authenticate = async (req, res, next) => {
   try {
@@ -24,4 +25,16 @@ const authorize = (...roles) => (req, res, next) => {
   next();
 };
 
-module.exports = { authenticate, authorize };
+// Lolos kalau role admin-tier (superadmin/admin/hrd), ATAU kalau user memegang
+// grant featureKey di user_feature_permissions. Tidak menerapkan scope divisi —
+// controller yang memanggil ini wajib memfilter hasil/aksi lewat resolveScope().
+const authorizeOrPermission = (featureKey) => async (req, res, next) => {
+  if (['superadmin', 'admin', 'hrd'].includes(req.user.role)) return next();
+  const allowed = await hasFeaturePermission(req.user.id, featureKey);
+  if (!allowed) {
+    return res.status(403).json({ success: false, message: 'Akses ditolak' });
+  }
+  next();
+};
+
+module.exports = { authenticate, authorize, authorizeOrPermission };

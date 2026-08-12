@@ -4,6 +4,15 @@ const { pool } = require('../config/database');
 const { generateOTP, generateId } = require('../utils/helpers');
 const { sendOTPEmail, sendPasswordResetEmail } = require('../utils/email');
 
+// Lampirkan daftar feature_key yang dipegang user (untuk gating menu admin di frontend)
+const attachPermissions = async (user) => {
+  const [rows] = await pool.query(
+    'SELECT feature_key FROM user_feature_permissions WHERE user_id = ?',
+    [user.id]
+  );
+  return { ...user, permissions: rows.map(r => r.feature_key) };
+};
+
 // Helper: format user object konsisten untuk web & mobile
 const formatUser = (user) => ({
   id: user.id,
@@ -47,7 +56,7 @@ const verifyOTP = async (req, res) => {
     await pool.query('UPDATE users SET is_verified = TRUE, otp_code = NULL, otp_expires = NULL WHERE id = ?', [userId]);
 
     const token = generateToken(user);
-    res.json({ success: true, message: 'Verifikasi berhasil!', token, user: formatUser(user) });
+    res.json({ success: true, message: 'Verifikasi berhasil!', token, user: await attachPermissions(formatUser(user)) });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Terjadi kesalahan server' });
   }
@@ -96,7 +105,7 @@ const login = async (req, res) => {
     const token = generateToken(user);
     res.json({
       success: true, message: 'Login berhasil!', token,
-      user: formatUser(user)
+      user: await attachPermissions(formatUser(user))
     });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Terjadi kesalahan server' });
@@ -114,7 +123,7 @@ const getMe = async (req, res) => {
        WHERE u.id = ?`,
       [req.user.id]
     );
-    res.json({ success: true, user: rows[0] });
+    res.json({ success: true, user: await attachPermissions(rows[0]) });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Terjadi kesalahan server' });
   }
@@ -237,7 +246,7 @@ const activateAccount = async (req, res) => {
       success: true,
       message: 'Akun berhasil diaktifkan! Silakan login.',
       token: jwtToken,
-      user: formatUser({ ...user, is_verified: true }),
+      user: await attachPermissions(formatUser({ ...user, is_verified: true })),
     });
   } catch (err) {
     console.error(err);

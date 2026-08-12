@@ -89,6 +89,21 @@ const testConnection = async () => {
       )
     `);
     
+    // Create user_feature_permissions table (akses granular per-user, mis. kelola shift divisi)
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS user_feature_permissions (
+        id VARCHAR(36) PRIMARY KEY,
+        user_id VARCHAR(36) NOT NULL,
+        feature_key VARCHAR(50) NOT NULL,
+        granted_by VARCHAR(36) DEFAULT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY uq_user_feature (user_id, feature_key),
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (granted_by) REFERENCES users(id) ON DELETE SET NULL,
+        INDEX idx_ufp_user (user_id)
+      )
+    `);
+
     // Seed initial announcements if empty
     const [rows] = await conn.query('SELECT COUNT(*) as count FROM company_announcements');
     if (rows[0].count === 0) {

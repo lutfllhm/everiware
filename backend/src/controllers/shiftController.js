@@ -1,5 +1,6 @@
 const { pool } = require('../config/database');
 const { generateId } = require('../utils/helpers');
+const { resolveScope } = require('../utils/permissionScope');
 
 // ── SHIFT CRUD ────────────────────────────────────────────────────────────────
 
@@ -60,6 +61,17 @@ const deleteShift = async (req, res) => {
 const getUserShift = async (req, res) => {
   try {
     const userId = req.params.userId || req.user.id;
+
+    if (req.params.userId) {
+      const scope = resolveScope(req.user);
+      if (scope.scoped) {
+        const [target] = await pool.query('SELECT department_id FROM users WHERE id = ?', [userId]);
+        if (!target.length || target[0].department_id !== scope.departmentId) {
+          return res.status(403).json({ success: false, message: 'Karyawan di luar divisi Anda' });
+        }
+      }
+    }
+
     const [rows] = await pool.query(
       `SELECT us.*, ws.name as shift_name, ws.start_time, ws.end_time, ws.late_tolerance
        FROM user_shifts us
@@ -84,6 +96,15 @@ const assignShift = async (req, res) => {
     const { user_id, shift_id, effective_date } = req.body;
     if (!user_id || !shift_id || !effective_date)
       return res.status(400).json({ success: false, message: 'user_id, shift_id, dan effective_date wajib diisi' });
+
+    const scope = resolveScope(req.user);
+    if (scope.scoped) {
+      const [target] = await pool.query('SELECT department_id FROM users WHERE id = ?', [user_id]);
+      if (!target.length || target[0].department_id !== scope.departmentId) {
+        return res.status(403).json({ success: false, message: 'Karyawan di luar divisi Anda' });
+      }
+    }
+
     const id = generateId();
     await pool.query(
       'INSERT INTO user_shifts (id, user_id, shift_id, effective_date) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE shift_id = ?, effective_date = ?',
@@ -102,6 +123,17 @@ const bulkAssignShift = async (req, res) => {
     if (!user_ids?.length || !shift_id || !effective_date)
       return res.status(400).json({ success: false, message: 'user_ids, shift_id, dan effective_date wajib diisi' });
 
+    const scope = resolveScope(req.user);
+    if (scope.scoped) {
+      const [targets] = await pool.query(
+        `SELECT id FROM users WHERE id IN (?) AND department_id = ?`,
+        [user_ids, scope.departmentId]
+      );
+      if (targets.length !== user_ids.length) {
+        return res.status(403).json({ success: false, message: 'Ada karyawan di luar divisi Anda' });
+      }
+    }
+
     for (const uid of user_ids) {
       const id = generateId();
       await pool.query(
@@ -118,8 +150,8 @@ const bulkAssignShift = async (req, res) => {
 // Get all user-shift assignments (for admin table)
 const getAllUserShifts = async (req, res) => {
   try {
-    const [rows] = await pool.query(
-      `SELECT u.id as user_id, u.name, u.employee_id, u.department, u.avatar,
+    const scope = resolveScope(req.user);
+    let query = `SELECT u.id as user_id, u.name, u.employee_id, u.department, u.avatar,
               ws.id as shift_id, ws.name as shift_name, ws.start_time, ws.end_time,
               us.effective_date
        FROM users u
@@ -129,9 +161,15 @@ const getAllUserShifts = async (req, res) => {
            WHERE us2.user_id = u.id AND us2.effective_date <= CURDATE()
          )
        LEFT JOIN work_shifts ws ON us.shift_id = ws.id
-       WHERE u.role = 'employee' AND u.is_active = TRUE
-       ORDER BY u.name ASC`
-    );
+       WHERE u.role = 'employee' AND u.is_active = TRUE`;
+    const params = [];
+    if (scope.scoped) {
+      query += ' AND u.department_id = ?';
+      params.push(scope.departmentId);
+    }
+    query += ' ORDER BY u.name ASC';
+
+    const [rows] = await pool.query(query, params);
     res.json({ success: true, assignments: rows });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Terjadi kesalahan server' });

@@ -250,6 +250,19 @@ CREATE TABLE IF NOT EXISTS fcm_tokens (
   UNIQUE KEY unique_user_platform (user_id, platform(20))
 );
 
+-- Granular per-user feature permissions (mis. karyawan yang diberi akses kelola shift divisinya)
+CREATE TABLE IF NOT EXISTS user_feature_permissions (
+  id VARCHAR(36) PRIMARY KEY,
+  user_id VARCHAR(36) NOT NULL,
+  feature_key VARCHAR(50) NOT NULL,
+  granted_by VARCHAR(36) DEFAULT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_user_feature (user_id, feature_key),
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY (granted_by) REFERENCES users(id) ON DELETE SET NULL,
+  INDEX idx_ufp_user (user_id)
+);
+
 -- App settings
 CREATE TABLE IF NOT EXISTS app_settings (
   id INT PRIMARY KEY AUTO_INCREMENT,

@@ -57,9 +57,27 @@ const AdminRoute = ({ children }) => {
   const auth = isAuthenticated || stored.isAuthenticated;
   const currentUser = user || stored.user;
 
+  const hasAdminRole = ['superadmin', 'admin', 'hrd'].includes(currentUser?.role);
+  const hasAnyPermission = Array.isArray(currentUser?.permissions) && currentUser.permissions.length > 0;
+
   if (!auth) return <Navigate to="/login" replace />;
-  if (!['superadmin', 'admin', 'hrd'].includes(currentUser?.role)) return <Navigate to="/dashboard" replace />;
+  if (!hasAdminRole && !hasAnyPermission) return <Navigate to="/dashboard" replace />;
   return <AdminLayout>{children}</AdminLayout>;
+};
+
+// Membungkus halaman admin yang bisa diberikan sebagai grant granular (mis. shifts.manage).
+// Role admin-tier selalu lolos. Employee non-admin wajib memegang `feature` di user.permissions.
+const FeatureRoute = ({ children, feature }) => {
+  const { user } = useAuthStore();
+  const stored = (() => { try { return JSON.parse(localStorage.getItem('iware-auth') || '{}'); } catch { return {}; } })();
+  const currentUser = user || stored.user;
+
+  const hasAdminRole = ['superadmin', 'admin', 'hrd'].includes(currentUser?.role);
+  if (hasAdminRole) return children;
+
+  const hasFeature = feature && Array.isArray(currentUser?.permissions) && currentUser.permissions.includes(feature);
+  if (!hasFeature) return <Navigate to="/admin/shifts" replace />;
+  return children;
 };
 
 const EmployeeRoute = ({ children }) => {
@@ -104,22 +122,22 @@ export default function App() {
           <Route path="/overtime" element={<EmployeeRoute><OvertimePage /></EmployeeRoute>} />
 
           {/* Admin Routes */}
-          <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
-          <Route path="/admin/attendance" element={<AdminRoute><AttendanceAdmin /></AdminRoute>} />
-          <Route path="/admin/employees" element={<AdminRoute><EmployeesAdmin /></AdminRoute>} />
-          <Route path="/admin/leaves" element={<AdminRoute><LeavesAdmin /></AdminRoute>} />
-          <Route path="/admin/reports" element={<AdminRoute><ReportsAdmin /></AdminRoute>} />
-          <Route path="/admin/locations" element={<AdminRoute><LocationsAdmin /></AdminRoute>} />
+          <Route path="/admin" element={<AdminRoute><FeatureRoute><AdminDashboard /></FeatureRoute></AdminRoute>} />
+          <Route path="/admin/attendance" element={<AdminRoute><FeatureRoute><AttendanceAdmin /></FeatureRoute></AdminRoute>} />
+          <Route path="/admin/employees" element={<AdminRoute><FeatureRoute><EmployeesAdmin /></FeatureRoute></AdminRoute>} />
+          <Route path="/admin/leaves" element={<AdminRoute><FeatureRoute><LeavesAdmin /></FeatureRoute></AdminRoute>} />
+          <Route path="/admin/reports" element={<AdminRoute><FeatureRoute><ReportsAdmin /></FeatureRoute></AdminRoute>} />
+          <Route path="/admin/locations" element={<AdminRoute><FeatureRoute><LocationsAdmin /></FeatureRoute></AdminRoute>} />
           <Route path="/admin/backup" element={<AdminRoute><ProtectedRoute roles={['superadmin']}><BackupAdmin /></ProtectedRoute></AdminRoute>} />
-          <Route path="/admin/notifications" element={<AdminRoute><NotificationsAdmin /></AdminRoute>} />
+          <Route path="/admin/notifications" element={<AdminRoute><FeatureRoute><NotificationsAdmin /></FeatureRoute></AdminRoute>} />
           <Route path="/admin/users" element={<AdminRoute><ProtectedRoute roles={['superadmin', 'admin']}><UsersAdmin /></ProtectedRoute></AdminRoute>} />
           <Route path="/admin/settings" element={<AdminRoute><ProtectedRoute roles={['superadmin', 'admin']}><SettingsAdmin /></ProtectedRoute></AdminRoute>} />
-          <Route path="/admin/shifts" element={<AdminRoute><ShiftsAdmin /></AdminRoute>} />
-          <Route path="/admin/leave-types" element={<AdminRoute><LeaveTypesAdmin /></AdminRoute>} />
-          <Route path="/admin/team-calendar" element={<AdminRoute><TeamCalendarAdmin /></AdminRoute>} />
-          <Route path="/admin/departments" element={<AdminRoute><DepartmentsAdmin /></AdminRoute>} />
-          <Route path="/admin/overtime" element={<AdminRoute><OvertimeAdmin /></AdminRoute>} />
-          <Route path="/admin/holidays" element={<AdminRoute><HolidaysAdmin /></AdminRoute>} />
+          <Route path="/admin/shifts" element={<AdminRoute><FeatureRoute feature="shifts.manage"><ShiftsAdmin /></FeatureRoute></AdminRoute>} />
+          <Route path="/admin/leave-types" element={<AdminRoute><FeatureRoute><LeaveTypesAdmin /></FeatureRoute></AdminRoute>} />
+          <Route path="/admin/team-calendar" element={<AdminRoute><FeatureRoute><TeamCalendarAdmin /></FeatureRoute></AdminRoute>} />
+          <Route path="/admin/departments" element={<AdminRoute><FeatureRoute><DepartmentsAdmin /></FeatureRoute></AdminRoute>} />
+          <Route path="/admin/overtime" element={<AdminRoute><FeatureRoute><OvertimeAdmin /></FeatureRoute></AdminRoute>} />
+          <Route path="/admin/holidays" element={<AdminRoute><FeatureRoute><HolidaysAdmin /></FeatureRoute></AdminRoute>} />
           <Route path="/admin/audit-log" element={<AdminRoute><ProtectedRoute roles={['superadmin', 'admin']}><AuditLogAdmin /></ProtectedRoute></AdminRoute>} />
 
           <Route path="*" element={<Navigate to="/login" replace />} />

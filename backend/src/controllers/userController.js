@@ -11,7 +11,7 @@ const getAllUsers = async (req, res) => {
   try {
     const { role, department, location_id, search, page = 1, limit = 20 } = req.query;
     const offset = (page - 1) * limit;
-    let query = `SELECT u.id, u.name, u.email, u.phone, u.avatar, u.face_photo, u.role, u.department, u.position, u.employee_id, u.join_date, u.is_active, u.is_verified, u.created_at, u.face_registered,
+    let query = `SELECT u.id, u.name, u.email, u.phone, u.avatar, u.face_photo, u.role, u.department, u.department_id, u.position, u.employee_id, u.join_date, u.is_active, u.is_verified, u.created_at, u.face_registered,
                  u.location_id, al.name as location_name,
                  lq.total_days, lq.used_days, lq.remaining_days
                  FROM users u
@@ -29,7 +29,19 @@ const getAllUsers = async (req, res) => {
     params.push(parseInt(limit), parseInt(offset));
 
     const [rows] = await pool.query(query, params);
-    
+
+    if (rows.length) {
+      const [permRows] = await pool.query(
+        'SELECT user_id, feature_key FROM user_feature_permissions WHERE user_id IN (?)',
+        [rows.map(u => u.id)]
+      );
+      const permsByUser = {};
+      for (const p of permRows) {
+        (permsByUser[p.user_id] ??= []).push(p.feature_key);
+      }
+      for (const u of rows) u.permissions = permsByUser[u.id] || [];
+    }
+
     let countQuery = 'SELECT COUNT(*) as total FROM users WHERE 1=1';
     const countParams = [];
     if (role) { countQuery += ' AND role = ?'; countParams.push(role); }

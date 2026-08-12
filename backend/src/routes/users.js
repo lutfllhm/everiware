@@ -10,6 +10,7 @@ const {
   broadcastNotification, getDashboardStats, getSettings, updateSettings,
   saveFcmToken, removeFcmToken, registerFace
 } = require('../controllers/userController');
+const { getUserPermissions, setUserPermissions } = require('../controllers/userPermissionController');
 
 router.use(authenticate);
 
@@ -39,5 +40,7 @@ router.get('/:id', authorize('superadmin', 'admin', 'hrd'), getUser);
 router.put('/:id', authorize('superadmin', 'admin', 'hrd'), updateUser);
 router.delete('/:id', authorize('superadmin', 'admin', 'hrd'), deleteUser);
 router.delete('/:id/permanent', authorize('superadmin', 'admin'), permanentDeleteUser);
+router.get('/:id/permissions', authorize('superadmin', 'admin', 'hrd'), getUserPermissions);
+router.put('/:id/permissions', authorize('superadmin', 'admin', 'hrd'), setUserPermissions);
 
 module.exports = router;

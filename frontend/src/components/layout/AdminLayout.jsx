@@ -14,28 +14,28 @@ const navGroups = [
   {
     label: 'Utama',
     items: [
-      { path: '/admin', icon: LayoutDashboard, label: 'Dashboard', exact: true },
-      { path: '/admin/attendance', icon: Clock, label: 'Absensi' },
-      { path: '/admin/employees', icon: Users, label: 'Karyawan' },
-      { path: '/admin/leaves', icon: FileText, label: 'Perizinan' },
-      { path: '/admin/overtime', icon: Clock, label: 'Lembur' },
+      { path: '/admin', icon: LayoutDashboard, label: 'Dashboard', exact: true, roles: ['superadmin', 'admin', 'hrd'] },
+      { path: '/admin/attendance', icon: Clock, label: 'Absensi', roles: ['superadmin', 'admin', 'hrd'] },
+      { path: '/admin/employees', icon: Users, label: 'Karyawan', roles: ['superadmin', 'admin', 'hrd'] },
+      { path: '/admin/leaves', icon: FileText, label: 'Perizinan', roles: ['superadmin', 'admin', 'hrd'] },
+      { path: '/admin/overtime', icon: Clock, label: 'Lembur', roles: ['superadmin', 'admin', 'hrd'] },
     ]
   },
   {
     label: 'Konfigurasi',
     items: [
-      { path: '/admin/shifts',      icon: CalendarClock, label: 'Shift Kerja',          roles: ['superadmin', 'admin', 'hrd'] },
+      { path: '/admin/shifts',      icon: CalendarClock, label: 'Shift Kerja',          roles: ['superadmin', 'admin', 'hrd'], feature: 'shifts.manage' },
       { path: '/admin/leave-types', icon: ListChecks,    label: 'Jenis Izin',           roles: ['superadmin', 'admin', 'hrd'] },
       { path: '/admin/departments', icon: Building,      label: 'Departemen & Jabatan', roles: ['superadmin', 'admin', 'hrd'] },
       { path: '/admin/holidays',    icon: CalendarDays,  label: 'Hari Libur Nasional',  roles: ['superadmin', 'admin', 'hrd'] },
-      { path: '/admin/locations',   icon: MapPin,        label: 'Lokasi Absensi' },
+      { path: '/admin/locations',   icon: MapPin,        label: 'Lokasi Absensi', roles: ['superadmin', 'admin', 'hrd'] },
     ]
   },
   {
     label: 'Analitik',
     items: [
-      { path: '/admin/reports',       icon: BarChart3,    label: 'Laporan & Export' },
-      { path: '/admin/team-calendar', icon: CalendarDays, label: 'Kalender Tim' },
+      { path: '/admin/reports',       icon: BarChart3,    label: 'Laporan & Export', roles: ['superadmin', 'admin', 'hrd'] },
+      { path: '/admin/team-calendar', icon: CalendarDays, label: 'Kalender Tim', roles: ['superadmin', 'admin', 'hrd'] },
     ]
   },
   {
@@ -182,7 +182,10 @@ export default function AdminLayout({ children }) {
   const filteredGroups = navGroups
     .map(g => ({
       ...g,
-      items: g.items.filter(item => !item.roles || item.roles.includes(user?.role))
+      items: g.items.filter(item => {
+        if (!item.roles || item.roles.includes(user?.role)) return true;
+        return item.feature && (user?.permissions || []).includes(item.feature);
+      })
     }))
     .filter(g => g.items.length > 0);
 
