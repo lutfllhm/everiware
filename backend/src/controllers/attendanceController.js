@@ -50,6 +50,22 @@ const resolveUserShift = async (userId, date) => {
   };
 };
 
+// Hitung apakah jam check-in (checkInMinutes, 0-1439) sudah melewati batas telat
+// shift (workStartMinutes + tolerance), dengan menangani shift overnight (mis.
+// shift 3: 00:00-08:00) di mana karyawan lazim check-in di malam sebelumnya
+// (mis. jam 23:00) untuk shift yang baru dimulai jam 00:00 esoknya.
+// Aturan: check-in yang terjadi dalam jendela "kedatangan lebih awal" (paling
+// banyak EARLY_WINDOW_HOURS sebelum jam mulai, wrap 24 jam) dianggap tidak
+// telat. Selain itu dihitung normal: telat jika melewati jam mulai + toleransi.
+const EARLY_WINDOW_MINUTES = 4 * 60; // maksimal 4 jam lebih awal dianggap wajar
+const isLateCheckIn = (checkInMinutes, workStartMinutes, toleranceMinutes) => {
+  const DAY = 24 * 60;
+  const diff = (((checkInMinutes - workStartMinutes) % DAY) + DAY) % DAY; // 0..DAY-1, arah maju dari jam mulai
+  const early = DAY - diff; // seberapa jauh SEBELUM jam mulai (wrap)
+  if (early > 0 && early <= EARLY_WINDOW_MINUTES) return false;
+  return diff > toleranceMinutes;
+};
+
 // Check in
 const checkIn = async (req, res) => {
   try {
@@ -205,7 +221,7 @@ const checkIn = async (req, res) => {
     const tolerance = myShift.late_tolerance;
 
     const [startH, startM] = workStart.split(':').map(Number);
-    const workStartMinutes = startH * 60 + startM + tolerance;
+    const workStartMinutes = startH * 60 + startM;
     const nowParts = nowWIBParts();
     const nowMinutes = nowParts.getUTCHours() * 60 + nowParts.getUTCMinutes();
 
@@ -214,7 +230,7 @@ const checkIn = async (req, res) => {
     if (hasNonBlockingPermit) {
       status = 'present';
     } else {
-      status = nowMinutes > workStartMinutes ? 'late' : 'present';
+      status = isLateCheckIn(nowMinutes, workStartMinutes, tolerance) ? 'late' : 'present';
     }
 
     // ── Impossible-travel check: bandingkan dengan titik absensi terakhir ─────
@@ -721,9 +737,9 @@ const updateAttendance = async (req, res) => {
       const [wh, wm] = myShift.start_time.split(':').map(Number);
       const tolerance = myShift.late_tolerance;
       const [ih, im] = check_in.split(':').map(Number);
-      const workMins = wh * 60 + wm + tolerance;
+      const workMins = wh * 60 + wm;
       const inMins   = ih * 60 + im;
-      newStatus = inMins > workMins ? 'late' : 'present';
+      newStatus = isLateCheckIn(inMins, workMins, tolerance) ? 'late' : 'present';
     }
 
     await pool.query(
