@@ -7,6 +7,7 @@ const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 
 const { testConnection } = require('./config/database');
+const { startAttendanceReminderJob } = require('./jobs/attendanceReminder');
 const authRoutes = require('./routes/auth');
 const attendanceRoutes = require('./routes/attendance');
 const leaveRoutes = require('./routes/leave');
@@ -123,6 +124,7 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, '0.0.0.0', async () => {
   await testConnection();
+  startAttendanceReminderJob();
   console.log(`🚀 iWare Presence API running on port ${PORT}`);
 });
 

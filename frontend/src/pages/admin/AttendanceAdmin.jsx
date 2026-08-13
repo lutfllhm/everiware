@@ -22,6 +22,15 @@ export default function AttendanceAdmin() {
   const [deleting, setDeleting] = useState(false);
   const [detailEmployee, setDetailEmployee] = useState(null);
   const [expandedDept, setExpandedDept] = useState({});
+  const [onlyMissingCheckout, setOnlyMissingCheckout] = useState(false);
+
+  // Absen masuk sudah tercatat tapi belum absen pulang, dan bukan hari ini
+  // (hari ini masih wajar belum checkout karena jam kerja belum selesai)
+  const isMissingCheckout = (att) => {
+    if (!att.check_in || att.check_out) return false;
+    const today = format(new Date(), 'yyyy-MM-dd');
+    return format(new Date(att.date), 'yyyy-MM-dd') !== today;
+  };
 
   useEffect(() => {
     fetchData();
@@ -81,7 +90,8 @@ export default function AttendanceAdmin() {
   };
 
   const filtered = attendances.filter(a =>
-    !filters.search || a.user_name?.toLowerCase().includes(filters.search.toLowerCase()) || a.employee_id?.includes(filters.search)
+    (!filters.search || a.user_name?.toLowerCase().includes(filters.search.toLowerCase()) || a.employee_id?.includes(filters.search)) &&
+    (!onlyMissingCheckout || isMissingCheckout(a))
   );
 
   const grouped = useMemo(() => Object.values(
@@ -157,17 +167,24 @@ export default function AttendanceAdmin() {
             className="input-field py-2.5 text-sm w-auto">
             {[2024, 2025, 2026].map(y => <option key={y} value={y}>{y}</option>)}
           </select>
+          <label className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-600 cursor-pointer select-none hover:bg-slate-50">
+            <input type="checkbox" checked={onlyMissingCheckout}
+              onChange={(e) => setOnlyMissingCheckout(e.target.checked)}
+              className="rounded border-slate-300" />
+            Belum checkout saja
+          </label>
         </div>
       </div>
 
       {/* Summary */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-6 gap-3">
         {[
           { label: 'Total', value: filtered.length, iconCls: 'bg-slate-100 text-slate-600', borderCls: 'border-slate-200' },
           { label: 'Hadir', value: filtered.filter(a => a.status === 'present').length, iconCls: 'bg-teal-100 text-teal-600', borderCls: 'border-teal-200' },
           { label: 'Terlambat', value: filtered.filter(a => a.status === 'late').length, iconCls: 'bg-amber-100 text-amber-600', borderCls: 'border-amber-200' },
           { label: 'Cuti', value: filtered.filter(a => a.status === 'leave').length, iconCls: 'bg-sky-100 text-sky-600', borderCls: 'border-sky-200' },
           { label: 'Sakit', value: filtered.filter(a => a.status === 'sick').length, iconCls: 'bg-purple-100 text-purple-600', borderCls: 'border-purple-200' },
+          { label: 'Belum Pulang', value: filtered.filter(isMissingCheckout).length, iconCls: 'bg-orange-100 text-orange-600', borderCls: 'border-orange-200' },
         ].map(s => (
           <div key={s.label} className={`bg-white border ${s.borderCls} rounded-xl p-4 flex items-center gap-3 shadow-sm`}>
             <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${s.iconCls}`}>
@@ -302,7 +319,13 @@ export default function AttendanceAdmin() {
                           <tr key={att.id} className="hover:bg-slate-50 transition-colors">
                             <td className="px-4 py-2.5 text-sm text-slate-600">{format(new Date(att.date), 'dd MMM yyyy', { locale: id })}</td>
                             <td className="px-4 py-2.5 text-sm font-medium text-slate-900">{att.check_in ? format(new Date(att.check_in), 'HH:mm') : '-'}</td>
-                            <td className="px-4 py-2.5 text-sm font-medium text-slate-900">{att.check_out ? format(new Date(att.check_out), 'HH:mm') : '-'}</td>
+                            <td className="px-4 py-2.5 text-sm font-medium text-slate-900">
+                              {att.check_out
+                                ? format(new Date(att.check_out), 'HH:mm')
+                                : isMissingCheckout(att)
+                                  ? <span className="badge-orange whitespace-nowrap">Belum Checkout</span>
+                                  : '-'}
+                            </td>
                             <td className="px-4 py-2.5 text-sm text-slate-500">{att.location_name || '-'}</td>
                             <td className="px-4 py-2.5"><span className={s.cls}>{s.label}</span></td>
                             <td className="px-4 py-2.5">

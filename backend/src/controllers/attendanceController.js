@@ -760,4 +760,4 @@ const updateAttendance = async (req, res) => {
   }
 };
 
-module.exports = { checkIn, checkOut, getTodayAttendance, getMyAttendance, getAllAttendances, getAttendanceReport, getLocations, createLocation, updateLocation, deleteLocation, deleteAttendance, updateAttendance };
+module.exports = { checkIn, checkOut, getTodayAttendance, getMyAttendance, getAllAttendances, getAttendanceReport, getLocations, createLocation, updateLocation, deleteLocation, deleteAttendance, updateAttendance, resolveUserShift };
