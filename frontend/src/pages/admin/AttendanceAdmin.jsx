@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Eye, X, Trash2, AlertTriangle, Edit, ChevronRight } from 'lucide-react';
+import { Search, Eye, X, Trash2, AlertTriangle, Edit, ChevronRight, ChevronDown, Building } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../../api/axios';
 import { format } from 'date-fns';
@@ -21,6 +21,7 @@ export default function AttendanceAdmin() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
   const [detailEmployee, setDetailEmployee] = useState(null);
+  const [expandedDept, setExpandedDept] = useState({});
 
   useEffect(() => {
     fetchData();
@@ -92,7 +93,30 @@ export default function AttendanceAdmin() {
     }, {})
   ).sort((a, b) => (a.user_name || '').localeCompare(b.user_name || '')), [attendances, filters.search]);
 
-  const pagination = usePagination(grouped, 25);
+  const groupedByDept = useMemo(() => {
+    const byDept = grouped.reduce((acc, g) => {
+      const dept = g.department || 'Tanpa Departemen';
+      if (!acc[dept]) acc[dept] = [];
+      acc[dept].push(g);
+      return acc;
+    }, {});
+    return Object.entries(byDept)
+      .map(([department, employees]) => ({ department, employees }))
+      .sort((a, b) => a.department.localeCompare(b.department));
+  }, [grouped]);
+
+  // Saat mencari, otomatis buka departemen yang punya hasil match
+  useEffect(() => {
+    if (!filters.search) return;
+    setExpandedDept(prev => {
+      const next = { ...prev };
+      groupedByDept.forEach(d => { next[d.department] = true; });
+      return next;
+    });
+  }, [filters.search, groupedByDept]);
+
+  const toggleDept = (dept) => setExpandedDept(prev => ({ ...prev, [dept]: !prev[dept] }));
+
   const detailPagination = usePagination(detailEmployee?.records || [], 10);
 
   // Sinkronkan modal detail karyawan dengan data terbaru setelah edit/hapus
@@ -157,49 +181,84 @@ export default function AttendanceAdmin() {
         ))}
       </div>
 
-      {/* Grouped per karyawan (accordion) */}
-      <div className="card overflow-hidden">
+      {/* Grouped per departemen (accordion) → per karyawan */}
+      <div className="space-y-3">
         {loading ? (
-          <div className="text-center py-8 text-slate-400">Memuat data...</div>
-        ) : grouped.length === 0 ? (
-          <div className="text-center py-8 text-slate-400">Tidak ada data</div>
+          <div className="card text-center py-8 text-slate-400">Memuat data...</div>
+        ) : groupedByDept.length === 0 ? (
+          <div className="card text-center py-8 text-slate-400">Tidak ada data</div>
         ) : (
-          <div className="divide-y divide-slate-100">
-            {pagination.paged.map((grp) => {
-              const counts = {
-                present: grp.records.filter(r => r.status === 'present').length,
-                late: grp.records.filter(r => r.status === 'late').length,
-                absent: grp.records.filter(r => r.status === 'absent').length,
-                leave: grp.records.filter(r => r.status === 'leave').length,
-                sick: grp.records.filter(r => r.status === 'sick').length,
-              };
-              return (
-                <button key={grp.key} onClick={() => setDetailEmployee(grp)}
-                  className="w-full flex items-center justify-between gap-3 px-4 py-3 hover:bg-slate-50 transition-colors text-left">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <UserAvatar name={grp.user_name} avatar={grp.user_avatar} size="md" />
-                    <div className="min-w-0">
-                      <div className="font-medium text-slate-900 text-sm">{grp.user_name}</div>
-                      <div className="text-xs text-slate-500 truncate">{grp.employee_id ? `${grp.employee_id}${grp.department ? ' · ' + grp.department : ''}${grp.position ? ' · ' + grp.position : ''}` : [grp.department, grp.position].filter(Boolean).join(' · ') || '-'}</div>
-                    </div>
+          groupedByDept.map(({ department, employees }) => {
+            const deptCounts = {
+              present: employees.reduce((n, e) => n + e.records.filter(r => r.status === 'present').length, 0),
+              late: employees.reduce((n, e) => n + e.records.filter(r => r.status === 'late').length, 0),
+            };
+            const isOpen = !!expandedDept[department];
+            return (
+              <div key={department} className="card overflow-hidden">
+                <button onClick={() => toggleDept(department)}
+                  className="w-full flex items-center gap-3 p-4 hover:bg-slate-50 transition-colors text-left">
+                  {isOpen
+                    ? <ChevronDown size={16} className="text-slate-500 flex-shrink-0" />
+                    : <ChevronRight size={16} className="text-slate-500 flex-shrink-0" />}
+                  <div className="w-9 h-9 bg-slate-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <Building size={18} className="text-slate-600" />
                   </div>
-                  <div className="flex items-center gap-3 flex-shrink-0">
-                    <div className="hidden sm:flex items-center gap-2 text-xs">
-                      <span className="badge-success">{counts.present} Hadir</span>
-                      <span className="badge-warning">{counts.late} Terlambat</span>
-                      {counts.absent > 0 && <span className="badge-danger">{counts.absent} Absen</span>}
-                      {counts.leave > 0 && <span className="badge-info">{counts.leave} Cuti</span>}
-                      {counts.sick > 0 && <span className="badge-purple">{counts.sick} Sakit</span>}
-                    </div>
-                    <span className="text-xs text-slate-400">{grp.records.length} hari</span>
-                    <ChevronRight size={16} className="text-slate-400" />
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold text-slate-900 text-sm">{department}</div>
+                    <div className="text-xs text-slate-400 mt-0.5">{employees.length} karyawan</div>
+                  </div>
+                  <div className="hidden sm:flex items-center gap-2 text-xs flex-shrink-0">
+                    <span className="badge-success">{deptCounts.present} Hadir</span>
+                    <span className="badge-warning">{deptCounts.late} Terlambat</span>
                   </div>
                 </button>
-              );
-            })}
-          </div>
+
+                <AnimatePresence>
+                  {isOpen && (
+                    <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
+                      className="overflow-hidden border-t border-slate-100">
+                      <div className="divide-y divide-slate-100">
+                        {employees.map((grp) => {
+                          const counts = {
+                            present: grp.records.filter(r => r.status === 'present').length,
+                            late: grp.records.filter(r => r.status === 'late').length,
+                            absent: grp.records.filter(r => r.status === 'absent').length,
+                            leave: grp.records.filter(r => r.status === 'leave').length,
+                            sick: grp.records.filter(r => r.status === 'sick').length,
+                          };
+                          return (
+                            <button key={grp.key} onClick={() => setDetailEmployee(grp)}
+                              className="w-full flex items-center justify-between gap-3 px-4 py-3 hover:bg-slate-50 transition-colors text-left">
+                              <div className="flex items-center gap-3 min-w-0">
+                                <UserAvatar name={grp.user_name} avatar={grp.user_avatar} size="md" />
+                                <div className="min-w-0">
+                                  <div className="font-medium text-slate-900 text-sm">{grp.user_name}</div>
+                                  <div className="text-xs text-slate-500 truncate">{grp.employee_id ? `${grp.employee_id}${grp.position ? ' · ' + grp.position : ''}` : grp.position || '-'}</div>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-3 flex-shrink-0">
+                                <div className="hidden sm:flex items-center gap-2 text-xs">
+                                  <span className="badge-success">{counts.present} Hadir</span>
+                                  <span className="badge-warning">{counts.late} Terlambat</span>
+                                  {counts.absent > 0 && <span className="badge-danger">{counts.absent} Absen</span>}
+                                  {counts.leave > 0 && <span className="badge-info">{counts.leave} Cuti</span>}
+                                  {counts.sick > 0 && <span className="badge-purple">{counts.sick} Sakit</span>}
+                                </div>
+                                <span className="text-xs text-slate-400">{grp.records.length} hari</span>
+                                <ChevronRight size={16} className="text-slate-400" />
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            );
+          })
         )}
-        <Pagination {...pagination} />
       </div>
 
       {/* Modal Detail Absensi per Karyawan */}

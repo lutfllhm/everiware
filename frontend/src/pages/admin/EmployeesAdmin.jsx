@@ -1,6 +1,6 @@
-import { useState, useEffect, Fragment } from 'react';
+import { useState, useEffect, useMemo, Fragment } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Plus, Edit, Trash2, X, User, Mail, Phone, Building, Briefcase, Calendar, AlertTriangle } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, X, User, Mail, Phone, Building, Briefcase, Calendar, AlertTriangle, ChevronDown, ChevronRight } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../../api/axios';
 import { FEATURES } from '../../constants/features';
@@ -22,6 +22,7 @@ export default function EmployeesAdmin() {
   const [locations, setLocations] = useState([]);
   const [locationFilter, setLocationFilter] = useState('');
   const [permissions, setPermissions] = useState([]);
+  const [expandedDept, setExpandedDept] = useState({});
 
   useEffect(() => { fetchUsers(); fetchManagers(); fetchDepartments(); fetchLocations(); }, [locationFilter]);
 
@@ -175,6 +176,30 @@ export default function EmployeesAdmin() {
 
   const filtered = users.filter(u => !search || u.name?.toLowerCase().includes(search.toLowerCase()) || u.email?.toLowerCase().includes(search.toLowerCase()) || u.employee_id?.toLowerCase().includes(search.toLowerCase()));
 
+  const groupedByDept = useMemo(() => {
+    const byDept = filtered.reduce((acc, u) => {
+      const dept = u.department || 'Tanpa Departemen';
+      if (!acc[dept]) acc[dept] = [];
+      acc[dept].push(u);
+      return acc;
+    }, {});
+    return Object.entries(byDept)
+      .map(([department, members]) => ({ department, members }))
+      .sort((a, b) => a.department.localeCompare(b.department));
+  }, [filtered]);
+
+  // Saat mencari, otomatis buka departemen yang punya hasil match
+  useEffect(() => {
+    if (!search) return;
+    setExpandedDept(prev => {
+      const next = { ...prev };
+      groupedByDept.forEach(d => { next[d.department] = true; });
+      return next;
+    });
+  }, [search, groupedByDept]);
+
+  const toggleDept = (dept) => setExpandedDept(prev => ({ ...prev, [dept]: !prev[dept] }));
+
   return (
     <div className="space-y-4">
       {/* Header Actions */}
@@ -201,80 +226,112 @@ export default function EmployeesAdmin() {
         </button>
       </div>
 
-      {/* Table */}
-      <div className="card overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-slate-50 border-b border-slate-200">
-              <tr>
-                {['Karyawan', 'ID', 'Departemen', 'Jabatan', 'Penempatan', 'Jatah Cuti', 'Status', 'Aksi'].map(h => (
-                  <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-50">
-              {loading ? (
-                <tr><td colSpan={8} className="text-center py-8 text-slate-400">Memuat data...</td></tr>
-              ) : filtered.length === 0 ? (
-                <tr><td colSpan={8} className="text-center py-8 text-slate-400">Tidak ada karyawan</td></tr>
-              ) : (
-                filtered.map((user) => (
-                  <tr key={user.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 bg-gradient-to-br from-slate-700 to-slate-500 rounded-lg flex items-center justify-center text-white font-bold text-sm overflow-hidden flex-shrink-0">
-                          {user.avatar
-                            ? <img
-                                src={user.avatar.startsWith('http') ? user.avatar : `/uploads/avatar/${user.avatar}`}
-                                alt=""
-                                className="w-full h-full object-cover"
-                                onError={(e) => { e.target.style.display = 'none'; e.target.parentNode.innerHTML = `<span class="text-white font-bold text-sm">${user.name?.[0] || '?'}</span>`; }}
-                              />
-                            : user.name?.[0]
-                          }
-                        </div>
-                        <div>
-                          <div className="font-medium text-slate-900 text-sm">{user.name}</div>
-                          <div className="text-xs text-slate-500">{user.email}</div>
-                          {(user.department || user.position) && (
-                            <div className="text-xs text-slate-400 mt-0.5">{[user.department, user.position].filter(Boolean).join(' · ')}</div>
-                          )}
-                        </div>
+      {/* Grouped per departemen (accordion) */}
+      <div className="space-y-3">
+        {loading ? (
+          <div className="card text-center py-8 text-slate-400">Memuat data...</div>
+        ) : groupedByDept.length === 0 ? (
+          <div className="card text-center py-8 text-slate-400">Tidak ada karyawan</div>
+        ) : (
+          groupedByDept.map(({ department, members }) => {
+            const isOpen = !!expandedDept[department];
+            const activeCount = members.filter(m => m.is_active).length;
+            return (
+              <div key={department} className="card overflow-hidden">
+                <button onClick={() => toggleDept(department)}
+                  className="w-full flex items-center gap-3 p-4 hover:bg-slate-50 transition-colors text-left">
+                  {isOpen
+                    ? <ChevronDown size={16} className="text-slate-500 flex-shrink-0" />
+                    : <ChevronRight size={16} className="text-slate-500 flex-shrink-0" />}
+                  <div className="w-9 h-9 bg-slate-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <Building size={18} className="text-slate-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold text-slate-900 text-sm">{department}</div>
+                    <div className="text-xs text-slate-400 mt-0.5">{members.length} karyawan</div>
+                  </div>
+                  <div className="hidden sm:flex items-center gap-2 text-xs flex-shrink-0">
+                    <span className="badge-success">{activeCount} Aktif</span>
+                    {activeCount < members.length && <span className="badge-danger">{members.length - activeCount} Nonaktif</span>}
+                  </div>
+                </button>
+
+                <AnimatePresence>
+                  {isOpen && (
+                    <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
+                      className="overflow-hidden border-t border-slate-100">
+                      <div className="overflow-x-auto">
+                        <table className="w-full">
+                          <thead className="bg-slate-50 border-b border-slate-200">
+                            <tr>
+                              {['Karyawan', 'ID', 'Jabatan', 'Penempatan', 'Jatah Cuti', 'Status', 'Aksi'].map(h => (
+                                <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">{h}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-50">
+                            {members.map((user) => (
+                              <tr key={user.id} className="hover:bg-slate-50 transition-colors">
+                                <td className="px-4 py-3">
+                                  <div className="flex items-center gap-3">
+                                    <div className="w-9 h-9 bg-gradient-to-br from-slate-700 to-slate-500 rounded-lg flex items-center justify-center text-white font-bold text-sm overflow-hidden flex-shrink-0">
+                                      {user.avatar
+                                        ? <img
+                                            src={user.avatar.startsWith('http') ? user.avatar : `/uploads/avatar/${user.avatar}`}
+                                            alt=""
+                                            className="w-full h-full object-cover"
+                                            onError={(e) => { e.target.style.display = 'none'; e.target.parentNode.innerHTML = `<span class="text-white font-bold text-sm">${user.name?.[0] || '?'}</span>`; }}
+                                          />
+                                        : user.name?.[0]
+                                      }
+                                    </div>
+                                    <div>
+                                      <div className="font-medium text-slate-900 text-sm">{user.name}</div>
+                                      <div className="text-xs text-slate-500">{user.email}</div>
+                                      {user.position && (
+                                        <div className="text-xs text-slate-400 mt-0.5">{user.position}</div>
+                                      )}
+                                    </div>
+                                  </div>
+                                </td>
+                                <td className="px-4 py-3 text-sm text-slate-600">{user.employee_id || '-'}</td>
+                                <td className="px-4 py-3 text-sm text-slate-600">{user.position || '-'}</td>
+                                <td className="px-4 py-3 text-sm font-medium text-slate-600">
+                                  <span className="inline-flex items-center gap-1 text-slate-700 bg-slate-100 px-2 py-0.5 rounded text-xs border border-slate-200">
+                                    📍 {user.location_name || 'Belum di-assign'}
+                                  </span>
+                                </td>
+                                <td className="px-4 py-3">
+                                  <button onClick={() => { setQuotaModal(user); setQuotaForm({ total_days: user.total_days || 12, year: new Date().getFullYear() }); }}
+                                    className="text-sm font-medium text-slate-700 hover:text-slate-900 hover:underline">
+                                    {user.remaining_days ?? '-'} / {user.total_days ?? 12} hari
+                                  </button>
+                                </td>
+                                <td className="px-4 py-3">
+                                  <span className={user.is_active ? 'badge-success' : 'badge-danger'}>{user.is_active ? 'Aktif' : 'Nonaktif'}</span>
+                                </td>
+                                <td className="px-4 py-3">
+                                  <div className="flex items-center gap-1">
+                                    <button onClick={() => openEdit(user)} className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors" title="Edit">
+                                      <Edit size={15} className="text-slate-500" />
+                                    </button>
+                                    <button onClick={() => setDeleteModal(user)} className="p-1.5 hover:bg-red-50 rounded-lg transition-colors" title="Hapus">
+                                      <Trash2 size={15} className="text-red-500" />
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
                       </div>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-slate-600">{user.employee_id || '-'}</td>
-                    <td className="px-4 py-3 text-sm text-slate-600">{user.department || '-'}</td>
-                    <td className="px-4 py-3 text-sm text-slate-600">{user.position || '-'}</td>
-                    <td className="px-4 py-3 text-sm font-medium text-slate-600">
-                      <span className="inline-flex items-center gap-1 text-slate-700 bg-slate-100 px-2 py-0.5 rounded text-xs border border-slate-200">
-                        📍 {user.location_name || 'Belum di-assign'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <button onClick={() => { setQuotaModal(user); setQuotaForm({ total_days: user.total_days || 12, year: new Date().getFullYear() }); }}
-                        className="text-sm font-medium text-slate-700 hover:text-slate-900 hover:underline">
-                        {user.remaining_days ?? '-'} / {user.total_days ?? 12} hari
-                      </button>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={user.is_active ? 'badge-success' : 'badge-danger'}>{user.is_active ? 'Aktif' : 'Nonaktif'}</span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-1">
-                        <button onClick={() => openEdit(user)} className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors" title="Edit">
-                          <Edit size={15} className="text-slate-500" />
-                        </button>
-                        <button onClick={() => setDeleteModal(user)} className="p-1.5 hover:bg-red-50 rounded-lg transition-colors" title="Hapus">
-                          <Trash2 size={15} className="text-red-500" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            );
+          })
+        )}
       </div>
 
       {/* Add/Edit Modal */}
