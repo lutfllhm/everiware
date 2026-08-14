@@ -5,7 +5,7 @@ const { uploadSelfie } = require('../middleware/upload');
 const { compressUploadedImage } = require('../middleware/compressImage');
 const {
   checkIn, checkOut, getTodayAttendance, getMyAttendance,
-  getAllAttendances, getAttendanceReport, getLocations,
+  getAllAttendances, getActiveTodayAttendances, getAttendanceReport, getLocations,
   createLocation, updateLocation, deleteLocation, deleteAttendance, updateAttendance
 } = require('../controllers/attendanceController');
 
@@ -24,6 +24,7 @@ router.put('/locations/:id', authorize('superadmin', 'admin', 'hrd'), updateLoca
 router.delete('/locations/:id', authorize('superadmin', 'admin', 'hrd'), deleteLocation);
 
 // Admin routes
+router.get('/active-today', authorize('superadmin', 'admin', 'hrd'), getActiveTodayAttendances);
 router.get('/all', authorize('superadmin', 'admin', 'hrd'), getAllAttendances);
 router.get('/report', authorize('superadmin', 'admin', 'hrd'), getAttendanceReport);
 router.put('/:id', authorize('superadmin', 'admin', 'hrd'), updateAttendance);

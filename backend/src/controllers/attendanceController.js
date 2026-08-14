@@ -675,6 +675,38 @@ const getMyAttendance = async (req, res) => {
   }
 };
 
+// Admin: Get "kehadiran hari ini" — baris attendance yang secara efektif
+// termasuk hari kerja aktif sekarang. Berbeda dari filter `date = today`
+// polos: shift malam (mis. 00:00-08:00) yang check-in-nya terjadi SEBELUM
+// tengah malam (mis. 23:50) dicatat dengan `date` = BESOK (lihat
+// resolveCheckInWorkDate), sehingga baris itu tidak akan muncul di filter
+// tanggal biasa sampai tanggal kalender ikut berganti — padahal karyawan
+// tersebut sudah check-in secara fisik. Endpoint ini menutup celah itu
+// dengan turut menyertakan baris besok yang sudah check-in tapi belum
+// check-out.
+const getActiveTodayAttendances = async (req, res) => {
+  try {
+    const today = todayWIB();
+    const tomorrow = addDaysToDateStr(today, 1);
+
+    const [rows] = await pool.query(
+      `SELECT a.*, u.name as user_name, u.employee_id, u.department, u.position, u.avatar as user_avatar, l.name as location_name
+       FROM attendances a
+       JOIN users u ON a.user_id = u.id
+       LEFT JOIN attendance_locations l ON a.location_id = l.id
+       WHERE a.date = ?
+          OR (a.date = ? AND a.check_in IS NOT NULL AND a.check_out IS NULL)
+       ORDER BY a.date DESC, u.name ASC`,
+      [today, tomorrow]
+    );
+
+    res.json({ success: true, attendances: rows });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Terjadi kesalahan server' });
+  }
+};
+
 // Admin: Get all attendances
 const getAllAttendances = async (req, res) => {
   try {
@@ -875,4 +907,4 @@ const updateAttendance = async (req, res) => {
   }
 };
 
-module.exports = { checkIn, checkOut, getTodayAttendance, getMyAttendance, getAllAttendances, getAttendanceReport, getLocations, createLocation, updateLocation, deleteLocation, deleteAttendance, updateAttendance, resolveUserShift };
+module.exports = { checkIn, checkOut, getTodayAttendance, getMyAttendance, getAllAttendances, getActiveTodayAttendances, getAttendanceReport, getLocations, createLocation, updateLocation, deleteLocation, deleteAttendance, updateAttendance, resolveUserShift };
