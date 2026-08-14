@@ -30,7 +30,7 @@ const isWorkingDay = async () => {
 const notifyReminder = async (userId, shiftName, startTime) => {
   const id = generateId();
   const title = 'Jangan lupa absen!';
-  const message = `Shift ${shiftName} kamu mulai jam ${startTime.slice(0, 5)} WIB. Yuk absen masuk sekarang.`;
+  const message = `${shiftName} kamu mulai jam ${startTime.slice(0, 5)} WIB. Yuk absen masuk sekarang.`;
   await pool.query(
     'INSERT INTO notifications (id, user_id, title, message, type) VALUES (?, ?, ?, ?, ?)',
     [id, userId, title, message, 'info']
