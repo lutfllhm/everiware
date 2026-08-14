@@ -66,6 +66,88 @@ const isLateCheckIn = (checkInMinutes, workStartMinutes, toleranceMinutes) => {
   return diff > toleranceMinutes;
 };
 
+const addDaysToDateStr = (dateStr, days) => {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() + days);
+  return `${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, '0')}-${String(dt.getUTCDate()).padStart(2, '0')}`;
+};
+
+// Cari baris attendance "aktif" (hari kerja shift) untuk user pada saat request
+// terjadi. Shift bisa membentang lintas tengah malam dalam dua pola:
+//  - shift SORE (mis. 16:00-00:00, end_time <= start_time): check-in
+//    tersimpan tanggal H, tapi check-out terjadi setelah tengah malam
+//    (tanggal H+1 sudah berjalan).
+//  - shift MALAM (mis. 00:00-08:00, start_time dini hari): karyawan lazim
+//    check-in di malam sebelumnya (mis. 23:00, dalam EARLY_WINDOW_MINUTES),
+//    sehingga baris tersimpan tanggal H, lalu check-out terjadi paginya di
+//    tanggal H+1.
+// Kedua pola dideteksi dari BENTUK shift itu sendiri (bukan jam sekarang),
+// supaya shift reguler (mis. 08:00-17:00) yang lupa check-out kemarin TIDAK
+// ikut "menyambung" — baris bolongnya tetap dianggap lupa check-out, dan
+// check-in baru hari ini tetap diperbolehkan sebagai baris baru.
+const findActiveAttendanceRow = async (userId, todayStr) => {
+  const [todayRows] = await pool.query('SELECT * FROM attendances WHERE user_id = ? AND date = ?', [userId, todayStr]);
+  const todayRow = todayRows[0] || null;
+
+  // Baris hari ini sudah cukup menjelaskan (sudah check-in) — tidak perlu
+  // menengok kemarin lagi.
+  if (todayRow && todayRow.check_in) return { row: todayRow, date: todayStr };
+
+  const myShift = await resolveUserShift(userId, todayStr);
+  const [startH, startM] = myShift.start_time.split(':').map(Number);
+  const [endH, endM] = myShift.end_time.split(':').map(Number);
+  const startMinutes = startH * 60 + startM;
+  const endMinutes = endH * 60 + endM;
+  // Shift sore-lintas-malam: jam selesai "lebih kecil/sama" dari jam mulai
+  // karena wrap tengah malam (mis. 16:00-00:00 → 0 <= 960).
+  const isEveningOvernight = endMinutes <= startMinutes;
+  // Shift malam: mulai dini hari, sehingga jendela "kedatangan lebih awal"
+  // (EARLY_WINDOW_MINUTES sebelum start_time) menjangkau ke hari sebelumnya.
+  const isNightShift = startMinutes < EARLY_WINDOW_MINUTES;
+
+  if (isEveningOvernight || isNightShift) {
+    const yesterdayStr = addDaysToDateStr(todayStr, -1);
+    const [yRows] = await pool.query('SELECT * FROM attendances WHERE user_id = ? AND date = ?', [userId, yesterdayStr]);
+    const yRow = yRows[0];
+    if (yRow && yRow.check_in && !yRow.check_out) {
+      return { row: yRow, date: yesterdayStr };
+    }
+  }
+
+  return { row: todayRow, date: todayStr };
+};
+
+// Tentukan tanggal kerja (work-day) untuk CHECK-IN BARU (belum ada baris
+// tersimpan sama sekali). Aturan shift malam (mis. 00:00-08:00): "hari
+// kerja" selalu tanggal SETELAH tengah malam, yaitu tanggal saat jam 00:00
+// dan 08:00 shift itu jatuh — terlepas apakah karyawan check-in sebelum
+// tengah malam (mis. 23:50, masih dalam jendela "boleh datang lebih awal")
+// atau sesudahnya (mis. 00:15). Jadi:
+//  - checkin 23:50 Senin (night shift) → tanggal kerja = SELASA (besok)
+//  - checkin 00:15 Selasa (night shift) → tanggal kerja = SELASA (hari ini)
+// Shift lain (reguler, atau shift sore yang wrap ke tengah malam saat
+// PULANG) tidak terpengaruh — tanggal kerja tetap tanggal hari ini seperti
+// biasa, karena check-in-nya sendiri terjadi sebelum tengah malam berjalan.
+const resolveCheckInWorkDate = async (userId, todayStr) => {
+  const myShift = await resolveUserShift(userId, todayStr);
+  const [startH, startM] = myShift.start_time.split(':').map(Number);
+  const startMinutes = startH * 60 + startM;
+  const isNightShift = startMinutes < EARLY_WINDOW_MINUTES;
+  if (!isNightShift) return todayStr;
+
+  const nowParts = nowWIBParts();
+  const nowMinutes = nowParts.getUTCHours() * 60 + nowParts.getUTCMinutes();
+  // Sudah lewat tengah malam (dini hari) — hari ini SUDAH tanggal shift-nya.
+  if (nowMinutes <= startMinutes || nowMinutes <= EARLY_WINDOW_MINUTES) return todayStr;
+  // Masih sebelum tengah malam (mis. 23:50) — shift-nya baru resmi besok.
+  const DAY = 24 * 60;
+  const minutesUntilMidnight = DAY - nowMinutes;
+  if (minutesUntilMidnight <= EARLY_WINDOW_MINUTES) return addDaysToDateStr(todayStr, 1);
+
+  return todayStr;
+};
+
 // Check in
 const checkIn = async (req, res) => {
   try {
@@ -81,25 +163,36 @@ const checkIn = async (req, res) => {
       });
     }
 
-    // Cek apakah hari ini Sabtu dan apakah Sabtu masuk kerja
-    const dayOfWeek = nowWIBParts().getUTCDay(); // 6 = Sabtu
     const [satSettings] = await pool.query(
       "SELECT setting_key, setting_value FROM app_settings WHERE setting_key IN ('saturday_work_enabled')"
     );
     const satEnabled = satSettings.find(s => s.setting_key === 'saturday_work_enabled')?.setting_value !== 'false';
 
-    if (dayOfWeek === 0) {
+    // Check if already checked in today (atau masih dalam shift semalam yang
+    // belum check-out, untuk shift overnight seperti 00:00-08:00)
+    const { row: openRow } = await findActiveAttendanceRow(userId, today);
+    if (openRow && openRow.check_in && !openRow.check_out) {
+      return res.status(400).json({ success: false, message: 'Kamu sudah absen masuk hari ini' });
+    }
+
+    // Tanggal kerja efektif untuk baris absensi ini. Untuk shift malam,
+    // "hari kerja" selalu tanggal SETELAH tengah malam (mis. checkin 23:50
+    // Senin → tanggal kerja Selasa; checkin 00:15 Selasa → tetap Selasa).
+    const workDate = openRow ? today : await resolveCheckInWorkDate(userId, today);
+
+    // Cek hari libur berdasarkan tanggal kerja efektif (dihitung ulang dari
+    // string workDate, bukan offset dari `today` — workDate bisa jadi
+    // kemarin, hari ini, ATAU besok tergantung jenis shift).
+    const [wY, wM, wD] = workDate.split('-').map(Number);
+    const workDateDow = new Date(Date.UTC(wY, wM - 1, wD)).getUTCDay();
+    if (workDateDow === 0) {
       return res.status(400).json({ success: false, message: 'Hari Minggu libur, tidak ada absensi' });
     }
-    if (dayOfWeek === 6 && !satEnabled) {
+    if (workDateDow === 6 && !satEnabled) {
       return res.status(400).json({ success: false, message: 'Hari Sabtu libur sesuai pengaturan perusahaan' });
     }
 
-    // Check if already checked in today
-    const [existing] = await pool.query('SELECT * FROM attendances WHERE user_id = ? AND date = ?', [userId, today]);
-    if (existing.length && existing[0].check_in) {
-      return res.status(400).json({ success: false, message: 'Kamu sudah absen masuk hari ini' });
-    }
+    const [existing] = await pool.query('SELECT * FROM attendances WHERE user_id = ? AND date = ?', [userId, workDate]);
 
     // ── Cek izin yang tidak memblokir absensi (non-blocking permits) ──────────
     const [permits] = await pool.query(`
@@ -108,7 +201,7 @@ const checkIn = async (req, res) => {
       JOIN leave_types lt ON lr.type = lt.code
       WHERE lr.user_id = ? AND lr.start_date <= ? AND lr.end_date >= ?
         AND lr.status = 'approved' AND lt.blocks_attendance = FALSE
-    `, [userId, today, today]);
+    `, [userId, workDate, workDate]);
 
     const hasNonBlockingPermit = permits.length > 0;
     const latePermit = permits.find(p => p.leave_type_code === 'late_permission');
@@ -137,7 +230,7 @@ const checkIn = async (req, res) => {
         JOIN leave_types lt ON lr.type = lt.code
         WHERE lr.user_id = ? AND lr.start_date <= ? AND lr.end_date >= ?
           AND lr.status = 'approved' AND lt.blocks_attendance = TRUE
-      `, [userId, today, today]);
+      `, [userId, workDate, workDate]);
 
       if (blockingLeave.length) {
         return res.status(400).json({
@@ -216,7 +309,7 @@ const checkIn = async (req, res) => {
     const id = generateId();
 
     // Determine status (late check) — berdasarkan shift yang ditetapkan untuk karyawan ini
-    const myShift = await resolveUserShift(userId, today);
+    const myShift = await resolveUserShift(userId, workDate);
     const workStart = myShift.start_time;
     const tolerance = myShift.late_tolerance;
 
@@ -240,7 +333,7 @@ const checkIn = async (req, res) => {
     const [lastAtt] = await pool.query(
       `SELECT check_out_lat, check_out_lng, check_out, check_in_lat, check_in_lng, check_in
        FROM attendances WHERE user_id = ? AND date < ? ORDER BY date DESC LIMIT 1`,
-      [userId, today]
+      [userId, workDate]
     );
     if (lastAtt.length) {
       const prevLat = lastAtt[0].check_out_lat ?? lastAtt[0].check_in_lat;
@@ -267,12 +360,13 @@ const checkIn = async (req, res) => {
     } else {
       await pool.query(
         'INSERT INTO attendances (id, user_id, date, check_in, check_in_photo, check_in_lat, check_in_lng, location_id, status, is_location_anomaly, location_anomaly_note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [id, userId, today, now, photoPath, latitude, longitude, validLocation.id, status, !!anomalyNote, anomalyNote]
+        [id, userId, workDate, now, photoPath, latitude, longitude, validLocation.id, status, !!anomalyNote, anomalyNote]
       );
     }
 
-    // Pesan khusus Sabtu
-    const isSaturday = dayOfWeek === 6;
+    // Pesan khusus Sabtu — berdasarkan hari kerja efektif (workDate), bukan
+    // tanggal kalender saat request (bisa beda utk shift malam dini hari).
+    const isSaturday = workDateDow === 6;
     const [satEndRow] = await pool.query("SELECT setting_value FROM app_settings WHERE setting_key = 'saturday_end_time'");
     const satEnd = satEndRow[0]?.setting_value || '15:00';
 
@@ -280,13 +374,13 @@ const checkIn = async (req, res) => {
     const satMsg = isSaturday ? ` Hari Sabtu, jam pulang ${satEnd} WIB.` : '';
 
     const { broadcastEvent } = require('../utils/realtimeManager');
-    broadcastEvent('attendance_update', { event: 'attendance_update', type: 'check_in', userId, date: today });
+    broadcastEvent('attendance_update', { event: 'attendance_update', type: 'check_in', userId, date: workDate });
 
     const [attResult] = await pool.query(
       `SELECT a.*, l.name as location_name FROM attendances a
        LEFT JOIN attendance_locations l ON a.location_id = l.id
        WHERE a.user_id = ? AND a.date = ?`,
-      [userId, today]
+      [userId, workDate]
     );
 
     res.json({
@@ -319,9 +413,10 @@ const checkOut = async (req, res) => {
       });
     }
 
-    const [existing] = await pool.query('SELECT * FROM attendances WHERE user_id = ? AND date = ?', [userId, today]);
-    if (!existing.length || !existing[0].check_in) return res.status(400).json({ success: false, message: 'Kamu belum absen masuk hari ini' });
-    if (existing[0].check_out) return res.status(400).json({ success: false, message: 'Kamu sudah absen pulang hari ini' });
+    const { row: activeRow, date: attendanceDate } = await findActiveAttendanceRow(userId, today);
+    if (!activeRow || !activeRow.check_in) return res.status(400).json({ success: false, message: 'Kamu belum absen masuk hari ini' });
+    if (activeRow.check_out) return res.status(400).json({ success: false, message: 'Kamu sudah absen pulang hari ini' });
+    const existing = [activeRow];
 
     // ── Cek izin yang tidak memblokir absensi (non-blocking permits) ──────────
     const [permits] = await pool.query(`
@@ -330,7 +425,7 @@ const checkOut = async (req, res) => {
       JOIN leave_types lt ON lr.type = lt.code
       WHERE lr.user_id = ? AND lr.start_date <= ? AND lr.end_date >= ?
         AND lr.status = 'approved' AND lt.blocks_attendance = FALSE
-    `, [userId, today, today]);
+    `, [userId, attendanceDate, attendanceDate]);
 
     const hasNonBlockingPermit = permits.length > 0;
     const earlyLeavePermit = permits.find(p => p.leave_type_code === 'early_leave');
@@ -359,7 +454,7 @@ const checkOut = async (req, res) => {
         JOIN leave_types lt ON lr.type = lt.code
         WHERE lr.user_id = ? AND lr.start_date <= ? AND lr.end_date >= ?
           AND lr.status = 'approved' AND lt.blocks_attendance = TRUE
-      `, [userId, today, today]);
+      `, [userId, attendanceDate, attendanceDate]);
 
       if (blockingLeave.length) {
         return res.status(400).json({
@@ -454,17 +549,17 @@ const checkOut = async (req, res) => {
 
     await pool.query(
       'UPDATE attendances SET check_out = ?, check_out_photo = ?, check_out_lat = ?, check_out_lng = ?, is_location_anomaly = ?, location_anomaly_note = ? WHERE user_id = ? AND date = ?',
-      [now, photoPath, latitude, longitude, !!finalAnomalyNote, finalAnomalyNote, userId, today]
+      [now, photoPath, latitude, longitude, !!finalAnomalyNote, finalAnomalyNote, userId, attendanceDate]
     );
 
     const { broadcastEvent } = require('../utils/realtimeManager');
-    broadcastEvent('attendance_update', { event: 'attendance_update', type: 'check_out', userId, date: today });
+    broadcastEvent('attendance_update', { event: 'attendance_update', type: 'check_out', userId, date: attendanceDate });
 
     const [checkOutAttResult] = await pool.query(
       `SELECT a.*, l.name as location_name FROM attendances a
        LEFT JOIN attendance_locations l ON a.location_id = l.id
        WHERE a.user_id = ? AND a.date = ?`,
-      [userId, today]
+      [userId, attendanceDate]
     );
 
     res.json({
@@ -482,12 +577,32 @@ const checkOut = async (req, res) => {
 const getTodayAttendance = async (req, res) => {
   try {
     const today = todayWIB();
-    const [rows] = await pool.query(
-      `SELECT a.*, l.name as location_name FROM attendances a
-       LEFT JOIN attendance_locations l ON a.location_id = l.id
-       WHERE a.user_id = ? AND a.date = ?`,
-      [req.user.id, today]
-    );
+    // Ambil baris "aktif" — untuk shift overnight yang belum check-out, ini
+    // bisa jadi baris KEMARIN, bukan hari ini (mis. shift 00:00-08:00 yang
+    // check-in-nya jam 23:00 malam sebelumnya).
+    const { row: activeRow } = await findActiveAttendanceRow(req.user.id, today);
+    const isCarriedOver = !!(activeRow && activeRow.check_in && !activeRow.check_out);
+    // Tanggal acuan utk permit/shift info: tanggal baris aktif jika sedang
+    // "menyambung" dari kemarin (shift malam belum check-out), else hari ini.
+    const infoDate = isCarriedOver ? activeRow.date : today;
+    let rows;
+    if (isCarriedOver) {
+      const [r] = await pool.query(
+        `SELECT a.*, l.name as location_name FROM attendances a
+         LEFT JOIN attendance_locations l ON a.location_id = l.id
+         WHERE a.id = ?`,
+        [activeRow.id]
+      );
+      rows = r;
+    } else {
+      const [r] = await pool.query(
+        `SELECT a.*, l.name as location_name FROM attendances a
+         LEFT JOIN attendance_locations l ON a.location_id = l.id
+         WHERE a.user_id = ? AND a.date = ?`,
+        [req.user.id, today]
+      );
+      rows = r;
+    }
 
     // ── Cek izin yang tidak memblokir absensi (non-blocking permits) ──────────
     const [permits] = await pool.query(`
@@ -496,7 +611,7 @@ const getTodayAttendance = async (req, res) => {
       JOIN leave_types lt ON lr.type = lt.code
       WHERE lr.user_id = ? AND lr.start_date <= ? AND lr.end_date >= ?
         AND lr.status = 'approved' AND lt.blocks_attendance = FALSE
-    `, [req.user.id, today, today]);
+    `, [req.user.id, infoDate, infoDate]);
 
     // ── Ambil pengaturan permission times ─────────────────────────────────────
     const [permissionSettings] = await pool.query(
@@ -505,15 +620,15 @@ const getTodayAttendance = async (req, res) => {
     const ps = Object.fromEntries(permissionSettings.map(r => [r.setting_key, r.setting_value]));
 
     // Kirim info jam kerja hari ini (termasuk Sabtu), berdasarkan shift karyawan
-    const dayOfWeek = nowWIBParts().getUTCDay();
+    const infoDateDow = isCarriedOver ? (nowWIBParts().getUTCDay() + 6) % 7 : nowWIBParts().getUTCDay();
     const [satSettings2] = await pool.query(
       "SELECT setting_key, setting_value FROM app_settings WHERE setting_key IN ('saturday_work_enabled','saturday_end_time')"
     );
     const ss = Object.fromEntries(satSettings2.map(r => [r.setting_key, r.setting_value]));
-    const myShift = await resolveUserShift(req.user.id, today);
+    const myShift = await resolveUserShift(req.user.id, infoDate);
 
-    const isSaturday = dayOfWeek === 6;
-    const isSunday   = dayOfWeek === 0;
+    const isSaturday = infoDateDow === 6;
+    const isSunday   = infoDateDow === 0;
     const satEnabled = ss.saturday_work_enabled !== 'false';
     const endTime    = isSaturday && satEnabled ? (ss.saturday_end_time || '15:00') : myShift.end_time;
 
