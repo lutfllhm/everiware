@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { BarChart3, Download, Calendar, FileSpreadsheet, FileText, CalendarRange, CalendarDays } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { BarChart3, Download, Calendar, FileSpreadsheet, FileText, CalendarRange, CalendarDays, Building, ChevronDown, ChevronRight } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 import api from '../../api/axios';
 import UserAvatar from '../../components/ui/UserAvatar';
@@ -42,6 +42,7 @@ export default function ReportsAdmin() {
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState('');
+  const [expandedDept, setExpandedDept] = useState({});
 
   // Validasi range
   const rangeValid = filterMode === 'month' || (filters.start_date && filters.end_date && filters.start_date <= filters.end_date);
@@ -138,6 +139,33 @@ export default function ReportsAdmin() {
   ].filter(d => d.value > 0);
 
   const totalLeavedays = leaveReport.reduce((s, l) => s + (l.total_days || 0), 0);
+
+  // Group tabel "Detail per Karyawan" berdasarkan departemen (sama seperti halaman Karyawan/Absen)
+  const attGroupedByDept = useMemo(() => {
+    const byDept = attReport.reduce((acc, r) => {
+      const dept = r.department || 'Tanpa Departemen';
+      if (!acc[dept]) acc[dept] = [];
+      acc[dept].push(r);
+      return acc;
+    }, {});
+    return Object.entries(byDept)
+      .map(([department, members]) => ({ department, members }))
+      .sort((a, b) => a.department.localeCompare(b.department));
+  }, [attReport]);
+
+  const leaveGroupedByDept = useMemo(() => {
+    const byDept = leaveReport.reduce((acc, r) => {
+      const dept = r.department || 'Tanpa Departemen';
+      if (!acc[dept]) acc[dept] = [];
+      acc[dept].push(r);
+      return acc;
+    }, {});
+    return Object.entries(byDept)
+      .map(([department, members]) => ({ department, members }))
+      .sort((a, b) => a.department.localeCompare(b.department));
+  }, [leaveReport]);
+
+  const toggleDept = (dept) => setExpandedDept(prev => ({ ...prev, [dept]: !prev[dept] }));
 
   return (
     <div className="space-y-5">
@@ -330,52 +358,78 @@ export default function ReportsAdmin() {
             </div>
           )}
 
-          {/* Tabel */}
-          <div className="card overflow-hidden">
-            <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-              <div>
-                <h3 className="font-bold text-slate-900 text-sm">Detail per Karyawan</h3>
-                <p className="text-slate-400 text-xs mt-0.5">{attReport.length} karyawan · {periodLabel(filterMode, filters)}</p>
+          {/* Tabel: grouped per departemen */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between px-1">
+              <h3 className="font-bold text-slate-900 text-sm">Detail per Karyawan</h3>
+              <p className="text-slate-400 text-xs">{attReport.length} karyawan · {periodLabel(filterMode, filters)}</p>
+            </div>
+            {loading ? (
+              <div className="card text-center py-10 text-slate-400">Memuat data...</div>
+            ) : attGroupedByDept.length === 0 ? (
+              <div className="card text-center py-10">
+                <BarChart3 size={32} className="text-slate-200 mx-auto mb-2" />
+                <p className="text-slate-400 text-sm">Tidak ada data untuk periode ini</p>
               </div>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-slate-50 border-b border-slate-200">
-                  <tr>
-                    {['Karyawan', 'ID', 'Dept · Jabatan', 'Hadir', 'Terlambat', 'Absen', 'Cuti', 'Sakit', 'Total'].map(h => (
-                      <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50">
-                  {loading ? (
-                    <tr><td colSpan={9} className="text-center py-10 text-slate-400">Memuat data...</td></tr>
-                  ) : attReport.length === 0 ? (
-                    <tr><td colSpan={9} className="text-center py-10">
-                      <BarChart3 size={32} className="text-slate-200 mx-auto mb-2" />
-                      <p className="text-slate-400 text-sm">Tidak ada data untuk periode ini</p>
-                    </td></tr>
-                  ) : attReport.map((row) => (
-                    <tr key={row.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <UserAvatar name={row.name} avatar={row.avatar} size="md" />
-                          <span className="font-medium text-slate-900 text-sm">{row.name}</span>
+            ) : attGroupedByDept.map(({ department, members }) => {
+              const isOpen = !!expandedDept[`att-${department}`];
+              return (
+                <div key={department} className="card overflow-hidden">
+                  <button onClick={() => toggleDept(`att-${department}`)}
+                    className="w-full flex items-center gap-3 p-4 hover:bg-slate-50 transition-colors text-left">
+                    {isOpen
+                      ? <ChevronDown size={16} className="text-slate-500 flex-shrink-0" />
+                      : <ChevronRight size={16} className="text-slate-500 flex-shrink-0" />}
+                    <div className="w-9 h-9 bg-slate-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                      <Building size={18} className="text-slate-600" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-semibold text-slate-900 text-sm">{department}</div>
+                      <div className="text-xs text-slate-400 mt-0.5">{members.length} karyawan</div>
+                    </div>
+                  </button>
+
+                  <AnimatePresence>
+                    {isOpen && (
+                      <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
+                        className="overflow-hidden border-t border-slate-100">
+                        <div className="overflow-x-auto">
+                          <table className="w-full">
+                            <thead className="bg-slate-50 border-b border-slate-200">
+                              <tr>
+                                {['Karyawan', 'ID', 'Jabatan', 'Hadir', 'Terlambat', 'Absen', 'Cuti', 'Sakit', 'Total'].map(h => (
+                                  <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">{h}</th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-50">
+                              {members.map((row) => (
+                                <tr key={row.id} className="hover:bg-slate-50 transition-colors">
+                                  <td className="px-4 py-3">
+                                    <div className="flex items-center gap-2">
+                                      <UserAvatar name={row.name} avatar={row.avatar} size="md" />
+                                      <span className="font-medium text-slate-900 text-sm">{row.name}</span>
+                                    </div>
+                                  </td>
+                                  <td className="px-4 py-3 text-sm text-slate-500">{row.employee_id || '-'}</td>
+                                  <td className="px-4 py-3 text-sm text-slate-500">{row.position || '-'}</td>
+                                  <td className="px-4 py-3"><span className="badge-success">{row.present_count}</span></td>
+                                  <td className="px-4 py-3"><span className="badge-warning">{row.late_count}</span></td>
+                                  <td className="px-4 py-3"><span className="badge-danger">{row.absent_count}</span></td>
+                                  <td className="px-4 py-3"><span className="badge-info">{row.leave_count}</span></td>
+                                  <td className="px-4 py-3"><span className="badge-purple">{row.sick_count}</span></td>
+                                  <td className="px-4 py-3 font-bold text-slate-900">{row.total_days}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
                         </div>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-slate-500">{row.employee_id || '-'}</td>
-                      <td className="px-4 py-3 text-sm text-slate-500">{[row.department, row.position].filter(Boolean).join(' · ') || '-'}</td>
-                      <td className="px-4 py-3"><span className="badge-success">{row.present_count}</span></td>
-                      <td className="px-4 py-3"><span className="badge-warning">{row.late_count}</span></td>
-                      <td className="px-4 py-3"><span className="badge-danger">{row.absent_count}</span></td>
-                      <td className="px-4 py-3"><span className="badge-info">{row.leave_count}</span></td>
-                      <td className="px-4 py-3"><span className="badge-purple">{row.sick_count}</span></td>
-                      <td className="px-4 py-3 font-bold text-slate-900">{row.total_days}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
@@ -416,52 +470,80 @@ export default function ReportsAdmin() {
             </div>
           )}
 
-          <div className="card overflow-hidden">
-            <div className="p-4 border-b border-slate-100">
+          <div className="space-y-3">
+            <div className="flex items-center justify-between px-1">
               <h3 className="font-bold text-slate-900 text-sm">Detail Perizinan Disetujui</h3>
-              <p className="text-slate-400 text-xs mt-0.5">{leaveReport.length} pengajuan · {periodLabel(filterMode, filters)}</p>
+              <p className="text-slate-400 text-xs">{leaveReport.length} pengajuan · {periodLabel(filterMode, filters)}</p>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-slate-50 border-b border-slate-200">
-                  <tr>
-                    {['Karyawan', 'Departemen', 'Jenis', 'Tanggal', 'Durasi', 'Alasan'].map(h => (
-                      <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50">
-                  {loading ? (
-                    <tr><td colSpan={6} className="text-center py-10 text-slate-400">Memuat data...</td></tr>
-                  ) : leaveReport.length === 0 ? (
-                    <tr><td colSpan={6} className="text-center py-10">
-                      <Calendar size={32} className="text-slate-200 mx-auto mb-2" />
-                      <p className="text-slate-400 text-sm">Tidak ada perizinan disetujui untuk periode ini</p>
-                    </td></tr>
-                  ) : leaveReport.map((row) => (
-                    <tr key={row.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <UserAvatar name={row.user_name} avatar={row.user_avatar} size="md" />
-                          <span className="font-medium text-slate-900 text-sm">{row.user_name}</span>
+            {loading ? (
+              <div className="card text-center py-10 text-slate-400">Memuat data...</div>
+            ) : leaveGroupedByDept.length === 0 ? (
+              <div className="card text-center py-10">
+                <Calendar size={32} className="text-slate-200 mx-auto mb-2" />
+                <p className="text-slate-400 text-sm">Tidak ada perizinan disetujui untuk periode ini</p>
+              </div>
+            ) : leaveGroupedByDept.map(({ department, members }) => {
+              const isOpen = !!expandedDept[`leave-${department}`];
+              return (
+                <div key={department} className="card overflow-hidden">
+                  <button onClick={() => toggleDept(`leave-${department}`)}
+                    className="w-full flex items-center gap-3 p-4 hover:bg-slate-50 transition-colors text-left">
+                    {isOpen
+                      ? <ChevronDown size={16} className="text-slate-500 flex-shrink-0" />
+                      : <ChevronRight size={16} className="text-slate-500 flex-shrink-0" />}
+                    <div className="w-9 h-9 bg-slate-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                      <Building size={18} className="text-slate-600" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-semibold text-slate-900 text-sm">{department}</div>
+                      <div className="text-xs text-slate-400 mt-0.5">{members.length} pengajuan</div>
+                    </div>
+                  </button>
+
+                  <AnimatePresence>
+                    {isOpen && (
+                      <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
+                        className="overflow-hidden border-t border-slate-100">
+                        <div className="overflow-x-auto">
+                          <table className="w-full">
+                            <thead className="bg-slate-50 border-b border-slate-200">
+                              <tr>
+                                {['Karyawan', 'Jabatan', 'Jenis', 'Tanggal', 'Durasi', 'Alasan'].map(h => (
+                                  <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">{h}</th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-50">
+                              {members.map((row) => (
+                                <tr key={row.id} className="hover:bg-slate-50 transition-colors">
+                                  <td className="px-4 py-3">
+                                    <div className="flex items-center gap-2">
+                                      <UserAvatar name={row.user_name} avatar={row.user_avatar} size="md" />
+                                      <span className="font-medium text-slate-900 text-sm">{row.user_name}</span>
+                                    </div>
+                                  </td>
+                                  <td className="px-4 py-3 text-sm text-slate-500">{row.position || '-'}</td>
+                                  <td className="px-4 py-3">
+                                    <span className={row.type === 'annual' ? 'badge-info' : row.type === 'sick' ? 'badge-purple' : 'badge-warning'}>
+                                      {row.type === 'annual' ? 'Cuti' : row.type === 'sick' ? 'Sakit' : row.type === 'dinas' ? 'Dinas' : 'Izin'}
+                                    </span>
+                                  </td>
+                                  <td className="px-4 py-3 text-sm text-slate-600">
+                                    {new Date(row.start_date).toLocaleDateString('id-ID')} – {new Date(row.end_date).toLocaleDateString('id-ID')}
+                                  </td>
+                                  <td className="px-4 py-3 text-sm font-medium text-slate-900">{row.total_days} hari</td>
+                                  <td className="px-4 py-3 text-sm text-slate-600 max-w-xs truncate">{row.reason}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
                         </div>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-slate-500">{[row.department, row.position].filter(Boolean).join(' · ') || '-'}</td>
-                      <td className="px-4 py-3">
-                        <span className={row.type === 'annual' ? 'badge-info' : row.type === 'sick' ? 'badge-purple' : 'badge-warning'}>
-                          {row.type === 'annual' ? 'Cuti' : row.type === 'sick' ? 'Sakit' : row.type === 'dinas' ? 'Dinas' : 'Izin'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-slate-600">
-                        {new Date(row.start_date).toLocaleDateString('id-ID')} – {new Date(row.end_date).toLocaleDateString('id-ID')}
-                      </td>
-                      <td className="px-4 py-3 text-sm font-medium text-slate-900">{row.total_days} hari</td>
-                      <td className="px-4 py-3 text-sm text-slate-600 max-w-xs truncate">{row.reason}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
