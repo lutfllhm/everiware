@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { BarChart3, Download, Calendar, FileSpreadsheet, FileText, CalendarRange, CalendarDays, Building, ChevronDown, ChevronRight } from 'lucide-react';
+import { BarChart3, Download, Calendar, FileSpreadsheet, FileText, CalendarRange, CalendarDays, Building, ChevronDown, ChevronRight, Search } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 import api from '../../api/axios';
 import UserAvatar from '../../components/ui/UserAvatar';
@@ -43,6 +43,7 @@ export default function ReportsAdmin() {
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState('');
   const [expandedDept, setExpandedDept] = useState({});
+  const [deptSearch, setDeptSearch] = useState({});
 
   // Validasi range
   const rangeValid = filterMode === 'month' || (filters.start_date && filters.end_date && filters.start_date <= filters.end_date);
@@ -166,6 +167,7 @@ export default function ReportsAdmin() {
   }, [leaveReport]);
 
   const toggleDept = (dept) => setExpandedDept(prev => ({ ...prev, [dept]: !prev[dept] }));
+  const setDeptSearchValue = (dept, value) => setDeptSearch(prev => ({ ...prev, [dept]: value }));
 
   return (
     <div className="space-y-5">
@@ -373,6 +375,10 @@ export default function ReportsAdmin() {
               </div>
             ) : attGroupedByDept.map(({ department, members }) => {
               const isOpen = !!expandedDept[`att-${department}`];
+              const deptQuery = (deptSearch[`att-${department}`] || '').toLowerCase();
+              const visibleMembers = deptQuery
+                ? members.filter(r => r.name?.toLowerCase().includes(deptQuery) || r.employee_id?.toLowerCase().includes(deptQuery) || r.position?.toLowerCase().includes(deptQuery))
+                : members;
               return (
                 <div key={department} className="card overflow-hidden">
                   <button onClick={() => toggleDept(`att-${department}`)}
@@ -393,6 +399,15 @@ export default function ReportsAdmin() {
                     {isOpen && (
                       <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
                         className="overflow-hidden border-t border-slate-100">
+                        <div className="p-3 border-b border-slate-100 bg-slate-50/50">
+                          <div className="relative max-w-xs">
+                            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                            <input placeholder={`Cari di ${department}...`} value={deptSearch[`att-${department}`] || ''}
+                              onClick={e => e.stopPropagation()}
+                              onChange={e => setDeptSearchValue(`att-${department}`, e.target.value)}
+                              className="input-field pl-8 py-1.5 text-xs" />
+                          </div>
+                        </div>
                         <div className="overflow-x-auto">
                           <table className="w-full">
                             <thead className="bg-slate-50 border-b border-slate-200">
@@ -403,7 +418,9 @@ export default function ReportsAdmin() {
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-50">
-                              {members.map((row) => (
+                              {visibleMembers.length === 0 ? (
+                                <tr><td colSpan={9} className="text-center py-6 text-slate-400 text-sm">Tidak ada karyawan yang cocok</td></tr>
+                              ) : visibleMembers.map((row) => (
                                 <tr key={row.id} className="hover:bg-slate-50 transition-colors">
                                   <td className="px-4 py-3">
                                     <div className="flex items-center gap-2">
@@ -484,6 +501,10 @@ export default function ReportsAdmin() {
               </div>
             ) : leaveGroupedByDept.map(({ department, members }) => {
               const isOpen = !!expandedDept[`leave-${department}`];
+              const deptQuery = (deptSearch[`leave-${department}`] || '').toLowerCase();
+              const visibleMembers = deptQuery
+                ? members.filter(r => r.user_name?.toLowerCase().includes(deptQuery) || r.position?.toLowerCase().includes(deptQuery))
+                : members;
               return (
                 <div key={department} className="card overflow-hidden">
                   <button onClick={() => toggleDept(`leave-${department}`)}
@@ -504,6 +525,15 @@ export default function ReportsAdmin() {
                     {isOpen && (
                       <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
                         className="overflow-hidden border-t border-slate-100">
+                        <div className="p-3 border-b border-slate-100 bg-slate-50/50">
+                          <div className="relative max-w-xs">
+                            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                            <input placeholder={`Cari di ${department}...`} value={deptSearch[`leave-${department}`] || ''}
+                              onClick={e => e.stopPropagation()}
+                              onChange={e => setDeptSearchValue(`leave-${department}`, e.target.value)}
+                              className="input-field pl-8 py-1.5 text-xs" />
+                          </div>
+                        </div>
                         <div className="overflow-x-auto">
                           <table className="w-full">
                             <thead className="bg-slate-50 border-b border-slate-200">
@@ -514,7 +544,9 @@ export default function ReportsAdmin() {
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-50">
-                              {members.map((row) => (
+                              {visibleMembers.length === 0 ? (
+                                <tr><td colSpan={6} className="text-center py-6 text-slate-400 text-sm">Tidak ada data yang cocok</td></tr>
+                              ) : visibleMembers.map((row) => (
                                 <tr key={row.id} className="hover:bg-slate-50 transition-colors">
                                   <td className="px-4 py-3">
                                     <div className="flex items-center gap-2">

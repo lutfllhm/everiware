@@ -23,6 +23,7 @@ export default function EmployeesAdmin() {
   const [locationFilter, setLocationFilter] = useState('');
   const [permissions, setPermissions] = useState([]);
   const [expandedDept, setExpandedDept] = useState({});
+  const [deptSearch, setDeptSearch] = useState({});
 
   useEffect(() => { fetchUsers(); fetchManagers(); fetchDepartments(); fetchLocations(); }, [locationFilter]);
 
@@ -199,6 +200,7 @@ export default function EmployeesAdmin() {
   }, [search, groupedByDept]);
 
   const toggleDept = (dept) => setExpandedDept(prev => ({ ...prev, [dept]: !prev[dept] }));
+  const setDeptSearchValue = (dept, value) => setDeptSearch(prev => ({ ...prev, [dept]: value }));
 
   return (
     <div className="space-y-4">
@@ -236,6 +238,10 @@ export default function EmployeesAdmin() {
           groupedByDept.map(({ department, members }) => {
             const isOpen = !!expandedDept[department];
             const activeCount = members.filter(m => m.is_active).length;
+            const deptQuery = (deptSearch[department] || '').toLowerCase();
+            const visibleMembers = deptQuery
+              ? members.filter(m => m.name?.toLowerCase().includes(deptQuery) || m.email?.toLowerCase().includes(deptQuery) || m.employee_id?.toLowerCase().includes(deptQuery) || m.position?.toLowerCase().includes(deptQuery))
+              : members;
             return (
               <div key={department} className="card overflow-hidden">
                 <button onClick={() => toggleDept(department)}
@@ -260,6 +266,15 @@ export default function EmployeesAdmin() {
                   {isOpen && (
                     <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
                       className="overflow-hidden border-t border-slate-100">
+                      <div className="p-3 border-b border-slate-100 bg-slate-50/50">
+                        <div className="relative max-w-xs">
+                          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                          <input placeholder={`Cari di ${department}...`} value={deptSearch[department] || ''}
+                            onClick={e => e.stopPropagation()}
+                            onChange={e => setDeptSearchValue(department, e.target.value)}
+                            className="input-field pl-8 py-1.5 text-xs" />
+                        </div>
+                      </div>
                       <div className="overflow-x-auto">
                         <table className="w-full">
                           <thead className="bg-slate-50 border-b border-slate-200">
@@ -270,7 +285,9 @@ export default function EmployeesAdmin() {
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-50">
-                            {members.map((user) => (
+                            {visibleMembers.length === 0 ? (
+                              <tr><td colSpan={7} className="text-center py-6 text-slate-400 text-sm">Tidak ada karyawan yang cocok</td></tr>
+                            ) : visibleMembers.map((user) => (
                               <tr key={user.id} className="hover:bg-slate-50 transition-colors">
                                 <td className="px-4 py-3">
                                   <div className="flex items-center gap-3">

@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Plus, Edit, Trash2, X, Shield, Key, ToggleLeft, ToggleRight, UserCheck, UserX, AlertTriangle } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, X, Shield, Key, ToggleLeft, ToggleRight, UserCheck, UserX, AlertTriangle, Building, ChevronDown, ChevronRight } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../../api/axios';
 import useAuthStore from '../../store/authStore';
@@ -24,6 +24,8 @@ export default function UsersAdmin() {
   const [deleteModal, setDeleteModal] = useState(null);
   const [newPass, setNewPass] = useState('');
   const [form, setForm] = useState({ name: '', email: '', password: '', phone: '', role: 'employee', department: '', position: '', employee_id: '' });
+  const [expandedDept, setExpandedDept] = useState({});
+  const [deptSearch, setDeptSearch] = useState({});
 
   useEffect(() => { fetchUsers(); }, [roleFilter]);
 
@@ -113,6 +115,31 @@ export default function UsersAdmin() {
 
   const roleCounts = users.reduce((acc, u) => { acc[u.role] = (acc[u.role] || 0) + 1; return acc; }, {});
 
+  const groupedByDept = useMemo(() => {
+    const byDept = filtered.reduce((acc, u) => {
+      const dept = u.department || 'Tanpa Departemen';
+      if (!acc[dept]) acc[dept] = [];
+      acc[dept].push(u);
+      return acc;
+    }, {});
+    return Object.entries(byDept)
+      .map(([department, members]) => ({ department, members }))
+      .sort((a, b) => a.department.localeCompare(b.department));
+  }, [filtered]);
+
+  // Saat mencari, otomatis buka departemen yang punya hasil match
+  useEffect(() => {
+    if (!search) return;
+    setExpandedDept(prev => {
+      const next = { ...prev };
+      groupedByDept.forEach(d => { next[d.department] = true; });
+      return next;
+    });
+  }, [search, groupedByDept]);
+
+  const toggleDept = (dept) => setExpandedDept(prev => ({ ...prev, [dept]: !prev[dept] }));
+  const setDeptSearchValue = (dept, value) => setDeptSearch(prev => ({ ...prev, [dept]: value }));
+
   return (
     <div className="space-y-4">
       {/* Stats */}
@@ -151,79 +178,126 @@ export default function UsersAdmin() {
         )}
       </div>
 
-      {/* Table */}
-      <div className="card overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-slate-50 border-b border-slate-200">
-              <tr>
-                {['User', 'Role', 'Departemen', 'Kontak', 'Status', 'Aksi'].map(h => (
-                  <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-50">
-              {loading ? (
-                <tr><td colSpan={6} className="text-center py-10 text-slate-400">Memuat data...</td></tr>
-              ) : filtered.length === 0 ? (
-                <tr><td colSpan={6} className="text-center py-10 text-slate-400">Tidak ada user ditemukan</td></tr>
-              ) : filtered.map((u) => {
-                const rc = roleConfig[u.role] || roleConfig.employee;
-                const isSelf = u.id === currentUser?.id;
-                return (
-                  <tr key={u.id} className={`hover:bg-slate-50 transition-colors ${!u.is_active ? 'opacity-50' : ''}`}>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-slate-700 to-slate-500 flex items-center justify-center text-white font-bold text-sm flex-shrink-0 overflow-hidden">
-                          {u.avatar ? <img src={`/uploads/avatar/${u.avatar}`} alt="" className="w-full h-full object-cover" /> : u.name?.[0]}
-                        </div>
-                        <div>
-                          <div className="font-medium text-slate-900 text-sm flex items-center gap-1">
-                            {u.name} {isSelf && <span className="text-xs text-indigo-500">(Kamu)</span>}
-                          </div>
-                          <div className="text-xs text-slate-400">{u.email}</div>
-                        </div>
+      {/* Grouped per departemen (accordion) */}
+      <div className="space-y-3">
+        {loading ? (
+          <div className="card text-center py-8 text-slate-400">Memuat data...</div>
+        ) : groupedByDept.length === 0 ? (
+          <div className="card text-center py-8 text-slate-400">Tidak ada user ditemukan</div>
+        ) : groupedByDept.map(({ department, members }) => {
+          const isOpen = !!expandedDept[department];
+          const activeCount = members.filter(m => m.is_active).length;
+          const deptQuery = (deptSearch[department] || '').toLowerCase();
+          const visibleMembers = deptQuery
+            ? members.filter(u => u.name?.toLowerCase().includes(deptQuery) || u.email?.toLowerCase().includes(deptQuery) || u.employee_id?.toLowerCase().includes(deptQuery))
+            : members;
+          return (
+            <div key={department} className="card overflow-hidden">
+              <button onClick={() => toggleDept(department)}
+                className="w-full flex items-center gap-3 p-4 hover:bg-slate-50 transition-colors text-left">
+                {isOpen
+                  ? <ChevronDown size={16} className="text-slate-500 flex-shrink-0" />
+                  : <ChevronRight size={16} className="text-slate-500 flex-shrink-0" />}
+                <div className="w-9 h-9 bg-slate-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <Building size={18} className="text-slate-600" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="font-semibold text-slate-900 text-sm">{department}</div>
+                  <div className="text-xs text-slate-400 mt-0.5">{members.length} user</div>
+                </div>
+                <div className="hidden sm:flex items-center gap-2 text-xs flex-shrink-0">
+                  <span className="badge-success">{activeCount} Aktif</span>
+                  {activeCount < members.length && <span className="badge-danger">{members.length - activeCount} Nonaktif</span>}
+                </div>
+              </button>
+
+              <AnimatePresence>
+                {isOpen && (
+                  <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
+                    className="overflow-hidden border-t border-slate-100">
+                    <div className="p-3 border-b border-slate-100 bg-slate-50/50">
+                      <div className="relative max-w-xs">
+                        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <input placeholder={`Cari di ${department}...`} value={deptSearch[department] || ''}
+                          onClick={e => e.stopPropagation()}
+                          onChange={e => setDeptSearchValue(department, e.target.value)}
+                          className="input-field pl-8 py-1.5 text-xs" />
                       </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`text-xs px-2.5 py-1 rounded-lg font-medium ${rc.cls}`}>{rc.label}</span>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-slate-600">{u.department || '-'}</td>
-                    <td className="px-4 py-3">
-                      <div className="text-xs text-slate-600">{u.phone || '-'}</div>
-                      <div className="text-xs text-slate-400">{u.employee_id || '-'}</div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`text-xs px-2.5 py-1 rounded-lg font-medium border ${u.is_active ? 'bg-teal-50 text-teal-700 border-teal-200' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
-                        {u.is_active ? 'Aktif' : 'Nonaktif'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-1">
-                        <button onClick={() => openEdit(u)} title="Edit" className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors">
-                          <Edit size={14} className="text-slate-500" />
-                        </button>
-                        <button onClick={() => { setShowPassModal(u); setNewPass(''); }} title="Reset Password" className="p-1.5 hover:bg-amber-50 rounded-lg transition-colors">
-                          <Key size={14} className="text-amber-500" />
-                        </button>
-                        {!isSelf && (
-                          <>
-                            <button onClick={() => handleToggleActive(u)} title={u.is_active ? 'Nonaktifkan' : 'Aktifkan'} className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors">
-                              {u.is_active ? <UserX size={14} className="text-red-500" /> : <UserCheck size={14} className="text-emerald-500" />}
-                            </button>
-                            <button onClick={() => setDeleteModal(u)} title="Hapus" className="p-1.5 hover:bg-red-50 rounded-lg transition-colors">
-                              <Trash2 size={14} className="text-red-500" />
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead className="bg-slate-50 border-b border-slate-200">
+                          <tr>
+                            {['User', 'Role', 'Kontak', 'Status', 'Aksi'].map(h => (
+                              <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-50">
+                          {visibleMembers.length === 0 ? (
+                            <tr><td colSpan={5} className="text-center py-6 text-slate-400 text-sm">Tidak ada user yang cocok</td></tr>
+                          ) : visibleMembers.map((u) => {
+                            const rc = roleConfig[u.role] || roleConfig.employee;
+                            const isSelf = u.id === currentUser?.id;
+                            return (
+                              <tr key={u.id} className={`hover:bg-slate-50 transition-colors ${!u.is_active ? 'opacity-50' : ''}`}>
+                                <td className="px-4 py-3">
+                                  <div className="flex items-center gap-3">
+                                    <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-slate-700 to-slate-500 flex items-center justify-center text-white font-bold text-sm flex-shrink-0 overflow-hidden">
+                                      {u.avatar ? <img src={`/uploads/avatar/${u.avatar}`} alt="" className="w-full h-full object-cover" /> : u.name?.[0]}
+                                    </div>
+                                    <div>
+                                      <div className="font-medium text-slate-900 text-sm flex items-center gap-1">
+                                        {u.name} {isSelf && <span className="text-xs text-indigo-500">(Kamu)</span>}
+                                      </div>
+                                      <div className="text-xs text-slate-400">{u.email}</div>
+                                    </div>
+                                  </div>
+                                </td>
+                                <td className="px-4 py-3">
+                                  <span className={`text-xs px-2.5 py-1 rounded-lg font-medium ${rc.cls}`}>{rc.label}</span>
+                                </td>
+                                <td className="px-4 py-3">
+                                  <div className="text-xs text-slate-600">{u.phone || '-'}</div>
+                                  <div className="text-xs text-slate-400">{u.employee_id || '-'}</div>
+                                </td>
+                                <td className="px-4 py-3">
+                                  <span className={`text-xs px-2.5 py-1 rounded-lg font-medium border ${u.is_active ? 'bg-teal-50 text-teal-700 border-teal-200' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
+                                    {u.is_active ? 'Aktif' : 'Nonaktif'}
+                                  </span>
+                                </td>
+                                <td className="px-4 py-3">
+                                  <div className="flex items-center gap-1">
+                                    <button onClick={() => openEdit(u)} title="Edit" className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors">
+                                      <Edit size={14} className="text-slate-500" />
+                                    </button>
+                                    <button onClick={() => { setShowPassModal(u); setNewPass(''); }} title="Reset Password" className="p-1.5 hover:bg-amber-50 rounded-lg transition-colors">
+                                      <Key size={14} className="text-amber-500" />
+                                    </button>
+                                    {!isSelf && (
+                                      <>
+                                        <button onClick={() => handleToggleActive(u)} title={u.is_active ? 'Nonaktifkan' : 'Aktifkan'} className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors">
+                                          {u.is_active ? <UserX size={14} className="text-red-500" /> : <UserCheck size={14} className="text-emerald-500" />}
+                                        </button>
+                                        <button onClick={() => setDeleteModal(u)} title="Hapus" className="p-1.5 hover:bg-red-50 rounded-lg transition-colors">
+                                          <Trash2 size={14} className="text-red-500" />
+                                        </button>
+                                      </>
+                                    )}
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          );
+        })}
       </div>
 
       {/* Add/Edit Modal */}

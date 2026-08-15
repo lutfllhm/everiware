@@ -23,6 +23,7 @@ export default function AttendanceAdmin() {
   const [detailEmployee, setDetailEmployee] = useState(null);
   const [expandedDept, setExpandedDept] = useState({});
   const [onlyMissingCheckout, setOnlyMissingCheckout] = useState(false);
+  const [deptSearch, setDeptSearch] = useState({});
 
   // Absen masuk sudah tercatat tapi belum absen pulang, dan bukan hari ini
   // (hari ini masih wajar belum checkout karena jam kerja belum selesai)
@@ -126,6 +127,7 @@ export default function AttendanceAdmin() {
   }, [filters.search, groupedByDept]);
 
   const toggleDept = (dept) => setExpandedDept(prev => ({ ...prev, [dept]: !prev[dept] }));
+  const setDeptSearchValue = (dept, value) => setDeptSearch(prev => ({ ...prev, [dept]: value }));
 
   const detailPagination = usePagination(detailEmployee?.records || [], 10);
 
@@ -211,6 +213,10 @@ export default function AttendanceAdmin() {
               late: employees.reduce((n, e) => n + e.records.filter(r => r.status === 'late').length, 0),
             };
             const isOpen = !!expandedDept[department];
+            const deptQuery = (deptSearch[department] || '').toLowerCase();
+            const visibleEmployees = deptQuery
+              ? employees.filter(g => g.user_name?.toLowerCase().includes(deptQuery) || g.employee_id?.toLowerCase().includes(deptQuery) || g.position?.toLowerCase().includes(deptQuery))
+              : employees;
             return (
               <div key={department} className="card overflow-hidden">
                 <button onClick={() => toggleDept(department)}
@@ -235,8 +241,19 @@ export default function AttendanceAdmin() {
                   {isOpen && (
                     <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
                       className="overflow-hidden border-t border-slate-100">
+                      <div className="p-3 border-b border-slate-100 bg-slate-50/50">
+                        <div className="relative max-w-xs">
+                          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                          <input placeholder={`Cari di ${department}...`} value={deptSearch[department] || ''}
+                            onClick={e => e.stopPropagation()}
+                            onChange={e => setDeptSearchValue(department, e.target.value)}
+                            className="input-field pl-8 py-1.5 text-xs" />
+                        </div>
+                      </div>
                       <div className="divide-y divide-slate-100">
-                        {employees.map((grp) => {
+                        {visibleEmployees.length === 0 ? (
+                          <div className="text-center py-6 text-slate-400 text-sm">Tidak ada karyawan yang cocok</div>
+                        ) : visibleEmployees.map((grp) => {
                           const counts = {
                             present: grp.records.filter(r => r.status === 'present').length,
                             late: grp.records.filter(r => r.status === 'late').length,
