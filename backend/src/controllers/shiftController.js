@@ -65,8 +65,8 @@ const getUserShift = async (req, res) => {
     if (req.params.userId) {
       const scope = resolveScope(req.user);
       if (scope.scoped) {
-        const [target] = await pool.query('SELECT department_id FROM users WHERE id = ?', [userId]);
-        if (!target.length || target[0].department_id !== scope.departmentId) {
+        const [target] = await pool.query('SELECT department FROM users WHERE id = ?', [userId]);
+        if (!target.length || target[0].department !== scope.department) {
           return res.status(403).json({ success: false, message: 'Karyawan di luar divisi Anda' });
         }
       }
@@ -99,8 +99,8 @@ const assignShift = async (req, res) => {
 
     const scope = resolveScope(req.user);
     if (scope.scoped) {
-      const [target] = await pool.query('SELECT department_id FROM users WHERE id = ?', [user_id]);
-      if (!target.length || target[0].department_id !== scope.departmentId) {
+      const [target] = await pool.query('SELECT department FROM users WHERE id = ?', [user_id]);
+      if (!target.length || target[0].department !== scope.department) {
         return res.status(403).json({ success: false, message: 'Karyawan di luar divisi Anda' });
       }
     }
@@ -126,8 +126,8 @@ const bulkAssignShift = async (req, res) => {
     const scope = resolveScope(req.user);
     if (scope.scoped) {
       const [targets] = await pool.query(
-        `SELECT id FROM users WHERE id IN (?) AND department_id = ?`,
-        [user_ids, scope.departmentId]
+        `SELECT id FROM users WHERE id IN (?) AND department = ?`,
+        [user_ids, scope.department]
       );
       if (targets.length !== user_ids.length) {
         return res.status(403).json({ success: false, message: 'Ada karyawan di luar divisi Anda' });
@@ -164,8 +164,8 @@ const getAllUserShifts = async (req, res) => {
        WHERE u.role = 'employee' AND u.is_active = TRUE`;
     const params = [];
     if (scope.scoped) {
-      query += ' AND u.department_id = ?';
-      params.push(scope.departmentId);
+      query += ' AND u.department = ?';
+      params.push(scope.department);
     }
     query += ' ORDER BY u.name ASC';
 
