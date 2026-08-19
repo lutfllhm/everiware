@@ -119,32 +119,36 @@ const findActiveAttendanceRow = async (userId, todayStr) => {
 };
 
 // Tentukan tanggal kerja (work-day) untuk CHECK-IN BARU (belum ada baris
-// tersimpan sama sekali). Aturan shift malam (mis. 00:00-08:00): "hari
-// kerja" selalu tanggal SETELAH tengah malam, yaitu tanggal saat jam 00:00
-// dan 08:00 shift itu jatuh — terlepas apakah karyawan check-in sebelum
-// tengah malam (mis. 23:50, masih dalam jendela "boleh datang lebih awal")
-// atau sesudahnya (mis. 00:15). Jadi:
-//  - checkin 23:50 Senin (night shift) → tanggal kerja = SELASA (besok)
-//  - checkin 00:15 Selasa (night shift) → tanggal kerja = SELASA (hari ini)
+// tersimpan sama sekali). Aturan shift malam (mis. 00:00-08:00): shift ini
+// adalah SAMBUNGAN dari hari sebelumnya (mis. "shift malam Senin" berjalan
+// dini hari Senin/Selasa, melanjutkan shift sore Senin) — jadi "hari kerja"
+// selalu tanggal SEBELUM tengah malam, terlepas apakah karyawan check-in
+// sebelum tengah malam (mis. 23:50, masih dalam jendela "boleh datang lebih
+// awal") atau sesudahnya dalam toleransi keterlambatan (mis. 00:05). Jadi:
+//  - checkin 23:50 Senin (night shift) → tanggal kerja = SENIN (hari ini)
+//  - checkin 00:05 Selasa (night shift, masih dini hari) → tanggal kerja = SENIN (kemarin)
 // Shift lain (reguler, atau shift sore yang wrap ke tengah malam saat
 // PULANG) tidak terpengaruh — tanggal kerja tetap tanggal hari ini seperti
 // biasa, karena check-in-nya sendiri terjadi sebelum tengah malam berjalan.
 const resolveCheckInWorkDate = async (userId, todayStr) => {
   const myShift = await resolveUserShift(userId, todayStr);
   const [startH, startM] = myShift.start_time.split(':').map(Number);
+  const [endH, endM] = myShift.end_time.split(':').map(Number);
   const startMinutes = startH * 60 + startM;
+  const endMinutes = endH * 60 + endM;
   const isNightShift = startMinutes < EARLY_WINDOW_MINUTES;
   if (!isNightShift) return todayStr;
 
   const nowParts = nowWIBParts();
   const nowMinutes = nowParts.getUTCHours() * 60 + nowParts.getUTCMinutes();
-  // Sudah lewat tengah malam (dini hari) — hari ini SUDAH tanggal shift-nya.
-  if (nowMinutes <= startMinutes || nowMinutes <= EARLY_WINDOW_MINUTES) return todayStr;
-  // Masih sebelum tengah malam (mis. 23:50) — shift-nya baru resmi besok.
-  const DAY = 24 * 60;
-  const minutesUntilMidnight = DAY - nowMinutes;
-  if (minutesUntilMidnight <= EARLY_WINDOW_MINUTES) return addDaysToDateStr(todayStr, 1);
-
+  // Masih dini hari (sudah lewat tengah malam) dan belum melewati jam pulang
+  // shift (mis. 08:00) — check-in ini melanjutkan shift yang SECARA JADWAL
+  // dimulai kemarin, terlepas seberapa telat (mis. 00:05 maupun 03:00
+  // sama-sama dianggap masih bagian shift kemarin; hanya statusnya yang
+  // dihitung telat oleh isLateCheckIn).
+  if (nowMinutes >= startMinutes && nowMinutes < endMinutes) {
+    return addDaysToDateStr(todayStr, -1);
+  }
   return todayStr;
 };
 
@@ -176,13 +180,14 @@ const checkIn = async (req, res) => {
     }
 
     // Tanggal kerja efektif untuk baris absensi ini. Untuk shift malam,
-    // "hari kerja" selalu tanggal SETELAH tengah malam (mis. checkin 23:50
-    // Senin → tanggal kerja Selasa; checkin 00:15 Selasa → tetap Selasa).
+    // "hari kerja" selalu tanggal SEBELUM tengah malam (mis. checkin 23:50
+    // Senin → tanggal kerja Senin; checkin 00:05 Selasa, masih dalam
+    // toleransi → tanggal kerja tetap Senin/kemarin).
     const workDate = openRow ? today : await resolveCheckInWorkDate(userId, today);
 
     // Cek hari libur berdasarkan tanggal kerja efektif (dihitung ulang dari
     // string workDate, bukan offset dari `today` — workDate bisa jadi
-    // kemarin, hari ini, ATAU besok tergantung jenis shift).
+    // kemarin ATAU hari ini tergantung jenis shift).
     const [wY, wM, wD] = workDate.split('-').map(Number);
     const workDateDow = new Date(Date.UTC(wY, wM - 1, wD)).getUTCDay();
     if (workDateDow === 0) {

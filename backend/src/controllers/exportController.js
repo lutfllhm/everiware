@@ -623,4 +623,223 @@ const exportMonthlyRecapExcel = async (req, res) => {
   }
 };
 
-module.exports = { exportAttendanceExcel, exportAttendancePDF, exportAttendanceDetailPDF, exportLeaveExcel, exportMonthlyRecapExcel };
+// ── Helper: format menit (bisa > 24 jam, mis. akumulasi grand total) ke "HH:MM" ─
+const fmtMinutesToHHMM = (totalMinutes) => {
+  const m = Math.max(0, Math.round(totalMinutes || 0));
+  const h = Math.floor(m / 60);
+  const mm = m % 60;
+  return `${String(h).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+};
+
+const timeStrToMinutes = (t) => {
+  if (!t) return null;
+  const [h, m] = String(t).split(':').map(Number);
+  return h * 60 + m;
+};
+
+const dtToMinutesOfDay = (dt) => {
+  if (!dt) return null;
+  const d = new Date(dt);
+  return d.getHours() * 60 + d.getMinutes();
+};
+
+// ── EXPORT TIMESHEET ABSENSI EXCEL (format kartu jam kerja per hari, per karyawan) ─
+// Satu baris = satu karyawan pada satu tanggal dalam periode (termasuk hari tanpa
+// presensi), dengan kolom jadwal vs aktual, keterlambatan, pulang cepat, jam kerja,
+// lembur, dan potongan izin per jam — ditutup baris TOTAL per karyawan + GRAND TOTAL.
+const exportAttendanceTimesheetExcel = async (req, res) => {
+  try {
+    const { start_date, end_date, month, year, department, employee_id } = req.query;
+    let rangeStart, rangeEnd, fileTag;
+    if (start_date && end_date) {
+      rangeStart = start_date; rangeEnd = end_date; fileTag = `${start_date}_${end_date}`;
+    } else {
+      const m = parseInt(month) || new Date().getMonth() + 1;
+      const y = parseInt(year) || new Date().getFullYear();
+      rangeStart = `${y}-${String(m).padStart(2,'0')}-01`;
+      const lastDay = new Date(y, m, 0).getDate();
+      rangeEnd = `${y}-${String(m).padStart(2,'0')}-${String(lastDay).padStart(2,'0')}`;
+      fileTag = `${m}_${y}`;
+    }
+
+    let userFilter = '';
+    const userParams = [];
+    if (department) { userFilter += ' AND u.department = ?'; userParams.push(department); }
+    if (employee_id) { userFilter += ' AND u.employee_id = ?'; userParams.push(employee_id); }
+
+    const [users] = await pool.query(
+      `SELECT id, employee_id, name FROM users u
+       WHERE u.role='employee' AND u.is_active=TRUE ${userFilter}
+       ORDER BY u.name`,
+      userParams
+    );
+
+    const [settingsRows] = await pool.query(
+      "SELECT setting_key, setting_value FROM app_settings WHERE setting_key IN ('work_start_time','work_end_time','late_tolerance')"
+    );
+    const settingsMap = Object.fromEntries(settingsRows.map(r => [r.setting_key, r.setting_value]));
+    const tolerance = parseInt(settingsMap.late_tolerance || '10');
+
+    const [holidayRows] = await pool.query(
+      'SELECT date FROM public_holidays WHERE date >= ? AND date <= ?',
+      [rangeStart, rangeEnd]
+    );
+    const holidaySet = new Set(holidayRows.map(r => (r.date instanceof Date ? r.date.toISOString().split('T')[0] : String(r.date).split('T')[0])));
+
+    const userIds = users.map(u => u.id);
+    let attendanceRows = [], overtimeRows = [], hourlyLeaveRows = [];
+    if (userIds.length) {
+      const inClause = userIds.map(() => '?').join(',');
+      [[attendanceRows], [overtimeRows], [hourlyLeaveRows]] = await Promise.all([
+        pool.query(
+          `SELECT user_id, date, check_in, check_out FROM attendances
+           WHERE user_id IN (${inClause}) AND date >= ? AND date <= ?`,
+          [...userIds, rangeStart, rangeEnd]
+        ),
+        pool.query(
+          `SELECT user_id, date, start_time, end_time, duration_minutes FROM overtime_requests
+           WHERE user_id IN (${inClause}) AND status='approved' AND date >= ? AND date <= ?`,
+          [...userIds, rangeStart, rangeEnd]
+        ),
+        pool.query(
+          `SELECT user_id, start_date as date, time_start, time_end FROM leave_requests
+           WHERE user_id IN (${inClause}) AND status='approved' AND time_start IS NOT NULL AND time_end IS NOT NULL
+             AND start_date >= ? AND start_date <= ?`,
+          [...userIds, rangeStart, rangeEnd]
+        ),
+      ]);
+    }
+
+    const attByKey = {}, otByKey = {}, hlByKey = {};
+    const dateKey = (d) => (d instanceof Date ? d.toISOString().split('T')[0] : String(d).split('T')[0]);
+    attendanceRows.forEach(r => { attByKey[`${r.user_id}_${dateKey(r.date)}`] = r; });
+    overtimeRows.forEach(r => { const k = `${r.user_id}_${dateKey(r.date)}`; (otByKey[k] ||= []).push(r); });
+    hourlyLeaveRows.forEach(r => { const k = `${r.user_id}_${dateKey(r.date)}`; (hlByKey[k] ||= []).push(r); });
+
+    // Daftar tanggal dalam periode
+    const dateList = [];
+    for (let d = new Date(rangeStart + 'T00:00:00Z'); d <= new Date(rangeEnd + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + 1)) {
+      dateList.push(d.toISOString().split('T')[0]);
+    }
+
+    // Pre-fetch shift assignments per user (urut desc) untuk resolve cepat tanpa query per hari
+    const shiftAssignByUser = {};
+    if (userIds.length) {
+      const inClause = userIds.map(() => '?').join(',');
+      const [assigns] = await pool.query(
+        `SELECT us.user_id, us.effective_date, ws.start_time, ws.end_time
+         FROM user_shifts us JOIN work_shifts ws ON us.shift_id = ws.id
+         WHERE us.user_id IN (${inClause}) AND ws.is_active = TRUE
+         ORDER BY us.effective_date ASC`,
+        userIds
+      );
+      assigns.forEach(a => { (shiftAssignByUser[a.user_id] ||= []).push(a); });
+    }
+    const resolveShift = (userId, date) => {
+      if (holidaySet.has(date)) return { start_time: '00:00', end_time: '00:00' };
+      const list = shiftAssignByUser[userId] || [];
+      let picked = null;
+      for (const a of list) { if (dateKey(a.effective_date) <= date) picked = a; else break; }
+      if (picked) return { start_time: picked.start_time.substring(0,5), end_time: picked.end_time.substring(0,5) };
+      return { start_time: settingsMap.work_start_time || '08:00', end_time: settingsMap.work_end_time || '17:00' };
+    };
+
+    const wb = new ExcelJS.Workbook();
+    wb.creator = 'iWare Absenku';
+    wb.created = new Date();
+    wb.title = `Export Attendance Report`;
+    const ws = wb.addWorksheet('Export Attendance Report');
+
+    const headers = ['Employee ID','Full Name','Date','Schedule Check In','Schedule Check Out','Check In','Check Out',
+      'Late In','Early Out','Schedule Working Hour','Actual Working Hour','Real Working Hour',
+      'Overtime Duration Before','Overtime Duration After','Hourly Time Off Taken'];
+    ws.columns = headers.map((_, i) => ({ width: i < 2 ? 30.73 : 20.73 }));
+    const hdrRow = ws.addRow(headers);
+    hdrRow.font = { bold: true, size: 11 };
+
+    const grand = { lateIn: 0, earlyOut: 0, schedWork: 0, actualWork: 0, realWork: 0, otBefore: 0, otAfter: 0, hourlyOff: 0 };
+    const ORANGE = 'FFFFCBB1';
+
+    users.forEach(u => {
+      const totals = { lateIn: 0, earlyOut: 0, schedWork: 0, actualWork: 0, realWork: 0, otBefore: 0, otAfter: 0, hourlyOff: 0 };
+
+      dateList.forEach(date => {
+        const shift = resolveShift(u.id, date);
+        const schedStart = timeStrToMinutes(shift.start_time);
+        const schedEnd = timeStrToMinutes(shift.end_time);
+        const schedWorkMin = schedEnd > schedStart ? schedEnd - schedStart : 0;
+
+        const att = attByKey[`${u.id}_${date}`];
+        const checkInMin = att ? dtToMinutesOfDay(att.check_in) : null;
+        const checkOutMin = att ? dtToMinutesOfDay(att.check_out) : null;
+
+        let lateIn = 0, earlyOut = 0, actualWorkMin = 0;
+        if (checkInMin != null && schedWorkMin > 0) {
+          const diff = checkInMin - schedStart;
+          if (diff > tolerance) lateIn = diff;
+        }
+        if (checkOutMin != null && schedWorkMin > 0) {
+          const diff = schedEnd - checkOutMin;
+          if (diff > 0) earlyOut = diff;
+        }
+        if (checkInMin != null && checkOutMin != null && checkOutMin > checkInMin) {
+          actualWorkMin = checkOutMin - checkInMin;
+        }
+        const realWorkMin = Math.max(0, actualWorkMin - lateIn - earlyOut);
+
+        const ots = otByKey[`${u.id}_${date}`] || [];
+        let otBefore = 0, otAfter = 0;
+        ots.forEach(o => {
+          const os = timeStrToMinutes(o.start_time);
+          if (schedWorkMin > 0 && os < schedStart) otBefore += o.duration_minutes;
+          else otAfter += o.duration_minutes;
+        });
+
+        const hls = hlByKey[`${u.id}_${date}`] || [];
+        const hourlyOff = hls.reduce((sum, h) => sum + Math.max(0, timeStrToMinutes(h.time_end) - timeStrToMinutes(h.time_start)), 0);
+
+        totals.lateIn += lateIn; totals.earlyOut += earlyOut; totals.schedWork += schedWorkMin;
+        totals.actualWork += actualWorkMin; totals.realWork += realWorkMin;
+        totals.otBefore += otBefore; totals.otAfter += otAfter; totals.hourlyOff += hourlyOff;
+
+        ws.addRow([
+          u.employee_id || '-', u.name, date,
+          shift.start_time, shift.end_time,
+          att?.check_in ? fmtTime(att.check_in) : null,
+          att?.check_out ? fmtTime(att.check_out) : null,
+          fmtMinutesToHHMM(lateIn), fmtMinutesToHHMM(earlyOut),
+          fmtMinutesToHHMM(schedWorkMin), fmtMinutesToHHMM(actualWorkMin), fmtMinutesToHHMM(realWorkMin),
+          fmtMinutesToHHMM(otBefore), fmtMinutesToHHMM(otAfter), fmtMinutesToHHMM(hourlyOff),
+        ]);
+      });
+
+      const totalRow = ws.addRow([
+        `TOTAL FOR EMPLOYEE : ${u.employee_id || '-'} - ${u.name}`, null, null, null, null, null, null,
+        fmtMinutesToHHMM(totals.lateIn), fmtMinutesToHHMM(totals.earlyOut),
+        fmtMinutesToHHMM(totals.schedWork), fmtMinutesToHHMM(totals.actualWork), fmtMinutesToHHMM(totals.realWork),
+        fmtMinutesToHHMM(totals.otBefore), fmtMinutesToHHMM(totals.otAfter), fmtMinutesToHHMM(totals.hourlyOff),
+      ]);
+      totalRow.eachCell(cell => { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: ORANGE } }; });
+
+      Object.keys(grand).forEach(k => { grand[k] += totals[k]; });
+    });
+
+    const grandRow = ws.addRow([
+      'GRAND TOTAL', null, null, null, null, null, null,
+      fmtMinutesToHHMM(grand.lateIn), fmtMinutesToHHMM(grand.earlyOut),
+      fmtMinutesToHHMM(grand.schedWork), fmtMinutesToHHMM(grand.actualWork), fmtMinutesToHHMM(grand.realWork),
+      fmtMinutesToHHMM(grand.otBefore), fmtMinutesToHHMM(grand.otAfter), fmtMinutesToHHMM(grand.hourlyOff),
+    ]);
+    grandRow.font = { bold: true };
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename=export_attendance_timesheet_${fileTag}.xlsx`);
+    await wb.xlsx.write(res);
+    res.end();
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: 'Gagal export timesheet' });
+  }
+};
+
+module.exports = { exportAttendanceExcel, exportAttendancePDF, exportAttendanceDetailPDF, exportLeaveExcel, exportMonthlyRecapExcel, exportAttendanceTimesheetExcel };

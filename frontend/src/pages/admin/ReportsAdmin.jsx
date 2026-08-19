@@ -88,6 +88,7 @@ export default function ReportsAdmin() {
         'att-detail-pdf': `/export/attendance/detail-pdf?${q}`,
         'leave-excel':   `/export/leave/excel?${q}`,
         'monthly-excel': `/export/monthly-recap/excel?${q}`,
+        'timesheet-excel': `/export/attendance/timesheet-excel?${q}`,
       };
       const token = JSON.parse(localStorage.getItem('iware-auth') || '{}')?.token;
       const res = await fetch(`/api${urlMap[type]}`, {
@@ -278,6 +279,11 @@ export default function ReportsAdmin() {
                 className="btn-secondary py-2 flex items-center gap-1.5 text-sm disabled:opacity-50">
                 <Download size={14} />
                 {exporting === 'monthly-excel' ? 'Exporting...' : 'Rekap/Karyawan'}
+              </button>
+              <button onClick={() => handleExport('timesheet-excel')} disabled={!!exporting || !rangeValid}
+                className="btn-secondary py-2 flex items-center gap-1.5 text-sm disabled:opacity-50">
+                <FileSpreadsheet size={14} className="text-orange-600" />
+                {exporting === 'timesheet-excel' ? 'Exporting...' : 'Timesheet'}
               </button>
             </>)}
             {activeTab === 'leave' && (
