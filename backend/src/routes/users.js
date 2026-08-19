@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { authenticate, authorize } = require('../middleware/auth');
+const { authenticate, authorize, authorizeOrPermission } = require('../middleware/auth');
 const { uploadSelfie, uploadAvatar } = require('../middleware/upload');
 const { compressUploadedImage } = require('../middleware/compressImage');
 const {
@@ -34,7 +34,7 @@ router.delete('/fcm-token', removeFcmToken);
 router.get('/dashboard', authorize('superadmin', 'admin', 'hrd'), getDashboardStats);
 router.get('/settings', authorize('superadmin', 'admin'), getSettings);
 router.put('/settings', authorize('superadmin', 'admin'), updateSettings);
-router.get('/', authorize('superadmin', 'admin', 'hrd'), getAllUsers);
+router.get('/', authorizeOrPermission('shifts.manage'), getAllUsers);
 router.post('/', authorize('superadmin', 'admin', 'hrd'), uploadAvatar.single('avatar'), compressUploadedImage(), createUser);
 router.get('/:id', authorize('superadmin', 'admin', 'hrd'), getUser);
 router.put('/:id', authorize('superadmin', 'admin', 'hrd'), updateUser);

@@ -30,7 +30,12 @@ export default function ShiftsAdmin() {
     try { const { data } = await api.get('/shifts/assignments'); setAssignments(data.assignments); } catch {}
   };
   const fetchEmployees = async () => {
-    try { const { data } = await api.get('/users?role=employee'); setEmployees(data.users); } catch {}
+    try {
+      const { data } = await api.get('/users?role=employee');
+      setEmployees(data.users);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Gagal memuat daftar karyawan');
+    }
   };
 
   const openAdd = () => { setEditShift(null); setForm(emptyShift); setShowModal(true); };

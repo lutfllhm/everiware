@@ -4,13 +4,15 @@ const { generateId } = require('../utils/helpers');
 const { auditLog } = require('../utils/auditLog');
 const { validateRegistrationFace } = require('../utils/faceVerification');
 const { sendPushToMany } = require('../utils/fcm');
+const { resolveScope } = require('../utils/permissionScope');
 
 
-// Get all users (admin)
+// Get all users (admin, atau kepala divisi dengan grant shifts.manage — hasil dibatasi ke divisinya sendiri)
 const getAllUsers = async (req, res) => {
   try {
     const { role, department, location_id, search, page = 1, limit = 20 } = req.query;
     const offset = (page - 1) * limit;
+    const scope = resolveScope(req.user);
     let query = `SELECT u.id, u.name, u.email, u.phone, u.avatar, u.face_photo, u.role, u.department, u.department_id, u.position, u.employee_id, u.join_date, u.is_active, u.is_verified, u.created_at, u.face_registered,
                  u.location_id, al.name as location_name,
                  lq.total_days, lq.used_days, lq.remaining_days
@@ -20,6 +22,7 @@ const getAllUsers = async (req, res) => {
                  WHERE 1=1`;
     const params = [];
 
+    if (scope.scoped) { query += ' AND u.department_id = ?'; params.push(scope.departmentId); }
     if (role) { query += ' AND u.role = ?'; params.push(role); }
     if (department) { query += ' AND u.department = ?'; params.push(department); }
     if (location_id) { query += ' AND u.location_id = ?'; params.push(location_id); }
@@ -44,6 +47,7 @@ const getAllUsers = async (req, res) => {
 
     let countQuery = 'SELECT COUNT(*) as total FROM users WHERE 1=1';
     const countParams = [];
+    if (scope.scoped) { countQuery += ' AND department_id = ?'; countParams.push(scope.departmentId); }
     if (role) { countQuery += ' AND role = ?'; countParams.push(role); }
     if (location_id) { countQuery += ' AND location_id = ?'; countParams.push(location_id); }
     const [countResult] = await pool.query(countQuery, countParams);
