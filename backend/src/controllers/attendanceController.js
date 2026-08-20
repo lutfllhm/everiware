@@ -720,10 +720,14 @@ const getAllAttendances = async (req, res) => {
     const y = year || nowWIBParts().getUTCFullYear();
     const offset = (page - 1) * limit;
 
-    let query = `SELECT a.*, u.name as user_name, u.employee_id, u.department, u.position, u.avatar as user_avatar, l.name as location_name 
-                 FROM attendances a 
-                 JOIN users u ON a.user_id = u.id 
-                 LEFT JOIN attendance_locations l ON a.location_id = l.id 
+    let query = `SELECT a.*, u.name as user_name, u.employee_id, u.department, u.position, u.avatar as user_avatar, l.name as location_name,
+                 (SELECT ws.name FROM user_shifts us
+                   JOIN work_shifts ws ON us.shift_id = ws.id
+                   WHERE us.user_id = a.user_id AND us.effective_date <= a.date AND ws.is_active = TRUE
+                   ORDER BY us.effective_date DESC LIMIT 1) as shift_name
+                 FROM attendances a
+                 JOIN users u ON a.user_id = u.id
+                 LEFT JOIN attendance_locations l ON a.location_id = l.id
                  WHERE MONTH(a.date) = ? AND YEAR(a.date) = ?`;
     const params = [m, y];
 

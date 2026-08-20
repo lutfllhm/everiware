@@ -261,6 +261,9 @@ export default function AttendanceAdmin() {
                             leave: grp.records.filter(r => r.status === 'leave').length,
                             sick: grp.records.filter(r => r.status === 'sick').length,
                           };
+                          // Shift sekarang = shift pada record dengan tanggal paling baru
+                          const latestRecord = [...grp.records].sort((a, b) => new Date(b.date) - new Date(a.date))[0];
+                          const currentShift = latestRecord?.shift_name;
                           return (
                             <button key={grp.key} onClick={() => setDetailEmployee(grp)}
                               className="w-full flex items-center justify-between gap-3 px-4 py-3 hover:bg-slate-50 transition-colors text-left">
@@ -272,6 +275,9 @@ export default function AttendanceAdmin() {
                                 </div>
                               </div>
                               <div className="flex items-center gap-3 flex-shrink-0">
+                                {currentShift && (
+                                  <span className="hidden md:inline-flex badge-info">{currentShift}</span>
+                                )}
                                 <div className="hidden sm:flex items-center gap-2 text-xs">
                                   <span className="badge-success">{counts.present} Hadir</span>
                                   <span className="badge-warning">{counts.late} Terlambat</span>
