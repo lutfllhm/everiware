@@ -204,7 +204,10 @@ const exportAttendanceExcel = async (req, res) => {
           checkInMin -= 1440;
         }
         const diff = checkInMin - schedStart;
-        const lateMinutes = diff > rowTolerance ? diff : 0;
+        // "Telat (menit)" = keterlambatan EFEKTIF setelah toleransi
+        // dikecualikan (mis. checkin 118 menit setelah jadwal, toleransi 10
+        // menit → tampil 108 menit) — bukan selisih mentah dari jadwal.
+        const lateMinutes = diff > rowTolerance ? diff - rowTolerance : 0;
         if (lateMinutes > 0) {
           r.late_minutes = lateMinutes;
           r.denda = calcLateFineFromMinutes(lateMinutes);
