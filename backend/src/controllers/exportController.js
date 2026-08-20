@@ -655,9 +655,10 @@ const dtToMinutesOfDay = (dt) => {
 const exportAttendanceTimesheetExcel = async (req, res) => {
   try {
     const { start_date, end_date, month, year, department, employee_id } = req.query;
-    let rangeStart, rangeEnd, fileTag;
+    let rangeStart, rangeEnd, fileTag, periodLabel;
     if (start_date && end_date) {
       rangeStart = start_date; rangeEnd = end_date; fileTag = `${start_date}_${end_date}`;
+      periodLabel = `${fmtDate(start_date)} s/d ${fmtDate(end_date)}`;
     } else {
       const m = parseInt(month) || new Date().getMonth() + 1;
       const y = parseInt(year) || new Date().getFullYear();
@@ -665,6 +666,7 @@ const exportAttendanceTimesheetExcel = async (req, res) => {
       const lastDay = new Date(y, m, 0).getDate();
       rangeEnd = `${y}-${String(m).padStart(2,'0')}-${String(lastDay).padStart(2,'0')}`;
       fileTag = `${m}_${y}`;
+      periodLabel = `${months[m-1]} ${y}`;
     }
 
     let userFilter = '';
@@ -752,18 +754,43 @@ const exportAttendanceTimesheetExcel = async (req, res) => {
     const wb = new ExcelJS.Workbook();
     wb.creator = 'iWare Absenku';
     wb.created = new Date();
-    wb.title = `Export Attendance Report`;
-    const ws = wb.addWorksheet('Export Attendance Report');
+    wb.title = `Timesheet Absensi ${periodLabel}`;
+    wb.subject = 'Timesheet Absensi Karyawan';
+    const ws = wb.addWorksheet('Timesheet Absensi');
 
-    const headers = ['Employee ID','Full Name','Date','Schedule Check In','Schedule Check Out','Check In','Check Out',
-      'Late In','Early Out','Schedule Working Hour','Actual Working Hour','Real Working Hour',
+    const headers = ['Employee ID','Full Name','Date','Status','Schedule Check In','Schedule Check Out','Check In','Check Out',
+      'Late In','Late (min)','Early Out','Schedule Working Hour','Actual Working Hour','Real Working Hour',
       'Overtime Duration Before','Overtime Duration After','Hourly Time Off Taken'];
-    ws.columns = headers.map((_, i) => ({ width: i < 2 ? 30.73 : 20.73 }));
+    const NUM_COLS = headers.length;
+    ws.columns = headers.map((_, i) => ({ width: i < 2 ? 26 : (i === 3 ? 14 : 17) }));
+
+    styleExcelTitle(ws, NUM_COLS, `TIMESHEET ABSENSI — ${periodLabel.toUpperCase()}`);
+    const subtitleRow = ws.addRow([`Dicetak: ${new Date().toLocaleString('id-ID')}`]);
+    ws.mergeCells(subtitleRow.number, 1, subtitleRow.number, NUM_COLS);
+    subtitleRow.getCell(1).font = { italic: true, size: 9, color: { argb: 'FF64748B' } };
+    subtitleRow.getCell(1).alignment = { horizontal: 'center' };
+    ws.addRow([]);
+
     const hdrRow = ws.addRow(headers);
-    hdrRow.font = { bold: true, size: 11 };
+    styleExcelHeaderRow(hdrRow);
+    ws.views = [{ state: 'frozen', ySplit: hdrRow.number }];
+    ws.autoFilter = { from: { row: hdrRow.number, column: 1 }, to: { row: hdrRow.number, column: NUM_COLS } };
+
+    const now = new Date();
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
 
     const grand = { lateIn: 0, earlyOut: 0, schedWork: 0, actualWork: 0, realWork: 0, otBefore: 0, otAfter: 0, hourlyOff: 0 };
     const ORANGE = 'FFFFCBB1';
+    const STATUS_FILL = {
+      late:   'FFFEE2E2', // merah muda tipis
+      absent: 'FFF1F5F9', // abu-abu tipis
+      holiday:'FFDBEAFE', // biru muda
+    };
+    const STATUS_FONT = {
+      late:   'FFB91C1C',
+      absent: 'FF64748B',
+      holiday:'FF1D4ED8',
+    };
 
     users.forEach(u => {
       const totals = { lateIn: 0, earlyOut: 0, schedWork: 0, actualWork: 0, realWork: 0, otBefore: 0, otAfter: 0, hourlyOff: 0 };
@@ -830,38 +857,57 @@ const exportAttendanceTimesheetExcel = async (req, res) => {
         totals.actualWork += actualWorkMin; totals.realWork += realWorkMin;
         totals.otBefore += otBefore; totals.otAfter += otAfter; totals.hourlyOff += hourlyOff;
 
-        ws.addRow([
-          u.employee_id || '-', u.name, date,
+        // Status baris: Libur (tanggal masuk daftar hari libur) > Terlambat
+        // (checkin tercatat & melewati toleransi) > Hadir (checkin tercatat,
+        // tepat waktu) > Tidak Hadir (tidak ada catatan checkin, tanggal
+        // sudah lewat) > kosong (tanggal di masa depan, belum bisa dinilai).
+        const isFutureDate = date > todayStr;
+        let rowStatus, statusKey;
+        if (holidaySet.has(date)) { rowStatus = 'Libur'; statusKey = 'holiday'; }
+        else if (att?.check_in) { rowStatus = lateIn > 0 ? 'Terlambat' : 'Hadir'; statusKey = lateIn > 0 ? 'late' : null; }
+        else if (isFutureDate) { rowStatus = '-'; statusKey = null; }
+        else { rowStatus = 'Tidak Hadir'; statusKey = 'absent'; }
+
+        const row = ws.addRow([
+          u.employee_id || '-', u.name, date, rowStatus,
           shift.start_time, shift.end_time,
           att?.check_in ? fmtTime(att.check_in) : null,
           att?.check_out ? fmtTime(att.check_out) : null,
-          fmtMinutesToHHMM(lateIn), fmtMinutesToHHMM(earlyOut),
+          fmtMinutesToHHMM(lateIn), lateIn > 0 ? lateIn : null, fmtMinutesToHHMM(earlyOut),
           fmtMinutesToHHMM(schedWorkMin), fmtMinutesToHHMM(actualWorkMin), fmtMinutesToHHMM(realWorkMin),
           fmtMinutesToHHMM(otBefore), fmtMinutesToHHMM(otAfter), fmtMinutesToHHMM(hourlyOff),
         ]);
+        row.eachCell(borderThinCell);
+        if (statusKey) {
+          row.getCell(4).font = { color: { argb: STATUS_FONT[statusKey] }, bold: true };
+          row.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: STATUS_FILL[statusKey] } };
+        }
       });
 
       const totalRow = ws.addRow([
-        `TOTAL FOR EMPLOYEE : ${u.employee_id || '-'} - ${u.name}`, null, null, null, null, null, null,
-        fmtMinutesToHHMM(totals.lateIn), fmtMinutesToHHMM(totals.earlyOut),
+        `TOTAL FOR EMPLOYEE : ${u.employee_id || '-'} - ${u.name}`, null, null, null, null, null, null, null,
+        fmtMinutesToHHMM(totals.lateIn), totals.lateIn > 0 ? totals.lateIn : null, fmtMinutesToHHMM(totals.earlyOut),
         fmtMinutesToHHMM(totals.schedWork), fmtMinutesToHHMM(totals.actualWork), fmtMinutesToHHMM(totals.realWork),
         fmtMinutesToHHMM(totals.otBefore), fmtMinutesToHHMM(totals.otAfter), fmtMinutesToHHMM(totals.hourlyOff),
       ]);
+      totalRow.font = { bold: true };
       totalRow.eachCell(cell => { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: ORANGE } }; });
+      totalRow.eachCell(borderThinCell);
 
       Object.keys(grand).forEach(k => { grand[k] += totals[k]; });
     });
 
     const grandRow = ws.addRow([
-      'GRAND TOTAL', null, null, null, null, null, null,
-      fmtMinutesToHHMM(grand.lateIn), fmtMinutesToHHMM(grand.earlyOut),
+      'GRAND TOTAL', null, null, null, null, null, null, null,
+      fmtMinutesToHHMM(grand.lateIn), grand.lateIn > 0 ? grand.lateIn : null, fmtMinutesToHHMM(grand.earlyOut),
       fmtMinutesToHHMM(grand.schedWork), fmtMinutesToHHMM(grand.actualWork), fmtMinutesToHHMM(grand.realWork),
       fmtMinutesToHHMM(grand.otBefore), fmtMinutesToHHMM(grand.otAfter), fmtMinutesToHHMM(grand.hourlyOff),
     ]);
-    grandRow.font = { bold: true };
+    grandRow.font = { bold: true, size: 11 };
+    grandRow.eachCell(cell => { cell.border = { top: { style: 'double', color: { argb: 'FF1E293B' } } }; });
 
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', `attachment; filename=export_attendance_timesheet_${fileTag}.xlsx`);
+    res.setHeader('Content-Disposition', `attachment; filename=timesheet_absensi_${fileTag}.xlsx`);
     await wb.xlsx.write(res);
     res.end();
   } catch (err) {
