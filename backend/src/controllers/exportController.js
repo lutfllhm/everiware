@@ -637,6 +637,11 @@ const timeStrToMinutes = (t) => {
   return h * 60 + m;
 };
 
+// Sama dengan definisi "night shift" di attendanceController: shift yang mulai
+// dini hari (sebelum jam 04:00) dianggap overnight juga untuk keperluan unwrap
+// checkin/checkout lintas tengah malam, meski schedEnd > schedStart.
+const EARLY_WINDOW_MINUTES = 4 * 60;
+
 const dtToMinutesOfDay = (dt) => {
   if (!dt) return null;
   const d = new Date(dt);
@@ -766,12 +771,35 @@ const exportAttendanceTimesheetExcel = async (req, res) => {
       dateList.forEach(date => {
         const shift = resolveShift(u.id, date);
         const schedStart = timeStrToMinutes(shift.start_time);
-        const schedEnd = timeStrToMinutes(shift.end_time);
+        // Shift overnight (mis. sore 16:00-00:00 atau malam 00:00-08:00): jam
+        // selesai <= jam mulai berarti wrap ke hari berikutnya — unwrap +1440
+        // supaya durasi kerja tidak jatuh ke 0/negatif.
+        const isOvernightShift = timeStrToMinutes(shift.end_time) <= schedStart;
+        const schedEnd = timeStrToMinutes(shift.end_time) + (isOvernightShift ? 1440 : 0);
         const schedWorkMin = schedEnd > schedStart ? schedEnd - schedStart : 0;
 
         const att = attByKey[`${u.id}_${date}`];
-        const checkInMin = att ? dtToMinutesOfDay(att.check_in) : null;
-        const checkOutMin = att ? dtToMinutesOfDay(att.check_out) : null;
+        const isNightShift = schedStart < EARLY_WINDOW_MINUTES;
+        let checkInMin = att ? dtToMinutesOfDay(att.check_in) : null;
+        // Shift malam (mulai dini hari, mis. 00:00-08:00): karyawan lazim
+        // checkin sebelum tengah malam (mis. 23:50, disimpan tanggal hari
+        // sebelumnya oleh attendanceController). Nilai mentah 23:50=1430
+        // jauh "lebih besar" dari schedStart(0) sehingga akan salah dihitung
+        // telat ~1430 menit — geser -1440 supaya relatif jadi "10 menit
+        // sebelum jam mulai" seperti mestinya.
+        if (isNightShift && checkInMin != null && checkInMin > schedStart + EARLY_WINDOW_MINUTES) {
+          checkInMin -= 1440;
+        }
+        let checkOutMin = att ? dtToMinutesOfDay(att.check_out) : null;
+        // Checkout tercatat lebih kecil/sama dari checkin HANYA valid berarti
+        // "lewat tengah malam" untuk shift yang jadwalnya sendiri overnight
+        // (mis. shift malam 00:00-08:00 dgn checkin 23:50 hari sebelumnya,
+        // atau shift sore 16:00-00:00). Untuk shift reguler non-overnight,
+        // checkout < checkin berarti anomali data (lupa checkout, checkout
+        // manual keesokan harinya), bukan wrap sah — jangan diunwrap.
+        if ((isOvernightShift || isNightShift) && checkInMin != null && checkOutMin != null && checkOutMin <= checkInMin) {
+          checkOutMin += 1440;
+        }
 
         let lateIn = 0, earlyOut = 0, actualWorkMin = 0;
         if (checkInMin != null && schedWorkMin > 0) {

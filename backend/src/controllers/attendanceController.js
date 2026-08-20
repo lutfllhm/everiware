@@ -145,7 +145,10 @@ const resolveCheckInWorkDate = async (userId, todayStr) => {
   // shift (mis. 08:00) — check-in ini melanjutkan shift yang SECARA JADWAL
   // dimulai kemarin, terlepas seberapa telat (mis. 00:05 maupun 03:00
   // sama-sama dianggap masih bagian shift kemarin; hanya statusnya yang
-  // dihitung telat oleh isLateCheckIn).
+  // dihitung telat oleh isLateCheckIn). Berlaku tepat untuk shift malam yang
+  // start_time = 00:00 (satu-satunya konfigurasi yang dipakai saat ini) —
+  // early arrival sebelum tengah malam (mis. 23:50) sudah otomatis benar
+  // lewat todayStr di akhir fungsi tanpa perlu masuk cabang ini.
   if (nowMinutes >= startMinutes && nowMinutes < endMinutes) {
     return addDaysToDateStr(todayStr, -1);
   }
@@ -682,27 +685,42 @@ const getMyAttendance = async (req, res) => {
 
 // Admin: Get "kehadiran hari ini" — baris attendance yang secara efektif
 // termasuk hari kerja aktif sekarang. Berbeda dari filter `date = today`
-// polos: shift malam (mis. 00:00-08:00) yang check-in-nya terjadi SEBELUM
-// tengah malam (mis. 23:50) dicatat dengan `date` = BESOK (lihat
-// resolveCheckInWorkDate), sehingga baris itu tidak akan muncul di filter
-// tanggal biasa sampai tanggal kalender ikut berganti — padahal karyawan
-// tersebut sudah check-in secara fisik. Endpoint ini menutup celah itu
-// dengan turut menyertakan baris besok yang sudah check-in tapi belum
+// polos: shift malam (mis. 00:00-08:00) yang check-in-nya terjadi SETELAH
+// tengah malam (mis. 00:05-07:59) tetap dicatat dengan `date` = KEMARIN
+// (lihat resolveCheckInWorkDate — shift malam adalah sambungan hari
+// sebelumnya), sehingga baris itu tidak akan muncul di filter tanggal biasa
+// begitu tanggal kalender berganti — padahal karyawan tersebut sudah
+// check-in secara fisik dan masih aktif bekerja. Endpoint ini menutup celah
+// itu dengan turut menyertakan baris kemarin yang sudah check-in tapi belum
 // check-out.
 const getActiveTodayAttendances = async (req, res) => {
   try {
     const today = todayWIB();
-    const tomorrow = addDaysToDateStr(today, 1);
+    const yesterday = addDaysToDateStr(today, -1);
 
+    // Lookback ke baris kemarin HANYA untuk shift yang jam mulainya sendiri
+    // dini hari (night shift, mis. 00:00-08:00) — subquery ini mencari shift
+    // efektif per user pada tanggal kemarin, sama seperti resolveUserShift.
+    // Tanpa batasan ini, karyawan shift reguler yang lupa check-out kemarin
+    // akan ikut nyangkut sebagai "masih aktif" padahal itu anomali, bukan
+    // shift yang sedang berjalan.
     const [rows] = await pool.query(
       `SELECT a.*, u.name as user_name, u.employee_id, u.department, u.position, u.avatar as user_avatar, l.name as location_name
        FROM attendances a
        JOIN users u ON a.user_id = u.id
        LEFT JOIN attendance_locations l ON a.location_id = l.id
        WHERE a.date = ?
-          OR (a.date = ? AND a.check_in IS NOT NULL AND a.check_out IS NULL)
+          OR (
+            a.date = ? AND a.check_in IS NOT NULL AND a.check_out IS NULL
+            AND TIME_TO_SEC((
+              SELECT ws.start_time FROM user_shifts us
+              JOIN work_shifts ws ON us.shift_id = ws.id
+              WHERE us.user_id = a.user_id AND us.effective_date <= a.date AND ws.is_active = TRUE
+              ORDER BY us.effective_date DESC LIMIT 1
+            )) < ?
+          )
        ORDER BY a.date DESC, u.name ASC`,
-      [today, tomorrow]
+      [today, yesterday, EARLY_WINDOW_MINUTES * 60]
     );
 
     res.json({ success: true, attendances: rows });
