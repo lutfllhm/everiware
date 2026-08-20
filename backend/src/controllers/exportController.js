@@ -103,22 +103,12 @@ const getWorkStartSettings = async () => {
   };
 };
 
-// ── Helper: hitung denda keterlambatan berjenjang ─────────────────────────────
-// Menit ke-1 s/d `tolerance` = gratis. Setelah itu, tiap blok 10 menit tambahan dikenakan Rp10.000 x nomor blok.
-// Status selain 'late' (mis. 'present' karena izin terlambat disetujui) tidak dikenakan denda.
-const calcLateFine = (checkIn, date, workStart, tolerance, status) => {
-  if (!checkIn) return 0;
-  if (status !== 'late') return 0;
-  const [startH, startM] = workStart.split(':').map(Number);
-  const checkInDt = new Date(checkIn);
-  const scheduledDt = new Date(checkIn);
-  scheduledDt.setHours(startH, startM, 0, 0);
-
-  const lateMinutes = Math.round((checkInDt - scheduledDt) / 60000) - tolerance;
-  if (lateMinutes <= 0) return 0;
-
-  const block = Math.ceil(lateMinutes / 10);
-  return block * 10000;
+// ── Helper: hitung denda keterlambatan dari menit telat (di luar toleransi) ───
+// Telat 1-10 menit = Rp10.000. Telat 11 menit ke atas = flat Rp20.000,
+// berapa pun lama telatnya setelah itu (tidak terus bertambah per blok).
+const calcLateFineFromMinutes = (lateMinutes) => {
+  if (!lateMinutes || lateMinutes <= 0) return 0;
+  return lateMinutes <= 10 ? 10000 : 20000;
 };
 
 // ── Helper: bangun filter tanggal (range atau bulan/tahun) ────────────────────
@@ -148,7 +138,7 @@ const buildDateFilter = (query, tableAlias = 'a', dateCol = 'date') => {
 const exportAttendanceExcel = async (req, res) => {
   try {
     const { filter, params, label, fileTag } = buildDateFilter(req.query);
-    const { workStart, tolerance } = await getWorkStartSettings();
+    const { tolerance } = await getWorkStartSettings();
 
     const [report] = await pool.query(
       `SELECT u.name, u.employee_id, u.department, u.position,
@@ -165,8 +155,26 @@ const exportAttendanceExcel = async (req, res) => {
       params
     );
 
+    // Shift efektif per baris = shift yang berlaku pada tanggal absensi itu
+    // (sama pendekatan dgn getAllAttendances/exportAttendanceTimesheetExcel).
     const [detail] = await pool.query(
-      `SELECT u.name, u.employee_id, u.department, u.position, a.date, a.check_in, a.check_out, a.status, l.name as lokasi
+      `SELECT u.name, u.employee_id, u.department, u.position, a.date, a.check_in, a.check_out, a.status, l.name as lokasi,
+        (SELECT ws.name FROM user_shifts us
+          JOIN work_shifts ws ON us.shift_id = ws.id
+          WHERE us.user_id = a.user_id AND us.effective_date <= a.date AND ws.is_active = TRUE
+          ORDER BY us.effective_date DESC LIMIT 1) as shift_name,
+        (SELECT ws.start_time FROM user_shifts us
+          JOIN work_shifts ws ON us.shift_id = ws.id
+          WHERE us.user_id = a.user_id AND us.effective_date <= a.date AND ws.is_active = TRUE
+          ORDER BY us.effective_date DESC LIMIT 1) as shift_start,
+        (SELECT ws.end_time FROM user_shifts us
+          JOIN work_shifts ws ON us.shift_id = ws.id
+          WHERE us.user_id = a.user_id AND us.effective_date <= a.date AND ws.is_active = TRUE
+          ORDER BY us.effective_date DESC LIMIT 1) as shift_end,
+        (SELECT ws.late_tolerance FROM user_shifts us
+          JOIN work_shifts ws ON us.shift_id = ws.id
+          WHERE us.user_id = a.user_id AND us.effective_date <= a.date AND ws.is_active = TRUE
+          ORDER BY us.effective_date DESC LIMIT 1) as shift_tolerance
        FROM attendances a
        JOIN users u ON a.user_id = u.id
        LEFT JOIN attendance_locations l ON a.location_id = l.id
@@ -175,7 +183,34 @@ const exportAttendanceExcel = async (req, res) => {
       params
     );
 
-    detail.forEach(r => { r.denda = calcLateFine(r.check_in, r.date, workStart, tolerance, r.status); });
+    detail.forEach(r => {
+      const startTime = (r.shift_start || '08:00:00').substring(0,5);
+      const endTime = (r.shift_end || '17:00:00').substring(0,5);
+      const rowTolerance = r.shift_tolerance != null ? r.shift_tolerance : tolerance;
+      r.shift_name = r.shift_name || 'Shift Reguler';
+      r.shift_start_label = startTime;
+      r.shift_end_label = endTime;
+      r.late_minutes = null;
+      r.denda = 0;
+      if (r.check_in && r.status === 'late') {
+        const schedStart = timeStrToMinutes(startTime);
+        const isNightShift = schedStart < EARLY_WINDOW_MINUTES;
+        let checkInMin = dtToMinutesOfDay(r.check_in);
+        // Shift malam (mulai dini hari): checkin sebelum tengah malam (mis.
+        // 23:50 utk shift 00:00) tersimpan tanggal hari sebelumnya — geser
+        // -1440 supaya relatif ke jam mulai jadi benar (early, bukan telat
+        // ~1430 menit). Lihat penjelasan sama di exportAttendanceTimesheetExcel.
+        if (isNightShift && checkInMin > schedStart + EARLY_WINDOW_MINUTES) {
+          checkInMin -= 1440;
+        }
+        const diff = checkInMin - schedStart;
+        const lateMinutes = diff > rowTolerance ? diff : 0;
+        if (lateMinutes > 0) {
+          r.late_minutes = lateMinutes;
+          r.denda = calcLateFineFromMinutes(lateMinutes);
+        }
+      }
+    });
 
     const wb = new ExcelJS.Workbook();
     wb.creator = 'iWare Absenku';
@@ -207,11 +242,15 @@ const exportAttendanceExcel = async (req, res) => {
     // ── Sheet 2: Detail (dikelompokkan per karyawan, dengan Daftar Isi ber-hyperlink) ──
     const ws2 = wb.addWorksheet('Detail Absensi');
     const SHEET2 = 'Detail Absensi';
-    ws2.columns = [{ width: 14 }, { width: 12 }, { width: 12 }, { width: 14 }, { width: 22 }, { width: 16 }];
-    styleExcelTitle(ws2, 6, `DETAIL ABSENSI ${label.toUpperCase()}`);
+    const COL_COUNT = 10;
+    ws2.columns = [
+      { width: 12 }, { width: 16 }, { width: 12 }, { width: 12 }, { width: 12 },
+      { width: 12 }, { width: 12 }, { width: 22 }, { width: 12 }, { width: 14 },
+    ];
+    styleExcelTitle(ws2, COL_COUNT, `DETAIL ABSENSI ${label.toUpperCase()}`);
     ws2.addRow([]);
     const thin = { style: 'thin', color: { argb: 'FFCBD5E1' } };
-    const colHeaders = ['Tanggal','Jam Masuk','Jam Pulang','Status','Lokasi','Denda'];
+    const colHeaders = ['Tanggal','Shift','Jadwal Masuk','Jadwal Pulang','Clock In','Clock Out','Status','Lokasi','Telat (menit)','Denda'];
 
     const detailByUser = {};
     detail.forEach(r => {
@@ -232,7 +271,7 @@ const exportAttendanceExcel = async (req, res) => {
 
     // ── Daftar Isi ──
     const tocLabel = ws2.addRow([`Daftar Karyawan (klik nama untuk lompat ke data) — ${users.length} orang`]);
-    ws2.mergeCells(tocLabel.number, 1, tocLabel.number, 6);
+    ws2.mergeCells(tocLabel.number, 1, tocLabel.number, COL_COUNT);
     tocLabel.getCell(1).font = { italic: true, size: 9, color: { argb: 'FF64748B' } };
 
     users.forEach(({ info }, idx) => {
@@ -246,19 +285,19 @@ const exportAttendanceExcel = async (req, res) => {
     // ── Pass 2: render section per karyawan ──
     users.forEach(({ info, records }, idx) => {
       const titleRow = ws2.addRow([`${info.name}  •  ${info.employee_id||'-'}  •  ${info.department||'-'}  •  ${info.position||'-'}`]);
-      ws2.mergeCells(titleRow.number, 1, titleRow.number, 5);
+      ws2.mergeCells(titleRow.number, 1, titleRow.number, COL_COUNT - 1);
       titleRow.getCell(1).font = { bold: true, size: 11, color: { argb: 'FFFFFFFF' } };
       titleRow.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E293B' } };
       titleRow.getCell(1).alignment = { vertical: 'middle' };
-      titleRow.getCell(6).value = { text: '↑ Daftar Isi', hyperlink: `#'${SHEET2}'!A${tocLabel.number}` };
-      titleRow.getCell(6).font = { size: 8, color: { argb: 'FFCBD5E1' }, underline: true };
-      titleRow.getCell(6).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E293B' } };
-      titleRow.getCell(6).alignment = { vertical: 'middle', horizontal: 'right' };
+      titleRow.getCell(COL_COUNT).value = { text: '↑ Daftar Isi', hyperlink: `#'${SHEET2}'!A${tocLabel.number}` };
+      titleRow.getCell(COL_COUNT).font = { size: 8, color: { argb: 'FFCBD5E1' }, underline: true };
+      titleRow.getCell(COL_COUNT).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E293B' } };
+      titleRow.getCell(COL_COUNT).alignment = { vertical: 'middle', horizontal: 'right' };
       titleRow.height = 20;
 
       const totalDendaUser = records.reduce((sum, r) => sum + r.denda, 0);
       const summaryRow = ws2.addRow([`Total: ${records.length} hari tercatat  •  Denda keterlambatan: ${fmtRupiah(totalDendaUser)}`]);
-      ws2.mergeCells(summaryRow.number, 1, summaryRow.number, 6);
+      ws2.mergeCells(summaryRow.number, 1, summaryRow.number, COL_COUNT);
       summaryRow.getCell(1).font = { italic: true, size: 9, color: { argb: totalDendaUser > 0 ? 'FFB91C1C' : 'FF64748B' } };
       summaryRow.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
 
@@ -271,13 +310,20 @@ const exportAttendanceExcel = async (req, res) => {
       });
 
       records.forEach((r, i) => {
-        const row = ws2.addRow([fmtDate(r.date), fmtTime(r.check_in), fmtTime(r.check_out), statusLabel(r.status), r.lokasi||'-', r.denda > 0 ? fmtRupiah(r.denda) : '-']);
+        const row = ws2.addRow([
+          fmtDate(r.date), r.shift_name, r.shift_start_label, r.shift_end_label,
+          r.check_in ? fmtTime(r.check_in) : '-', r.check_out ? fmtTime(r.check_out) : '-',
+          statusLabel(r.status), r.lokasi||'-',
+          r.late_minutes != null ? r.late_minutes : '-',
+          r.denda > 0 ? fmtRupiah(r.denda) : '-',
+        ]);
         row.eachCell(cell => {
           cell.border = { top: thin, bottom: thin, left: thin, right: thin };
           cell.alignment = { horizontal: 'center' };
         });
-        row.getCell(5).alignment = { horizontal: 'left' };
-        if (r.denda > 0) row.getCell(6).font = { color: { argb: 'FFB91C1C' }, bold: true };
+        row.getCell(8).alignment = { horizontal: 'left' };
+        if (r.late_minutes != null) row.getCell(9).font = { color: { argb: 'FFB91C1C' }, bold: true };
+        if (r.denda > 0) row.getCell(10).font = { color: { argb: 'FFB91C1C' }, bold: true };
         if (i % 2 === 0) row.eachCell(cell => { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } }; });
       });
 
