@@ -111,6 +111,60 @@ const calcLateFineFromMinutes = (lateMinutes) => {
   return lateMinutes <= 10 ? 10000 : 20000;
 };
 
+// ── Helper: normalisasi Date/string SQL jadi "YYYY-MM-DD" — dipakai untuk
+// membentuk key lookup pada leaveMap di semua fungsi export.
+const toDateKey = (d) => (d instanceof Date ? d.toISOString().split('T')[0] : String(d).split('T')[0]);
+
+// ── Helper: format label "Keterangan" dari entri leaveMap (label + alasan).
+const formatKeterangan = (leaveInfo) => leaveInfo ? `${leaveInfo.label}${leaveInfo.reason ? ' — ' + leaveInfo.reason : ''}` : '';
+
+// ── Helper: ambil izin/cuti approved yang overlap suatu periode, di-expand
+// per (user_id, date) supaya bisa dicek cepat baris per baris. Dipakai untuk
+// menandai laporan & mengecualikan hari izin dari denda keterlambatan.
+// Fallback label sama dengan typeMap di exportLeaveExcel — dipakai hanya jika
+// lt.name kosong ATAU leave_types-nya sudah dihapus/direname (LEFT JOIN, lihat
+// di bawah, supaya leave_requests dgn kode yatim tidak hilang dari laporan).
+const leaveTypeLabelFallback = { annual: 'Cuti Tahunan', sick: 'Izin Sakit', permission: 'Izin', dinas: 'Dinas Luar', late_permission: 'Izin Terlambat', early_leave: 'Izin Pulang Cepat', leave_office: 'Izin Keluar Kantor' };
+const leaveTypeLabel = (code, name) => name || leaveTypeLabelFallback[code] || code;
+
+const fetchApprovedLeaveMap = async (userIds, rangeStart, rangeEnd) => {
+  const map = {}; // key `${user_id}_${date}` -> { label, reason, blocks_attendance }
+  if (!userIds.length) return map;
+  const inClause = userIds.map(() => '?').join(',');
+  const [rows] = await pool.query(
+    `SELECT lr.user_id, lr.start_date, lr.end_date, lr.reason, lr.type,
+            lt.name as type_name, lt.blocks_attendance
+     FROM leave_requests lr
+     LEFT JOIN leave_types lt ON lr.type = lt.code
+     WHERE lr.user_id IN (${inClause}) AND lr.status = 'approved'
+       AND lr.start_date <= ? AND lr.end_date >= ?`,
+    [...userIds, rangeEnd, rangeStart]
+  );
+  rows.forEach(r => {
+    const label = leaveTypeLabel(r.type, r.type_name);
+    // blocks_attendance tak dikenal (leave_types dihapus/kode yatim) → default
+    // TRUE (anggap memblokir/absen) supaya tidak diam-diam dianggap 'Hadir'.
+    const blocksAttendance = r.blocks_attendance == null ? true : !!r.blocks_attendance;
+    for (let d = new Date(r.start_date); d <= new Date(r.end_date); d.setDate(d.getDate() + 1)) {
+      const key = `${r.user_id}_${toDateKey(d)}`;
+      map[key] = { label, reason: r.reason || '', blocks_attendance: blocksAttendance };
+    }
+  });
+  return map;
+};
+
+// ── Helper: resolve query (start_date/end_date ATAU month/year) jadi rentang
+// tanggal string "YYYY-MM-DD" eksplisit — dipakai untuk query leave_requests
+// yang butuh batas tanggal pasti, bukan filter SQL berbentuk MONTH()/YEAR().
+const resolveDateRange = (query) => {
+  const { start_date, end_date, month, year } = query;
+  if (start_date && end_date) return { start: start_date, end: end_date };
+  const m = parseInt(month) || new Date().getMonth() + 1;
+  const y = parseInt(year) || new Date().getFullYear();
+  const lastDay = new Date(y, m, 0).getDate();
+  return { start: `${y}-${String(m).padStart(2,'0')}-01`, end: `${y}-${String(m).padStart(2,'0')}-${String(lastDay).padStart(2,'0')}` };
+};
+
 // ── Helper: bangun filter tanggal (range atau bulan/tahun) ────────────────────
 const buildDateFilter = (query, tableAlias = 'a', dateCol = 'date') => {
   const { start_date, end_date, month, year } = query;
@@ -158,7 +212,7 @@ const exportAttendanceExcel = async (req, res) => {
     // Shift efektif per baris = shift yang berlaku pada tanggal absensi itu
     // (sama pendekatan dgn getAllAttendances/exportAttendanceTimesheetExcel).
     const [detail] = await pool.query(
-      `SELECT u.name, u.employee_id, u.department, u.position, a.date, a.check_in, a.check_out, a.status, l.name as lokasi,
+      `SELECT a.user_id, u.name, u.employee_id, u.department, u.position, a.date, a.check_in, a.check_out, a.status, l.name as lokasi,
         (SELECT ws.name FROM user_shifts us
           JOIN work_shifts ws ON us.shift_id = ws.id
           WHERE us.user_id = a.user_id AND us.effective_date <= a.date AND ws.is_active = TRUE
@@ -183,6 +237,10 @@ const exportAttendanceExcel = async (req, res) => {
       params
     );
 
+    const { start: leaveRangeStart, end: leaveRangeEnd } = resolveDateRange(req.query);
+    const userIdsForLeave = [...new Set(detail.map(r => r.user_id).filter(Boolean))];
+    const leaveMap = await fetchApprovedLeaveMap(userIdsForLeave, leaveRangeStart, leaveRangeEnd);
+
     detail.forEach(r => {
       const startTime = (r.shift_start || '08:00:00').substring(0,5);
       const endTime = (r.shift_end || '17:00:00').substring(0,5);
@@ -192,7 +250,11 @@ const exportAttendanceExcel = async (req, res) => {
       r.shift_end_label = endTime;
       r.late_minutes = null;
       r.denda = 0;
-      if (r.check_in && r.status === 'late') {
+      r.leave_info = leaveMap[`${r.user_id}_${toDateKey(r.date)}`] || null;
+      // Pengaman ganda: walau attendances.status seharusnya sudah 'present' saat
+      // ada izin non-blocking (lihat attendanceController checkIn), jangan kenakan
+      // denda jika hari itu ternyata match izin/cuti approved apa pun.
+      if (r.check_in && r.status === 'late' && !r.leave_info) {
         const schedStart = timeStrToMinutes(startTime);
         const isNightShift = schedStart < EARLY_WINDOW_MINUTES;
         let checkInMin = dtToMinutesOfDay(r.check_in);
@@ -245,15 +307,15 @@ const exportAttendanceExcel = async (req, res) => {
     // ── Sheet 2: Detail (dikelompokkan per karyawan, dengan Daftar Isi ber-hyperlink) ──
     const ws2 = wb.addWorksheet('Detail Absensi');
     const SHEET2 = 'Detail Absensi';
-    const COL_COUNT = 10;
+    const COL_COUNT = 11;
     ws2.columns = [
       { width: 12 }, { width: 16 }, { width: 12 }, { width: 12 }, { width: 12 },
-      { width: 12 }, { width: 12 }, { width: 22 }, { width: 12 }, { width: 14 },
+      { width: 12 }, { width: 12 }, { width: 22 }, { width: 12 }, { width: 14 }, { width: 26 },
     ];
     styleExcelTitle(ws2, COL_COUNT, `DETAIL ABSENSI ${label.toUpperCase()}`);
     ws2.addRow([]);
     const thin = { style: 'thin', color: { argb: 'FFCBD5E1' } };
-    const colHeaders = ['Tanggal','Shift','Jadwal Masuk','Jadwal Pulang','Clock In','Clock Out','Status','Lokasi','Telat (menit)','Denda'];
+    const colHeaders = ['Tanggal','Shift','Jadwal Masuk','Jadwal Pulang','Clock In','Clock Out','Status','Lokasi','Telat (menit)','Denda','Keterangan'];
 
     const detailByUser = {};
     detail.forEach(r => {
@@ -313,21 +375,29 @@ const exportAttendanceExcel = async (req, res) => {
       });
 
       records.forEach((r, i) => {
+        const keterangan = r.leave_info ? formatKeterangan(r.leave_info) : '-';
         const row = ws2.addRow([
           fmtDate(r.date), r.shift_name, r.shift_start_label, r.shift_end_label,
           r.check_in ? fmtTime(r.check_in) : '-', r.check_out ? fmtTime(r.check_out) : '-',
           statusLabel(r.status), r.lokasi||'-',
           r.late_minutes != null ? r.late_minutes : '-',
           r.denda > 0 ? fmtRupiah(r.denda) : '-',
+          keterangan,
         ]);
         row.eachCell(cell => {
           cell.border = { top: thin, bottom: thin, left: thin, right: thin };
           cell.alignment = { horizontal: 'center' };
         });
         row.getCell(8).alignment = { horizontal: 'left' };
+        row.getCell(11).alignment = { horizontal: 'left' };
         if (r.late_minutes != null) row.getCell(9).font = { color: { argb: 'FFB91C1C' }, bold: true };
         if (r.denda > 0) row.getCell(10).font = { color: { argb: 'FFB91C1C' }, bold: true };
-        if (i % 2 === 0) row.eachCell(cell => { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } }; });
+        if (r.leave_info) {
+          row.getCell(11).font = { color: { argb: 'FF15803D' }, bold: true };
+          row.eachCell(cell => { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDCFCE7' } }; });
+        } else if (i % 2 === 0) {
+          row.eachCell(cell => { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } }; });
+        }
       });
 
       if (idx < users.length - 1) ws2.addRow([]);
@@ -430,7 +500,7 @@ const exportAttendanceDetailPDF = async (req, res) => {
     const { filter, params, label, fileTag } = buildDateFilter(req.query);
 
     const [rows] = await pool.query(
-      `SELECT u.name, u.employee_id, u.department, a.date, a.check_in, a.check_out, a.status, l.name as lokasi
+      `SELECT u.id as user_id, u.name, u.employee_id, u.department, a.date, a.check_in, a.check_out, a.status, l.name as lokasi
        FROM users u
        LEFT JOIN attendances a ON u.id = a.user_id ${filter}
        LEFT JOIN attendance_locations l ON a.location_id = l.id
@@ -441,6 +511,10 @@ const exportAttendanceDetailPDF = async (req, res) => {
 
     const [settings] = await pool.query("SELECT setting_value FROM app_settings WHERE setting_key='company_name'");
     const companyName = settings[0]?.setting_value || 'iWare Absenku';
+
+    const { start: detailRangeStart, end: detailRangeEnd } = resolveDateRange(req.query);
+    const detailUserIds = [...new Set(rows.map(r => r.user_id).filter(Boolean))];
+    const detailLeaveMap = await fetchApprovedLeaveMap(detailUserIds, detailRangeStart, detailRangeEnd);
 
     const byUser = {};
     rows.forEach(r => {
@@ -454,8 +528,8 @@ const exportAttendanceDetailPDF = async (req, res) => {
     res.setHeader('Content-Disposition', `attachment; filename=detail_absensi_${fileTag}.pdf`);
     doc.pipe(res);
 
-    const cols = [90, 110, 90, 90, 90];
-    const headers = ['Tanggal', 'Jam Masuk', 'Jam Pulang', 'Status', 'Lokasi'];
+    const cols = [75, 85, 85, 80, 75, 130];
+    const headers = ['Tanggal', 'Jam Masuk', 'Jam Pulang', 'Status', 'Lokasi', 'Keterangan'];
     const tableLeft = 40;
     const tableWidth = cols.reduce((a, b) => a + b, 0);
     const rowHeight = 18;
@@ -501,13 +575,16 @@ const exportAttendanceDetailPDF = async (req, res) => {
           drawTableHeader();
           doc.font('Helvetica').fontSize(8);
         }
+        const leaveInfo = detailLeaveMap[`${r.user_id}_${toDateKey(r.date)}`] || null;
+        const keterangan = leaveInfo ? leaveInfo.label : '-';
+
         const rowY = doc.y;
         doc.rect(tableLeft, rowY - 3, tableWidth, rowHeight)
-          .fill(idx % 2 === 0 ? '#F8FAFC' : '#FFFFFF').stroke('#E2E8F0');
+          .fill(leaveInfo ? '#DCFCE7' : (idx % 2 === 0 ? '#F8FAFC' : '#FFFFFF')).stroke('#E2E8F0');
         let x = tableLeft;
-        const vals = [fmtDate(r.date), fmtTime(r.check_in), fmtTime(r.check_out), statusLabel(r.status), r.lokasi || '-'];
+        const vals = [fmtDate(r.date), fmtTime(r.check_in), fmtTime(r.check_out), statusLabel(r.status), r.lokasi || '-', keterangan];
         vals.forEach((v, i) => {
-          doc.fillColor('#1E293B').text(String(v), x, rowY + 2, { width: cols[i], align: i === 0 ? 'left' : 'center', lineBreak: false });
+          doc.fillColor(leaveInfo && i === 5 ? '#15803D' : '#1E293B').text(String(v), x, rowY + 2, { width: cols[i], align: (i === 0 || i === 5) ? 'left' : 'center', lineBreak: false });
           x += cols[i];
         });
         doc.y = rowY + rowHeight;
@@ -560,13 +637,12 @@ const exportLeaveExcel = async (req, res) => {
     const hdr = ws.addRow(['No','Nama','ID','Departemen','Jabatan','Jenis','Tgl Mulai','Tgl Selesai','Durasi','Alasan','Status','Catatan HRD']);
     styleExcelHeaderRow(hdr);
 
-    const typeMap = { annual:'Cuti Tahunan', sick:'Izin Sakit', permission:'Izin', dinas:'Dinas Luar' };
     const statusMap = { pending:'Menunggu', approved:'Disetujui', rejected:'Ditolak' };
 
     rows.forEach((r, i) => {
       const row = ws.addRow([
         i+1, r.name, r.employee_id||'-', r.department||'-', r.position||'-',
-        typeMap[r.type] || r.type,
+        leaveTypeLabelFallback[r.type] || r.type,
         fmtDate(r.start_date), fmtDate(r.end_date),
         `${r.total_days} hari`,
         r.reason, statusMap[r.status] || r.status, r.review_notes||'-'
@@ -598,7 +674,7 @@ const exportMonthlyRecapExcel = async (req, res) => {
     if (userId) { userFilter = ' AND u.id = ?'; params.push(userId); }
 
     const [rows] = await pool.query(
-      `SELECT u.name, u.employee_id, u.department,
+      `SELECT u.id as user_id, u.name, u.employee_id, u.department,
               a.date, a.check_in, a.check_out, a.status, l.name as lokasi,
               ws.name as shift_name, ws.start_time as shift_start, ws.end_time as shift_end
        FROM users u
@@ -611,6 +687,10 @@ const exportMonthlyRecapExcel = async (req, res) => {
        ORDER BY u.name, a.date`,
       params
     );
+
+    const { start: recapRangeStart, end: recapRangeEnd } = resolveDateRange(req.query);
+    const recapUserIds = [...new Set(rows.map(r => r.user_id).filter(Boolean))];
+    const recapLeaveMap = await fetchApprovedLeaveMap(recapUserIds, recapRangeStart, recapRangeEnd);
 
     const wb = new ExcelJS.Workbook();
     wb.creator = 'iWare Absenku';
@@ -641,14 +721,21 @@ const exportMonthlyRecapExcel = async (req, res) => {
       const days = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
       records.filter(r => r.date).forEach((r, i) => {
         const d = new Date(r.date);
+        const leaveInfo = recapLeaveMap[`${r.user_id}_${toDateKey(r.date)}`] || null;
+        const keterangan = formatKeterangan(leaveInfo);
         const row = ws.addRow([
           fmtDate(r.date), days[d.getDay()],
           r.shift_start ? `${r.shift_start.substring(0,5)} - ${r.shift_end.substring(0,5)}` : '-',
           fmtTime(r.check_in), fmtTime(r.check_out),
-          statusLabel(r.status), r.lokasi||'-', ''
+          statusLabel(r.status), r.lokasi||'-', keterangan
         ]);
-        if (i % 2 === 0) row.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
         row.eachCell(borderThinCell);
+        if (leaveInfo) {
+          row.getCell(8).font = { color: { argb: 'FF15803D' }, bold: true };
+          row.eachCell(cell => { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDCFCE7' } }; });
+        } else if (i % 2 === 0) {
+          row.eachCell(cell => { cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } }; });
+        }
       });
 
       // Summary row
@@ -704,16 +791,14 @@ const dtToMinutesOfDay = (dt) => {
 const exportAttendanceTimesheetExcel = async (req, res) => {
   try {
     const { start_date, end_date, month, year, department, employee_id } = req.query;
-    let rangeStart, rangeEnd, fileTag, periodLabel;
+    const { start: rangeStart, end: rangeEnd } = resolveDateRange(req.query);
+    let fileTag, periodLabel;
     if (start_date && end_date) {
-      rangeStart = start_date; rangeEnd = end_date; fileTag = `${start_date}_${end_date}`;
+      fileTag = `${start_date}_${end_date}`;
       periodLabel = `${fmtDate(start_date)} s/d ${fmtDate(end_date)}`;
     } else {
       const m = parseInt(month) || new Date().getMonth() + 1;
       const y = parseInt(year) || new Date().getFullYear();
-      rangeStart = `${y}-${String(m).padStart(2,'0')}-01`;
-      const lastDay = new Date(y, m, 0).getDate();
-      rangeEnd = `${y}-${String(m).padStart(2,'0')}-${String(lastDay).padStart(2,'0')}`;
       fileTag = `${m}_${y}`;
       periodLabel = `${months[m-1]} ${y}`;
     }
@@ -772,6 +857,11 @@ const exportAttendanceTimesheetExcel = async (req, res) => {
     overtimeRows.forEach(r => { const k = `${r.user_id}_${dateKey(r.date)}`; (otByKey[k] ||= []).push(r); });
     hourlyLeaveRows.forEach(r => { const k = `${r.user_id}_${dateKey(r.date)}`; (hlByKey[k] ||= []).push(r); });
 
+    // Izin/cuti approved (apapun jenisnya) per (user, tanggal) — dipakai untuk
+    // menandai baris "Izin" di kolom Status/Keterangan dan mencegah hari itu
+    // dihitung sebagai keterlambatan.
+    const leaveMap = await fetchApprovedLeaveMap(userIds, rangeStart, rangeEnd);
+
     // Daftar tanggal dalam periode
     const dateList = [];
     for (let d = new Date(rangeStart + 'T00:00:00Z'); d <= new Date(rangeEnd + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + 1)) {
@@ -809,7 +899,7 @@ const exportAttendanceTimesheetExcel = async (req, res) => {
 
     const headers = ['Employee ID','Full Name','Date','Status','Schedule Check In','Schedule Check Out','Check In','Check Out',
       'Late In','Late (min)','Early Out','Schedule Working Hour','Actual Working Hour','Real Working Hour',
-      'Overtime Duration Before','Overtime Duration After','Hourly Time Off Taken'];
+      'Overtime Duration Before','Overtime Duration After','Hourly Time Off Taken','Keterangan'];
     const NUM_COLS = headers.length;
     ws.columns = headers.map((_, i) => ({ width: i < 2 ? 26 : (i === 3 ? 14 : 17) }));
 
@@ -834,11 +924,13 @@ const exportAttendanceTimesheetExcel = async (req, res) => {
       late:   'FFFEE2E2', // merah muda tipis
       absent: 'FFF1F5F9', // abu-abu tipis
       holiday:'FFDBEAFE', // biru muda
+      leave:  'FFDCFCE7', // hijau muda (izin/cuti)
     };
     const STATUS_FONT = {
       late:   'FFB91C1C',
       absent: 'FF64748B',
       holiday:'FF1D4ED8',
+      leave:  'FF15803D',
     };
 
     users.forEach(u => {
@@ -877,8 +969,10 @@ const exportAttendanceTimesheetExcel = async (req, res) => {
           checkOutMin += 1440;
         }
 
+        const leaveInfo = leaveMap[`${u.id}_${date}`] || null;
+
         let lateIn = 0, earlyOut = 0, actualWorkMin = 0;
-        if (checkInMin != null && schedWorkMin > 0) {
+        if (checkInMin != null && schedWorkMin > 0 && !leaveInfo) {
           const diff = checkInMin - schedStart;
           if (diff > tolerance) lateIn = diff;
         }
@@ -906,16 +1000,31 @@ const exportAttendanceTimesheetExcel = async (req, res) => {
         totals.actualWork += actualWorkMin; totals.realWork += realWorkMin;
         totals.otBefore += otBefore; totals.otAfter += otAfter; totals.hourlyOff += hourlyOff;
 
-        // Status baris: Libur (tanggal masuk daftar hari libur) > Terlambat
-        // (checkin tercatat & melewati toleransi) > Hadir (checkin tercatat,
-        // tepat waktu) > Tidak Hadir (tidak ada catatan checkin, tanggal
-        // sudah lewat) > kosong (tanggal di masa depan, belum bisa dinilai).
+        // Status baris: Libur (tanggal masuk daftar hari libur) > Izin/Cuti
+        // (ada leave_requests approved yang menutup tanggal ini — tidak
+        // dihitung telat, tidak dikenakan denda) > Terlambat (checkin
+        // tercatat & melewati toleransi) > Hadir (checkin tercatat, tepat
+        // waktu) > Tidak Hadir (tidak ada catatan checkin, tanggal sudah
+        // lewat) > kosong (tanggal di masa depan, belum bisa dinilai).
+        //
+        // leaveInfo ditandai 'leave' jika: (a) blocking (cuti/sakit — hari
+        // itu memang tidak perlu checkin), ATAU (b) ada checkin (non-blocking
+        // permit yang dipakai — lateIn sudah disupresi di atas jadi status
+        // wajib ikut menandainya, bukan diam-diam tampil 'Hadir'). Non-
+        // blocking TANPA checkin sama sekali TIDAK dianggap excused — sama
+        // dengan attendanceController: non-blocking permit hanya mengubah
+        // status checkin yang benar-benar terjadi, bukan membebaskan hari itu
+        // dari kewajiban absen sama sekali.
         const isFutureDate = date > todayStr;
+        const isExcusedLeave = leaveInfo && (leaveInfo.blocks_attendance || !!att?.check_in);
         let rowStatus, statusKey;
         if (holidaySet.has(date)) { rowStatus = 'Libur'; statusKey = 'holiday'; }
+        else if (isExcusedLeave) { rowStatus = leaveInfo.label; statusKey = 'leave'; }
         else if (att?.check_in) { rowStatus = lateIn > 0 ? 'Terlambat' : 'Hadir'; statusKey = lateIn > 0 ? 'late' : null; }
         else if (isFutureDate) { rowStatus = '-'; statusKey = null; }
         else { rowStatus = 'Tidak Hadir'; statusKey = 'absent'; }
+
+        const keterangan = formatKeterangan(leaveInfo);
 
         const row = ws.addRow([
           u.employee_id || '-', u.name, date, rowStatus,
@@ -925,6 +1034,7 @@ const exportAttendanceTimesheetExcel = async (req, res) => {
           fmtMinutesToHHMM(lateIn), lateIn > 0 ? lateIn : null, fmtMinutesToHHMM(earlyOut),
           fmtMinutesToHHMM(schedWorkMin), fmtMinutesToHHMM(actualWorkMin), fmtMinutesToHHMM(realWorkMin),
           fmtMinutesToHHMM(otBefore), fmtMinutesToHHMM(otAfter), fmtMinutesToHHMM(hourlyOff),
+          keterangan,
         ]);
         row.eachCell(borderThinCell);
         if (statusKey) {
