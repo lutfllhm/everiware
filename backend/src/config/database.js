@@ -12,6 +12,13 @@ const pool = mysql.createPool({
   queueLimit: 0,
   timezone: '+07:00',
   dateStrings: true,  // Kembalikan DATETIME sebagai string, bukan Date object
+  enableKeepAlive: true,   // cegah koneksi idle diputus diam-diam oleh firewall/proxy VPS
+  keepAliveInitialDelay: 10000,
+});
+
+// Log koneksi pool yang mati (mis. MySQL restart, network blip) alih-alih diam-diam menyumbat antrian
+pool.on('error', (err) => {
+  console.error('❌ MySQL pool error:', err.code || err.message);
 });
 
 const testConnection = async () => {

@@ -23,6 +23,14 @@ const auditLogRoutes   = require('./routes/auditLog');
 const realtimeRoutes   = require('./routes/realtime');
 const announcementRoutes = require('./routes/announcements');
 
+// Jangan biarkan error tak tertangani membuat proses menyangkut diam-diam tanpa jejak di log
+process.on('unhandledRejection', (reason) => {
+  console.error('❌ Unhandled Rejection:', reason);
+});
+process.on('uncaughtException', (err) => {
+  console.error('❌ Uncaught Exception:', err);
+});
+
 const app = express();
 
 // Security
