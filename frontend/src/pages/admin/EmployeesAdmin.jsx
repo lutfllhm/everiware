@@ -30,7 +30,7 @@ export default function EmployeesAdmin() {
   const fetchUsers = async () => {
     setLoading(true);
     try {
-      const url = `/users?role=employee${locationFilter ? `&location_id=${locationFilter}` : ''}`;
+      const url = `/users?role=employee&limit=1000${locationFilter ? `&location_id=${locationFilter}` : ''}`;
       const { data } = await api.get(url);
       setUsers(data.users);
     } catch {} finally { setLoading(false); }
