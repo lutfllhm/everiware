@@ -1,4 +1,10 @@
+.env
+.env.local
+.env.*.local
 .env.production
+.env.development
+backend/.env
+frontend/.env
 backend/firebase-service-account.json
 .vscode/
 uploads/

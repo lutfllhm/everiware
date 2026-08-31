@@ -1,7 +1,9 @@
+import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import useAuthStore from './store/authStore';
+import api from './api/axios';
 
 // Pages
 import LoginPage from './pages/LoginPage';
@@ -104,6 +106,16 @@ export default function App() {
   const stored = (() => { try { return JSON.parse(localStorage.getItem('iware-auth') || '{}'); } catch { return {}; } })();
   const auth = isAuthenticated || stored.isAuthenticated;
   const currentUser = user || stored.user;
+
+  // Validasi token secara diam-diam begitu app dibuka (mis. setelah lama tidak dibuka).
+  // Kalau token sudah tidak valid, interceptor di api/axios.js yang akan menangani
+  // logout + redirect halus, jadi tab lama tidak terasa "macet" sebelum ter-reload paksa.
+  useEffect(() => {
+    if (auth) {
+      api.get('/auth/me').catch(() => {});
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <QueryClientProvider client={queryClient}>
