@@ -51,7 +51,7 @@ export default function ReportsAdmin() {
   useEffect(() => {
     // Load departments & employees untuk filter
     api.get('/departments').then(r => setDepartments(r.data.departments || [])).catch(() => {});
-    api.get('/users?role=employee').then(r => setEmployees(r.data.users || [])).catch(() => {});
+    api.get('/users?role=employee&limit=1000').then(r => setEmployees(r.data.users || [])).catch(() => {});
   }, []);
 
   useEffect(() => {

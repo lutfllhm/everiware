@@ -31,7 +31,7 @@ export default function ShiftsAdmin() {
   };
   const fetchEmployees = async () => {
     try {
-      const { data } = await api.get('/users?role=employee');
+      const { data } = await api.get('/users?role=employee&limit=1000');
       setEmployees(data.users);
     } catch (err) {
       toast.error(err.response?.data?.message || 'Gagal memuat daftar karyawan');
