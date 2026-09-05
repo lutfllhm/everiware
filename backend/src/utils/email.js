@@ -24,7 +24,7 @@ const sendOTPEmail = async (email, name, otp) => {
         <div style="max-width: 540px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.03);">
           <!-- Header Logo Section -->
           <div style="background-color: #ffffff; padding: 25px 20px; text-align: center; border-bottom: 1px solid #f1f5f9;">
-            <img src="https://everiware.iwareid.com/logo.png" alt="Everiware Logo" style="height: 48px; width: auto; max-width: 100%; display: block; margin: 0 auto;" />
+            <img src="https://everiware.iware.tech/logo.png" alt="Everiware Logo" style="height: 48px; width: auto; max-width: 100%; display: block; margin: 0 auto;" />
           </div>
           
           <!-- Content Body -->
@@ -77,7 +77,7 @@ const sendPasswordResetEmail = async (email, name, otp) => {
         <div style="max-width: 540px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.03);">
           <!-- Header Logo Section -->
           <div style="background-color: #ffffff; padding: 25px 20px; text-align: center; border-bottom: 1px solid #f1f5f9;">
-            <img src="https://everiware.iwareid.com/logo.png" alt="Everiware Logo" style="height: 48px; width: auto; max-width: 100%; display: block; margin: 0 auto;" />
+            <img src="https://everiware.iware.tech/logo.png" alt="Everiware Logo" style="height: 48px; width: auto; max-width: 100%; display: block; margin: 0 auto;" />
           </div>
           
           <!-- Content Body -->
@@ -131,7 +131,7 @@ const sendLeaveNotification = async (email, name, status, leaveType) => {
         <div style="max-width: 540px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.03);">
           <!-- Header Logo Section -->
           <div style="background-color: #ffffff; padding: 25px 20px; text-align: center; border-bottom: 1px solid #f1f5f9;">
-            <img src="https://everiware.iwareid.com/logo.png" alt="Everiware Logo" style="height: 48px; width: auto; max-width: 100%; display: block; margin: 0 auto;" />
+            <img src="https://everiware.iware.tech/logo.png" alt="Everiware Logo" style="height: 48px; width: auto; max-width: 100%; display: block; margin: 0 auto;" />
           </div>
           
           <!-- Content Body -->
