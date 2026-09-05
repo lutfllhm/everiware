@@ -20,3 +20,8 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .DS_Store
+
+# Database backup (jangan pernah masuk git - berisi data karyawan)
+*.sql
+!database/schema.sql
+backup/
