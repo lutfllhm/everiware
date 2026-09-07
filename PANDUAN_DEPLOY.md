@@ -8,7 +8,7 @@ Panduan ini telah disesuaikan agar **tidak terjadi bentrok nama kontainer maupun
 *   **Database MySQL Host Port**: Menggunakan port **`3309`** (karena port `3306`, `3307`, `3308`, dan `4080` sudah terpakai di VPS).
 *   **Frontend Host Port**: Menggunakan port **`8088`** (karena port `8080`, `8082`, `8085`, `8090`, dan `9090` sudah terpakai di VPS).
 *   **Nama Kontainer**: Menggunakan awalan **`everiware_`** (`everiware_db`, `everiware_backend`, `everiware_frontend`).
-*   **Domain**: **`everiware.iware.tech`**
+
 
 ---
 
@@ -32,7 +32,7 @@ Panduan ini telah disesuaikan agar **tidak terjadi bentrok nama kontainer maupun
 Sebelum memulai, pastikan Anda telah menyiapkan hal-hal berikut:
 *   **VPS Hostinger** dengan OS **Ubuntu 22.04 LTS** atau **Ubuntu 24.04 LTS**.
 *   Hak akses **root** atau user dengan wewenang **sudo**.
-*   Domain aktif yang Anda miliki: **`everiware.iware.tech`**.
+*   Domain aktif yang Anda miliki: **`everiware.iwareid.com`**.
     > [!IMPORTANT]
     > **Kenapa wajib menggunakan HTTPS/SSL?**
     > Fitur absensi digital Everiware menggunakan kamera (selfie) dan lokasi (GPS). Browser modern (seperti Chrome & Safari di handphone) secara ketat memblokir izin akses Kamera dan GPS jika situs web diakses lewat koneksi HTTP biasa tanpa SSL.
@@ -44,12 +44,12 @@ Agar domain Anda dapat mengarah ke aplikasi yang berada di VPS, lakukan konfigur
 
 1. Masuk ke **DNS Zone Editor** dari domain **`iwareid.com`**.
 2. Tambahkan record baru dengan tipe **A Record**:
-   *   **Host/Name**: `everiware` (untuk subdomain `everiware.iware.tech`).
+   *   **Host/Name**: `everiware` (untuk subdomain `everiware.iwareid.com`).
    *   **Points to (IP Address)**: Isi dengan **IP Publik VPS** Anda (misalnya `103.190.24.123`).
    *   **TTL**: Biarkan default (biasanya 3600 atau Auto).
 3. Simpan record DNS tersebut.
     > [!NOTE]
-    > Propagasi DNS biasanya membutuhkan waktu mulai dari 5 menit hingga maksimal 24 jam. Anda dapat memverifikasi apakah domain sudah mengarah ke IP VPS dengan menjalankan perintah `ping everiware.iware.tech` di terminal komputer lokal Anda.
+    > Propagasi DNS biasanya membutuhkan waktu mulai dari 5 menit hingga maksimal 24 jam. Anda dapat memverifikasi apakah domain sudah mengarah ke IP VPS dengan menjalankan perintah `ping everiware.iwareid.com` di terminal komputer lokal Anda.
 
 ---
 
@@ -138,8 +138,8 @@ Jika Anda tidak menggunakan Git, Anda bisa menggunakan SCP via Terminal atau apl
         ```bash
         openssl rand -base64 32
         ```
-   *   `FRONTEND_URL` & `WEB_URL`: Masukkan URL domain lengkap Anda menggunakan awalan `https://` yaitu **`https://everiware.iware.tech`**.
-   *   `GOOGLE_CALLBACK_URL`: Masukkan URL callback Google OAuth Anda yaitu **`https://everiware.iware.tech/api/auth/google/callback`**.
+   *   `FRONTEND_URL` & `WEB_URL`: Masukkan URL domain lengkap Anda menggunakan awalan `https://` yaitu **`https://everiware.iwareid.com`**.
+   *   `GOOGLE_CALLBACK_URL`: Masukkan URL callback Google OAuth Anda yaitu **`https://everiware.iwareid.com/api/auth/google/callback`**.
    *   `EMAIL_USER` & `EMAIL_PASS`: Masukkan akun Gmail dan **App Password** Gmail Anda (bukan password akun biasa) agar fitur verifikasi OTP email dapat berjalan lancar.
 5. Simpan perubahan dengan menekan kombinasi tombol `Ctrl + O` lalu `Enter`, kemudian keluar dengan `Ctrl + X`.
 
@@ -226,7 +226,7 @@ sudo apt install nginx certbot python3-certbot-nginx -y
    ```
 
 ### 3. Generate Sertifikat SSL Let's Encrypt
-Jalankan Certbot untuk mendapatkan sertifikat SSL gratis secara otomatis pada domain **`everiware.iware.tech`**:
+Jalankan Certbot untuk mendapatkan sertifikat SSL gratis secara otomatis pada domain **`everiware.iwareid.com`**:
 ```bash
 sudo certbot --nginx -d everiware.iware.tech
 ```
@@ -239,7 +239,7 @@ sudo certbot --nginx -d everiware.iware.tech
    sudo systemctl restart nginx
    ```
 
-Aplikasi Anda kini sudah dapat diakses dengan aman di **`https://everiware.iware.tech`**!
+Aplikasi Anda kini sudah dapat diakses dengan aman di **`https://everiware.iwareid.com`**!
 
 ---
 
@@ -252,9 +252,9 @@ Sebelum membuild aplikasi, pastikan konfigurasi API URL pada aplikasi Flutter su
 * Buka file [constants.dart](file:///d:/project/Everiware/iwareabsenku/lib/utils/constants.dart) di komputer lokal Anda.
 * Pastikan variabel `baseUrl`, `uploadsUrl`, dan `webUrl` diset seperti berikut:
   ```dart
-  static const String baseUrl = 'https://everiware.iware.tech/api';
-  static const String uploadsUrl = 'https://everiware.iware.tech/uploads';
-  static const String webUrl = 'https://everiware.iware.tech';
+  static const String baseUrl = 'https://everiware.iwareid.com/api';
+  static const String uploadsUrl = 'https://everiware.iwareid.com/uploads';
+  static const String webUrl = 'https://everiware.iwareid.com';
   ```
 
 ### 2. Build Release APK di Komputer Lokal
@@ -276,7 +276,7 @@ Agar karyawan dapat mengunduh APK langsung dari domain web Anda, lakukan langkah
    docker compose up -d --build frontend
    ```
 4. Karyawan kini dapat mengunduh aplikasi mobile secara langsung melalui browser handphone mereka dengan mengakses tautan:
-   **`https://everiware.iware.tech/everiware.apk`**
+   **`https://everiware.iwareid.com/everiware.apk`**
 
 ### 4. Cara Install APK di Handphone Karyawan
 Karena aplikasi tidak didistribusikan melalui Google Play Store, karyawan perlu melakukan instalasi manual:
@@ -301,7 +301,7 @@ docker compose up -d --build
 ### 2. Kamera atau GPS Tidak Berfungsi di Handphone Karyawan
 **Penyebab:** Aplikasi diakses menggunakan protokol HTTP biasa (`http://...`) atau alamat IP mentah. Browser menolak memberikan izin lokasi dan kamera pada situs yang dinilai tidak aman.
 **Solusi:**
-Pastikan Anda mengakses menggunakan domain HTTPS (**`https://everiware.iware.tech`**). Periksa apakah konfigurasi SSL Let's Encrypt telah sukses dan alamat URL di `.env` sudah menggunakan awalan `https://`.
+Pastikan Anda mengakses menggunakan domain HTTPS (**`https://everiware.iwareid.com`**). Periksa apakah konfigurasi SSL Let's Encrypt telah sukses dan alamat URL di `.env` sudah menggunakan awalan `https://`.
 
 ### 3. Email OTP Tidak Terkirim
 **Penyebab:** Konfigurasi email tidak valid atau akun Google memblokir akses login biasa.

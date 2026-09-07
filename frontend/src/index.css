@@ -3,6 +3,17 @@
 @tailwind utilities;
 
 @layer base {
+  /* ── Brand tokens — disamakan dengan app mobile (lib/utils/app_theme.dart) ── */
+  :root {
+    --brand-primary: #8B1F1F;       /* Crimson Red */
+    --brand-primary-dark: #4A0808;  /* Deep Dark Red */
+    --brand-primary-light: #EF5350; /* Light Coral Red */
+    --brand-surface: #F6F8FD;       /* background dashboard mobile */
+    --brand-border: #E7E5E4;        /* warm border (stone-200) */
+    --brand-text: #1C1917;          /* stone-900 */
+    --brand-text-muted: #78716C;    /* stone-500 */
+  }
+
   html {
     scroll-behavior: smooth;
   }
@@ -41,6 +52,19 @@
   
   .card {
     @apply bg-white rounded-xl shadow-sm border border-slate-200 transition-all duration-300 ease-out;
+  }
+
+  /* Kartu bergaya mobile: radius 24, border warm, shadow lembut */
+  .card-mobile {
+    @apply bg-white rounded-3xl transition-all duration-300 ease-out;
+    border: 1px solid var(--brand-border);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06), 0 1px 4px rgba(0, 0, 0, 0.03);
+  }
+
+  /* Judul seksi dengan bilah gradient di kiri, seperti di mobile */
+  .section-bar {
+    @apply w-1 h-[18px] rounded flex-shrink-0;
+    background: linear-gradient(to bottom, var(--brand-primary), var(--brand-primary-light));
   }
   
   .card-hover {

@@ -2,9 +2,9 @@ import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
-  Clock, MapPin, Calendar, FileText, CheckCircle, AlertCircle,
-  ChevronRight, Fingerprint, Activity, RefreshCw, Sparkles,
-  TrendingUp, ArrowRight, Sun, Moon, Sunset
+  Clock, MapPin, CheckCircle, AlertCircle, LogIn, LogOut, Circle,
+  RefreshCw, Sun, Sunset, Moon, Briefcase, ClipboardCheck,
+  PartyPopper, Info, XCircle, ChevronRight, LifeBuoy, Bell
 } from 'lucide-react';
 import api from '../../api/axios';
 import useAuthStore from '../../store/authStore';
@@ -12,41 +12,71 @@ import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
 import { useAutoRefresh } from '../../hooks/useAutoRefresh';
 
+// ── Menu layanan mandiri — disamakan persis dengan grid di app mobile ──
+const menuItems = [
+  { label: 'Izin\nTerlambat',      icon: '/menu/01_izin_terlambat.svg',      to: '/leave/late-permission' },
+  { label: 'Izin Pulang\nCepat',   icon: '/menu/02_izin_pulang_cepat.svg',   to: '/leave/early-leave' },
+  { label: 'Ajukan\nCuti',         icon: '/menu/03_ajukan_cuti.svg',         to: '/leave/annual' },
+  { label: 'Izin\nSakit',          icon: '/menu/04_izin_sakit.svg',          to: '/leave/sick' },
+  { label: 'Dinas Luar/\nKelilingan', icon: '/menu/05_dinas_luar.svg',       to: '/leave/dinas' },
+  { label: 'Izin Keluar\nKantor',  icon: '/menu/06_izin_keluar_kantor.svg',  to: '/leave/leave-office' },
+  { label: 'Ajukan\nLembur',       icon: '/menu/07_ajukan_lembur.svg',       to: '/overtime' },
+  { label: 'Statistik\nUser',      icon: '/menu/08_statistik_user.svg',      to: '/attendance' },
+];
+
 const statusConfig = {
-  present: { label: 'Hadir',       color: 'text-emerald-700', bg: 'bg-emerald-50',  border: 'border-emerald-200', icon: CheckCircle,  dot: 'bg-emerald-500' },
-  late:    { label: 'Terlambat',   color: 'text-amber-700',   bg: 'bg-amber-50',    border: 'border-amber-200',   icon: AlertCircle,  dot: 'bg-amber-500' },
-  absent:  { label: 'Tidak Hadir', color: 'text-red-700',     bg: 'bg-red-50',      border: 'border-red-200',     icon: AlertCircle,  dot: 'bg-red-500' },
-  leave:   { label: 'Cuti',        color: 'text-blue-700',    bg: 'bg-blue-50',     border: 'border-blue-200',    icon: Calendar,     dot: 'bg-blue-500' },
-  sick:    { label: 'Sakit',       color: 'text-purple-700',  bg: 'bg-purple-50',   border: 'border-purple-200',  icon: FileText,     dot: 'bg-purple-500' },
+  present: { label: 'Hadir',       color: 'text-emerald-700', bg: 'bg-emerald-50', border: 'border-emerald-200', dot: 'bg-emerald-500' },
+  late:    { label: 'Terlambat',   color: 'text-amber-700',   bg: 'bg-amber-50',   border: 'border-amber-200',   dot: 'bg-amber-500' },
+  absent:  { label: 'Tidak Hadir', color: 'text-red-700',     bg: 'bg-red-50',     border: 'border-red-200',     dot: 'bg-red-500' },
+  leave:   { label: 'Cuti',        color: 'text-blue-700',    bg: 'bg-blue-50',    border: 'border-blue-200',    dot: 'bg-blue-500' },
+  sick:    { label: 'Sakit',       color: 'text-purple-700',  bg: 'bg-purple-50',  border: 'border-purple-200',  dot: 'bg-purple-500' },
+};
+
+const requestStatusConfig = {
+  pending:  { label: 'Menunggu',  color: 'text-amber-700',   bg: 'bg-amber-50',   border: 'border-amber-200' },
+  approved: { label: 'Disetujui', color: 'text-emerald-700', bg: 'bg-emerald-50', border: 'border-emerald-200' },
+  rejected: { label: 'Ditolak',   color: 'text-red-700',     bg: 'bg-red-50',     border: 'border-red-200' },
+};
+
+// Quote harian — sama persis dengan _getMotivationalQuote() di mobile
+const quotes = [
+  'Semangat bekerja! Setiap usaha terbaikmu hari ini adalah bekal kesuksesan hari esok.',
+  'Ayo berikan performa terbaikmu hari ini untuk masa depan yang lebih gemilang!',
+  'Kesehatan dan keselamatan kerja adalah yang utama. Selamat beraktivitas!',
+  'Fokus, kerja keras, dan konsistensi adalah kunci mencapai kesuksesan bersama.',
+  'Jadikan hari ini lebih baik dari kemarin dengan dedikasi dan profesionalisme tinggi.',
+  'Kerja sama tim yang solid melahirkan hasil yang luar biasa. Semangat!',
+  'Setiap kontribusi kecilmu sangat berharga bagi kemajuan perusahaan.',
+];
+
+// Ambang batas jam sama dengan _getGreeting() di mobile (11 / 15 / 18)
+const getGreeting = (h) => {
+  if (h < 11) return { text: 'Selamat Pagi', Icon: Sun };
+  if (h < 15) return { text: 'Selamat Siang', Icon: Sun };
+  if (h < 18) return { text: 'Selamat Sore', Icon: Sunset };
+  return { text: 'Selamat Malam', Icon: Moon };
 };
 
 const fadeUp = (delay = 0) => ({
   initial: { opacity: 0, y: 20 },
   animate: { opacity: 1, y: 0 },
-  transition: { duration: 0.5, delay, ease: [0.16, 1, 0.3, 1] }
+  transition: { duration: 0.5, delay, ease: [0.16, 1, 0.3, 1] },
 });
 
-const statsContainerVariants = {
-  hidden: { opacity: 0 },
-  show: {
-    opacity: 1,
-    transition: {
-      staggerChildren: 0.08,
-      delayChildren: 0.05
-    }
-  }
-};
+const fmtTime = (v) => (v ? format(new Date(v), 'HH:mm') : '--:--');
 
-const statsItemVariants = {
-  hidden: { opacity: 0, y: 15 },
-  show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 260, damping: 25 } }
-};
+// Backend mengirim start_time/end_time sebagai "08:00:00" — mobile menampilkannya
+// apa adanya, jadi cukup potong detiknya supaya rapi.
+const fmtShift = (v, fallback) => (v ? String(v).slice(0, 5) : fallback);
 
 export default function DashboardPage() {
   const { user } = useAuthStore();
   const [todayAtt, setTodayAtt] = useState(null);
   const [quota, setQuota] = useState(null);
-  const [recentAtt, setRecentAtt] = useState([]);
+  const [shift, setShift] = useState(null);
+  const [monthAtt, setMonthAtt] = useState([]);
+  const [recentLeaves, setRecentLeaves] = useState([]);
+  const [announcements, setAnnouncements] = useState([]);
   const [time, setTime] = useState(new Date());
   const [lastUpdated, setLastUpdated] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -57,32 +87,30 @@ export default function DashboardPage() {
   }, []);
 
   const fetchData = useCallback(async () => {
-    try {
-      const [attRes, quotaRes, histRes] = await Promise.all([
-        api.get('/attendance/today'),
-        api.get('/leave/quota'),
-        api.get('/attendance/my'),
-      ]);
-      setTodayAtt(attRes.data.attendance);
-      setQuota(quotaRes.data.quota);
-      setRecentAtt(histRes.data.attendances.slice(0, 7));
-      setLastUpdated(new Date());
-    } catch {}
+    // Setiap endpoint dibungkus agar satu kegagalan tidak mengosongkan kartu lain.
+    const safe = (p) => p.then(r => r.data).catch(() => null);
+    const [att, q, hist, sh, lv, ann] = await Promise.all([
+      safe(api.get('/attendance/today')),
+      safe(api.get('/leave/quota')),
+      safe(api.get('/attendance/my')),
+      safe(api.get('/shifts/my')),
+      safe(api.get('/leave/my')),
+      safe(api.get('/announcements')),
+    ]);
+    if (att) setTodayAtt(att.attendance);
+    if (q) setQuota(q.quota);
+    if (hist) setMonthAtt(hist.attendances || []);
+    if (sh) setShift(sh.shift || null);
+    if (lv) setRecentLeaves((lv.leaves || []).slice(0, 3));
+    if (ann) setAnnouncements((ann.announcements || []).slice(0, 5));
+    setLastUpdated(new Date());
   }, []);
 
   useEffect(() => {
     const handleUpdate = () => fetchData();
-    window.addEventListener('realtime-attendance', handleUpdate);
-    window.addEventListener('realtime-leave', handleUpdate);
-    window.addEventListener('realtime-overtime', handleUpdate);
-    window.addEventListener('realtime-notification', handleUpdate);
-
-    return () => {
-      window.removeEventListener('realtime-attendance', handleUpdate);
-      window.removeEventListener('realtime-leave', handleUpdate);
-      window.removeEventListener('realtime-overtime', handleUpdate);
-      window.removeEventListener('realtime-notification', handleUpdate);
-    };
+    const events = ['realtime-attendance', 'realtime-leave', 'realtime-overtime', 'realtime-notification'];
+    events.forEach(e => window.addEventListener(e, handleUpdate));
+    return () => events.forEach(e => window.removeEventListener(e, handleUpdate));
   }, [fetchData]);
 
   useAutoRefresh(fetchData, 30_000);
@@ -93,385 +121,491 @@ export default function DashboardPage() {
     setTimeout(() => setRefreshing(false), 600);
   };
 
-  const getGreeting = () => {
-    const h = time.getHours();
-    if (h < 12) return { text: 'Selamat pagi', icon: Sun, color: 'text-amber-400' };
-    if (h < 15) return { text: 'Selamat siang', icon: Sun, color: 'text-orange-400' };
-    if (h < 18) return { text: 'Selamat sore', icon: Sunset, color: 'text-orange-500' };
-    return { text: 'Selamat malam', icon: Moon, color: 'text-indigo-400' };
-  };
+  const { text: greetingText, Icon: GreetIcon } = getGreeting(time.getHours());
+  const quote = quotes[new Date().getDate() % quotes.length];
 
-  const greeting = getGreeting();
-  const GreetIcon = greeting.icon;
+  const isCheckIn = Boolean(todayAtt?.check_in);
+  const isCheckOut = Boolean(todayAtt?.check_out);
+  const isLate = todayAtt?.status === 'late';
+
+  // Rekap bulan berjalan — dihitung dari riwayat absensi seperti di mobile.
+  const now = new Date();
+  const thisMonth = monthAtt.filter(a => {
+    const d = new Date(a.date);
+    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+  });
+  const presentCount = thisMonth.filter(a => a.status === 'present').length;
+  const lateCount = thisMonth.filter(a => a.status === 'late').length;
+  const leaveSickCount = thisMonth.filter(a => a.status === 'leave' || a.status === 'sick').length;
+  const totalDays = presentCount + lateCount + leaveSickCount;
+  const attendanceRate = totalDays > 0 ? (presentCount + lateCount) / totalDays : 1;
+  const ratePct = Math.round(attendanceRate * 100);
+  const rateColor = attendanceRate >= 0.9 ? '#16A34A' : attendanceRate >= 0.75 ? '#D97706' : '#DC2626';
+
+  // Badge status kehadiran di kartu shift
+  const attendanceBadge = !isCheckIn
+    ? { label: 'Belum Hadir', cls: 'bg-slate-100 text-slate-500' }
+    : isCheckOut
+      ? { label: 'Selesai', cls: 'bg-[#FFEBEE] text-[#8B1F1F]' }
+      : isLate
+        ? { label: 'Terlambat', cls: 'bg-amber-50 text-amber-700' }
+        : { label: 'Hadir', cls: 'bg-emerald-50 text-emerald-700' };
+
+  const shiftName = shift?.name || shift?.shift_name || 'Shift Reguler';
+  const shiftStart = fmtShift(shift?.start_time, '08:00');
+  const shiftEnd = fmtShift(shift?.end_time, '17:00');
+
+  const quotaTotal = Number(quota?.total_days ?? 0);
+  const quotaUsed = Number(quota?.used_days ?? 0);
+  const quotaRemaining = Number(quota?.remaining_days ?? 0);
+  const quotaPct = quotaTotal > 0 ? Math.min((quotaUsed / quotaTotal) * 100, 100) : 0;
 
   return (
-    <div className="p-4 lg:p-6 space-y-5">
+    <div className="bg-[#F6F8FD] min-h-screen -m-px">
 
-      {/* ── Hero Banner ── */}
-      <motion.div {...fadeUp(0)}
-        className="relative overflow-hidden rounded-3xl text-white"
-        style={{ background: 'linear-gradient(135deg, #1e1b4b 0%, #312e81 35%, #4338ca 65%, #6366f1 100%)' }}>
+      {/* ── Header: foto latar + overlay gelap, identik dengan mobile ── */}
+      <div
+        className="relative rounded-b-[28px] overflow-hidden bg-cover bg-center"
+        style={{ backgroundImage: 'url(/bg-apk.jpg)' }}
+      >
+        <div className="absolute inset-0 bg-gradient-to-b from-black/[0.65] to-black/40" />
 
-        {/* Decorative Orbs */}
-        <div className="absolute top-0 right-0 w-72 h-72 rounded-full opacity-20 pointer-events-none"
-          style={{ background: 'radial-gradient(circle, #818cf8 0%, transparent 70%)', transform: 'translate(30%, -30%)' }} />
-        <div className="absolute bottom-0 left-0 w-48 h-48 rounded-full opacity-15 pointer-events-none"
-          style={{ background: 'radial-gradient(circle, #a78bfa 0%, transparent 70%)', transform: 'translate(-30%, 30%)' }} />
-        <div className="absolute top-1/2 left-1/2 w-96 h-96 rounded-full opacity-5 pointer-events-none"
-          style={{ background: 'radial-gradient(circle, #c4b5fd 0%, transparent 70%)', transform: 'translate(-50%, -50%)' }} />
+        <div className="relative px-5 pt-4 pb-6 lg:px-8 lg:pt-6 lg:pb-8">
+          {/* Baris atas: logo + tanggal */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center text-white font-black italic text-lg tracking-tight">
+              EV
+              <img src="/iwaa.png" alt="" className="w-[22px] h-[22px] mx-[3px] object-contain" />
+              RIWARE
+            </div>
+            <div className="flex items-center gap-2.5">
+              <Link
+                to="/notifications"
+                className="w-[38px] h-[38px] rounded-xl bg-white/20 border border-white/[0.12] flex items-center justify-center hover:bg-white/30 transition-colors"
+              >
+                <Bell size={20} className="text-white" />
+              </Link>
+              <span className="text-white text-[11px] font-medium">
+                {format(time, 'EEEE, d MMM yyyy', { locale: id })}
+              </span>
+            </div>
+          </div>
 
-        {/* Shimmer overlay */}
-        <div className="absolute inset-0 opacity-30 pointer-events-none"
-          style={{ background: 'linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.08) 50%, transparent 60%)' }} />
-
-        <div className="relative p-6 lg:p-8">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
-            <div className="flex-1">
-              <div className="flex items-center gap-2 mb-2">
-                <GreetIcon size={16} className={greeting.color} />
-                <p className="text-indigo-200 text-sm font-medium">{greeting.text}</p>
+          {/* Profil + salam */}
+          <div className="mt-5 flex items-center gap-3.5">
+            <div className="w-[60px] h-[60px] rounded-full border-2 border-white shadow-lg overflow-hidden flex-shrink-0 bg-gradient-to-br from-[#8B1F1F] to-[#EF5350] flex items-center justify-center">
+              {user?.avatar
+                ? <img src={`/uploads/avatar/${user.avatar}`} alt="" className="w-full h-full object-cover" />
+                : <span className="text-white font-black text-xl">{user?.name?.[0]}</span>}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1.5">
+                <GreetIcon size={15} className="text-[#FFD54F]" />
+                <span className="text-white/85 text-[12.5px] font-medium">{greetingText}</span>
               </div>
-              <h2 className="text-2xl lg:text-3xl font-bold tracking-tight">
-                {user?.name?.split(' ')[0]}
-                <span className="ml-2 text-2xl">👋</span>
+              <h2 className="text-white text-lg font-black tracking-tight truncate mt-0.5">
+                {user?.name || 'Karyawan'}
               </h2>
-              <p className="text-indigo-300 text-sm mt-1.5 font-medium">
-                {format(time, 'EEEE, d MMMM yyyy', { locale: id })}
+              <p className="text-white/70 text-[11px] truncate">
+                {[user?.department, user?.position].filter(Boolean).join(' · ') || '-'}
               </p>
-              {user?.department && (
-                <div className="mt-3 inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl px-3 py-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  <span className="text-xs text-indigo-200 font-medium">{user.department} · {user.position || 'Karyawan'}</span>
-                </div>
-              )}
-              {lastUpdated && (
-                <p className="text-indigo-400 text-xs mt-2 flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse inline-block" />
-                  Update {format(lastUpdated, 'HH:mm:ss')}
-                </p>
-              )}
             </div>
 
-            <div className="flex items-start gap-3">
-              <button onClick={handleManualRefresh} title="Refresh data"
-                className="w-10 h-10 bg-white/10 hover:bg-white/20 border border-white/20 rounded-2xl flex items-center justify-center transition-all active:scale-95 flex-shrink-0 backdrop-blur-sm">
+            {/* Jam + refresh — pemanfaatan ruang lebar khas desktop */}
+            <div className="hidden lg:flex items-center gap-3">
+              <button
+                onClick={handleManualRefresh}
+                title="Refresh data"
+                className="w-10 h-10 bg-white/10 hover:bg-white/20 border border-white/20 rounded-2xl flex items-center justify-center transition-all active:scale-95"
+              >
                 <RefreshCw size={16} className={`text-white ${refreshing ? 'animate-spin' : ''}`} />
               </button>
-              <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl px-5 py-4 text-center">
-                <div className="text-3xl lg:text-4xl font-bold font-mono tracking-tight tabular-nums">
+              <div className="bg-white/10 border border-white/20 rounded-2xl px-5 py-3 text-center">
+                <div className="text-3xl font-bold font-mono tabular-nums text-white leading-none">
                   {format(time, 'HH:mm')}
                 </div>
-                <div className="text-indigo-300 text-xs mt-1 font-mono">{format(time, 'ss')}s</div>
+                {lastUpdated && (
+                  <div className="text-white/60 text-[10px] mt-1.5">
+                    Update {format(lastUpdated, 'HH:mm:ss')}
+                  </div>
+                )}
               </div>
             </div>
           </div>
-        </div>
-      </motion.div>
 
-      {/* ── Stats Row ── */}
-      <motion.div
-        variants={statsContainerVariants}
-        initial="hidden"
-        animate="show"
-        className="grid grid-cols-3 gap-3"
-      >
-        {[
-          {
-            label: 'Hadir Bulan Ini',
-            value: recentAtt.filter(a => a.status === 'present' || a.status === 'late').length,
-            icon: CheckCircle,
-            gradient: 'from-emerald-500 to-teal-500',
-            bg: 'bg-emerald-50',
-            text: 'text-emerald-700',
-          },
-          {
-            label: 'Terlambat',
-            value: recentAtt.filter(a => a.status === 'late').length,
-            icon: AlertCircle,
-            gradient: 'from-amber-500 to-orange-500',
-            bg: 'bg-amber-50',
-            text: 'text-amber-700',
-          },
-          {
-            label: 'Sisa Cuti',
-            value: quota?.remaining_days ?? '-',
-            icon: Calendar,
-            gradient: 'from-blue-500 to-indigo-500',
-            bg: 'bg-blue-50',
-            text: 'text-blue-700',
-          },
-        ].map((stat, i) => (
-          <motion.div
-            key={stat.label}
-            variants={statsItemVariants}
-            className="card card-hover p-4 text-center cursor-pointer"
-          >
-            <div className={`w-9 h-9 rounded-2xl bg-gradient-to-br ${stat.gradient} flex items-center justify-center mx-auto mb-2 shadow-lg`}>
-              <stat.icon size={16} className="text-white" />
-            </div>
-            <div className={`text-2xl font-bold ${stat.text}`}>{stat.value}</div>
-            <div className="text-xs text-slate-500 mt-0.5 leading-tight">{stat.label}</div>
-          </motion.div>
-        ))}
-      </motion.div>
+          {/* Banner quote */}
+          <div className="mt-3 rounded-xl bg-white/[0.08] border border-white/[0.05] px-3 py-2">
+            <p className="text-white/90 text-[10.5px] italic leading-relaxed">{quote}</p>
+          </div>
 
-      {/* ── Desktop: 2-column grid ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-
-        {/* ── Left Column ── */}
-        <div className="lg:col-span-2 space-y-5">
-
-          {/* Today Status */}
-          <motion.div {...fadeUp(0.1)} className="card card-hover p-5">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-200">
-                  <Clock size={15} className="text-white" />
-                </div>
-                <h3 className="font-bold text-slate-900">Status Hari Ini</h3>
-              </div>
-              <Link to="/attendance"
-                className="flex items-center gap-1 text-sm font-semibold text-indigo-600 hover:text-indigo-700 transition-colors group">
-                Absen <ArrowRight size={14} className="group-hover:translate-x-0.5 transition-transform" />
+          {/* Tombol absen masuk / pulang — gaya 3D bevel seperti mobile */}
+          <div className="mt-4 grid grid-cols-2 gap-4 lg:max-w-md">
+            {[
+              { title: 'Absen Masuk', icon: '/menu/masuk_top.png' },
+              { title: 'Absen Pulang', icon: '/menu/keluar_top.png' },
+            ].map(btn => (
+              <Link
+                key={btn.title}
+                to="/attendance"
+                className="h-[90px] rounded-2xl flex flex-col items-center justify-center border transition-transform active:scale-[0.94]"
+                style={{
+                  background: 'linear-gradient(135deg, #8B1F1F 0%, #5A0F11 50%, #360507 100%)',
+                  borderColor: 'rgba(139,31,31,0.55)',
+                  boxShadow: '0 6px 10px rgba(22,1,2,0.3), 0 3px 0 rgba(22,1,2,0.7)',
+                }}
+              >
+                <img src={btn.icon} alt="" className="w-12 h-12 object-contain" />
+                <span className="text-white text-xs font-bold mt-1">{btn.title}</span>
               </Link>
-            </div>
-
-            {todayAtt ? (
-              <div className="space-y-3">
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="relative overflow-hidden bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200/60 rounded-2xl p-4">
-                    <div className="absolute top-0 right-0 w-16 h-16 bg-emerald-400/10 rounded-full -translate-y-1/2 translate-x-1/2" />
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="w-6 h-6 bg-emerald-500 rounded-lg flex items-center justify-center shadow-sm">
-                        <Clock size={12} className="text-white" />
-                      </div>
-                      <span className="text-xs text-emerald-600 font-semibold uppercase tracking-wide">Masuk</span>
-                    </div>
-                    <div className="text-2xl font-bold text-emerald-800 font-mono">
-                      {todayAtt.check_in ? format(new Date(todayAtt.check_in), 'HH:mm') : '--:--'}
-                    </div>
-                  </div>
-                  <div className="relative overflow-hidden bg-gradient-to-br from-slate-50 to-blue-50/50 border border-slate-200/60 rounded-2xl p-4">
-                    <div className="absolute top-0 right-0 w-16 h-16 bg-slate-400/10 rounded-full -translate-y-1/2 translate-x-1/2" />
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="w-6 h-6 bg-slate-600 rounded-lg flex items-center justify-center shadow-sm">
-                        <Clock size={12} className="text-white" />
-                      </div>
-                      <span className="text-xs text-slate-500 font-semibold uppercase tracking-wide">Pulang</span>
-                    </div>
-                    <div className="text-2xl font-bold text-slate-700 font-mono">
-                      {todayAtt.check_out ? format(new Date(todayAtt.check_out), 'HH:mm') : '--:--'}
-                    </div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 flex-wrap">
-                  {(() => {
-                    const s = statusConfig[todayAtt.status] || statusConfig.present;
-                    return (
-                      <span className={`${s.bg} ${s.color} border ${s.border} px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5`}>
-                        <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />
-                        {s.label}
-                      </span>
-                    );
-                  })()}
-                  {todayAtt.location_name && (
-                    <span className="text-slate-400 text-xs flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-2.5 py-1.5 rounded-xl">
-                      <MapPin size={11} className="text-slate-400" /> {todayAtt.location_name}
-                    </span>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <div className="flex flex-col sm:flex-row items-center gap-4 py-3 px-4 bg-gradient-to-r from-slate-50 to-indigo-50/50 rounded-2xl border border-slate-200/60">
-                <div className="w-14 h-14 bg-gradient-to-br from-indigo-100 to-purple-100 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-inner">
-                  <Fingerprint size={26} className="text-indigo-500" />
-                </div>
-                <div className="text-center sm:text-left flex-1">
-                  <p className="font-semibold text-slate-800">Belum absen hari ini</p>
-                  <p className="text-slate-500 text-sm mt-0.5">Lakukan absensi untuk mencatat kehadiran kamu</p>
-                </div>
-                <Link to="/attendance" className="btn-primary py-2.5 px-5 text-sm whitespace-nowrap">
-                  Absen Sekarang
-                </Link>
-              </div>
-            )}
-          </motion.div>
-
-          {/* Quick Actions */}
-          <motion.div {...fadeUp(0.15)}>
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-lg shadow-violet-200">
-                  <Sparkles size={15} className="text-white" />
-                </div>
-                <h3 className="font-bold text-slate-900">Aksi Cepat</h3>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-              {[
-                {
-                  to: '/attendance', icon: Fingerprint, label: 'Absensi', desc: 'Masuk & Pulang',
-                  gradient: 'from-slate-800 via-slate-900 to-black',
-                  shadow: 'shadow-slate-900/30',
-                },
-                {
-                  to: '/leave/annual', icon: Calendar, label: 'Ajukan Cuti', desc: `Sisa: ${quota?.remaining_days ?? '-'} hari`,
-                  gradient: 'from-emerald-500 via-teal-500 to-cyan-600',
-                  shadow: 'shadow-emerald-500/30',
-                },
-                {
-                  to: '/leave/sick', icon: FileText, label: 'Izin Sakit', desc: 'Upload bukti foto',
-                  gradient: 'from-amber-500 via-orange-500 to-red-500',
-                  shadow: 'shadow-amber-500/30',
-                },
-                {
-                  to: '/leave', icon: Activity, label: 'Riwayat', desc: 'Lihat semua',
-                  gradient: 'from-blue-500 via-indigo-500 to-violet-600',
-                  shadow: 'shadow-blue-500/30',
-                },
-              ].map((item) => (
-                <Link key={item.to} to={item.to}
-                  className={`relative overflow-hidden bg-gradient-to-br ${item.gradient} text-white rounded-2xl p-4 hover:scale-[1.03] active:scale-[0.97] transition-all duration-300 shadow-xl ${item.shadow} group`}>
-                  <div className="absolute top-0 right-0 w-20 h-20 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2 group-hover:scale-150 transition-transform duration-500" />
-                  <div className="w-9 h-9 bg-white/15 backdrop-blur-sm rounded-xl flex items-center justify-center mb-3 border border-white/20">
-                    <item.icon size={18} />
-                  </div>
-                  <div className="font-bold text-sm">{item.label}</div>
-                  <div className="text-xs opacity-70 mt-0.5">{item.desc}</div>
-                </Link>
-              ))}
-            </div>
-          </motion.div>
-
-          {/* Recent Attendance */}
-          {recentAtt.length > 0 && (
-            <motion.div {...fadeUp(0.2)} className="card card-hover p-5">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-blue-200">
-                    <TrendingUp size={15} className="text-white" />
-                  </div>
-                  <h3 className="font-bold text-slate-900">Riwayat Absensi</h3>
-                </div>
-                <Link to="/attendance"
-                  className="flex items-center gap-1 text-sm font-semibold text-indigo-600 hover:text-indigo-700 transition-colors group">
-                  Lihat semua <ArrowRight size={14} className="group-hover:translate-x-0.5 transition-transform" />
-                </Link>
-              </div>
-              <div className="space-y-1">
-                {recentAtt.map((att, i) => {
-                  const s = statusConfig[att.status] || statusConfig.present;
-                  return (
-                    <motion.div key={att.id}
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: i * 0.04 }}
-                      className="flex items-center justify-between py-3 border-b border-slate-50 last:border-0 group hover:bg-slate-50/50 rounded-xl px-2 -mx-2 transition-colors">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-gradient-to-br from-slate-100 to-slate-50 border border-slate-200/60 rounded-xl flex flex-col items-center justify-center flex-shrink-0 shadow-sm">
-                          <span className="text-xs font-bold text-slate-800 leading-none">{format(new Date(att.date), 'd')}</span>
-                          <span className="text-[9px] text-slate-400 font-semibold uppercase tracking-wide">{format(new Date(att.date), 'MMM', { locale: id })}</span>
-                        </div>
-                        <div>
-                          <div className="font-semibold text-slate-900 text-sm">{format(new Date(att.date), 'EEEE', { locale: id })}</div>
-                          <div className="text-xs text-slate-400 flex items-center gap-1.5 mt-0.5">
-                            <Clock size={10} />
-                            <span className="font-mono">{att.check_in ? format(new Date(att.check_in), 'HH:mm') : '-'}</span>
-                            <span>–</span>
-                            <span className="font-mono">{att.check_out ? format(new Date(att.check_out), 'HH:mm') : '-'}</span>
-                          </div>
-                        </div>
-                      </div>
-                      <span className={`${s.bg} ${s.color} border ${s.border} px-2.5 py-1 rounded-xl text-xs font-semibold flex items-center gap-1.5`}>
-                        <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />
-                        {s.label}
-                      </span>
-                    </motion.div>
-                  );
-                })}
-              </div>
-            </motion.div>
-          )}
+            ))}
+          </div>
         </div>
+      </div>
 
-        {/* ── Right Column ── */}
-        <div className="space-y-5">
+      {/* ── Konten ── */}
+      <div className="px-4 py-5 lg:px-6 space-y-5">
 
-          {/* Leave Quota */}
-          {quota && (
-            <motion.div {...fadeUp(0.12)} className="card card-hover p-5">
-              <div className="flex items-center gap-2.5 mb-4">
-                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-violet-200">
-                  <Calendar size={15} className="text-white" />
-                </div>
-                <h3 className="font-bold text-slate-900">Jatah Cuti {quota.year}</h3>
+        {/* Kartu shift & absensi hari ini */}
+        <motion.div {...fadeUp(0.05)} className="card-mobile p-4">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 rounded-[10px] bg-[#FFEBEE] flex-shrink-0">
+              <Briefcase size={18} className="text-[#8B1F1F]" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-[10px] font-bold text-stone-400 tracking-wide">SHIFT JADWAL KERJA</div>
+              <div className="text-[13px] font-extrabold text-stone-900 truncate">
+                {shiftName} ({shiftStart} - {shiftEnd})
               </div>
+            </div>
+            <span className={`text-[10px] font-bold px-2.5 py-1 rounded-lg flex-shrink-0 ${attendanceBadge.cls}`}>
+              {attendanceBadge.label}
+            </span>
+          </div>
 
-              <div className="grid grid-cols-3 gap-2 mb-4">
-                {[
-                  { label: 'Total', value: quota.total_days, gradient: 'from-slate-100 to-slate-50', text: 'text-slate-800' },
-                  { label: 'Terpakai', value: quota.used_days, gradient: 'from-red-50 to-rose-50', text: 'text-red-600' },
-                  { label: 'Sisa', value: quota.remaining_days, gradient: 'from-emerald-50 to-teal-50', text: 'text-emerald-600' },
-                ].map(s => (
-                  <div key={s.label} className={`text-center bg-gradient-to-br ${s.gradient} rounded-2xl p-3 border border-slate-100/60`}>
-                    <div className={`text-2xl font-bold ${s.text}`}>{s.value}</div>
-                    <div className="text-xs text-slate-400 mt-0.5 font-medium">{s.label}</div>
-                  </div>
-                ))}
+          {/* Panel jam masuk & pulang */}
+          <div className="mt-4 rounded-[14px] bg-[#FAFAF9] border border-stone-100 px-3.5 py-3 flex items-center">
+            <div className="flex-1 flex items-center gap-2.5 min-w-0">
+              <div className={`p-1.5 rounded-full flex-shrink-0 ${isCheckIn ? (isLate ? 'bg-amber-50' : 'bg-emerald-50') : 'bg-stone-50'}`}>
+                {isCheckIn
+                  ? (isLate ? <AlertCircle size={16} className="text-amber-600" /> : <CheckCircle size={16} className="text-emerald-600" />)
+                  : <LogIn size={16} className="text-stone-400" />}
               </div>
-
-              <div className="mb-3">
-                <div className="flex justify-between text-xs text-slate-500 mb-1.5 font-medium">
-                  <span>{quota.used_days} hari terpakai</span>
-                  <span>{Math.round((quota.used_days / quota.total_days) * 100)}%</span>
-                </div>
-                <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
-                  <motion.div
-                    initial={{ width: 0 }}
-                    animate={{ width: `${Math.min((quota.used_days / quota.total_days) * 100, 100)}%` }}
-                    transition={{ duration: 1, delay: 0.5, ease: 'easeOut' }}
-                    className="h-2.5 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500"
-                  />
+              <div className="min-w-0">
+                <div className="text-[10px] font-bold text-stone-400">Absen Masuk</div>
+                <div className={`text-base font-black tracking-tight ${isCheckIn ? 'text-emerald-600' : 'text-stone-900/40'}`}>
+                  {fmtTime(todayAtt?.check_in)}
                 </div>
               </div>
+            </div>
 
-              <Link to="/leave/annual"
-                className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl border-2 border-indigo-200 text-indigo-700 hover:bg-indigo-50 hover:border-indigo-300 transition-all text-sm font-semibold group">
-                <Calendar size={15} />
-                Ajukan Cuti
-                <ArrowRight size={14} className="ml-auto group-hover:translate-x-0.5 transition-transform" />
-              </Link>
-            </motion.div>
+            <div className="w-px h-8 bg-stone-200 mx-3" />
+
+            <div className="flex-1 flex items-center gap-2.5 min-w-0">
+              <div className={`p-1.5 rounded-full flex-shrink-0 ${isCheckOut ? 'bg-[#FFEBEE]' : isCheckIn ? 'bg-amber-50' : 'bg-stone-50'}`}>
+                {isCheckOut
+                  ? <CheckCircle size={16} className="text-[#8B1F1F]" />
+                  : isCheckIn
+                    ? <LogOut size={16} className="text-amber-500" />
+                    : <Circle size={16} className="text-stone-400" />}
+              </div>
+              <div className="min-w-0">
+                <div className="text-[10px] font-bold text-stone-400">Absen Pulang</div>
+                <div className={`text-base font-black tracking-tight ${isCheckOut ? 'text-[#8B1F1F]' : isCheckIn ? 'text-amber-500' : 'text-stone-900/40'}`}>
+                  {fmtTime(todayAtt?.check_out)}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {isCheckIn && todayAtt?.location_name && (
+            <div className="mt-2.5 flex items-center gap-1.5">
+              <MapPin size={13} className="text-red-600 flex-shrink-0" />
+              <span className="text-[10px] text-stone-600 font-medium truncate">
+                Absen masuk di: {todayAtt.location_name}
+              </span>
+            </div>
           )}
 
-          {/* Info Card */}
-          <motion.div {...fadeUp(0.18)} className="card card-hover p-5">
-            <div className="flex items-center gap-2.5 mb-4">
-              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-pink-500 to-rose-500 flex items-center justify-center shadow-lg shadow-pink-200">
-                <Fingerprint size={15} className="text-white" />
+          {!isCheckIn && (
+            <Link
+              to="/attendance"
+              className="mt-3 w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-white text-sm font-semibold transition-transform active:scale-[0.98]"
+              style={{ background: 'linear-gradient(135deg, #8B1F1F, #EF5350)' }}
+            >
+              <Clock size={15} /> Absen Sekarang
+            </Link>
+          )}
+        </motion.div>
+
+        {/* Menu layanan mandiri */}
+        <motion.div {...fadeUp(0.1)}>
+          <div className="flex items-center gap-2.5 mb-4">
+            <span className="section-bar" />
+            <h3 className="text-[14.5px] font-extrabold text-stone-900 tracking-tight">Menu Layanan Mandiri</h3>
+          </div>
+          <div className="grid grid-cols-4 gap-x-2 gap-y-4 lg:grid-cols-8">
+            {menuItems.map(item => (
+              <Link
+                key={item.label}
+                to={item.to}
+                className="flex flex-col items-center transition-transform active:scale-[0.92] hover:-translate-y-0.5"
+              >
+                <img src={item.icon} alt="" className="w-[62px] h-[62px] object-contain" />
+                <span className="mt-1.5 text-[11px] font-bold text-stone-600 text-center leading-tight whitespace-pre-line">
+                  {item.label}
+                </span>
+              </Link>
+            ))}
+          </div>
+        </motion.div>
+
+        {/* Analisis kehadiran bulanan */}
+        <motion.div {...fadeUp(0.12)} className="card-mobile p-[18px]">
+          <div className="flex items-center gap-2.5">
+            <span className="section-bar" />
+            <h3 className="text-[14.5px] font-extrabold text-stone-900 tracking-tight">
+              Analisis Kehadiran Bulanan ({format(now, 'MMMM', { locale: id })})
+            </h3>
+          </div>
+
+          <div className="mt-[18px] flex items-center gap-4">
+            {/* Cincin progres rasio kehadiran */}
+            <div className="relative w-20 h-20 flex-shrink-0">
+              <svg viewBox="0 0 80 80" className="w-full h-full -rotate-90">
+                <circle cx="40" cy="40" r="36" fill="none" stroke="#E7E5E4" strokeWidth="6.5" />
+                <motion.circle
+                  cx="40" cy="40" r="36" fill="none"
+                  stroke={rateColor} strokeWidth="6.5" strokeLinecap="round"
+                  strokeDasharray={2 * Math.PI * 36}
+                  initial={{ strokeDashoffset: 2 * Math.PI * 36 }}
+                  animate={{ strokeDashoffset: 2 * Math.PI * 36 * (1 - attendanceRate) }}
+                  transition={{ duration: 1, ease: 'easeOut' }}
+                />
+              </svg>
+              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <span className="text-base font-black tracking-tight leading-none" style={{ color: rateColor }}>
+                  {ratePct}%
+                </span>
+                <span className="text-[9px] font-extrabold text-stone-400 mt-0.5">Rasio</span>
               </div>
-              <h3 className="font-bold text-slate-900">Info Akun</h3>
             </div>
-            <div className="space-y-2.5">
+
+            {/* Mini stat */}
+            <div className="flex-1 grid grid-cols-3 gap-1.5">
               {[
-                { label: 'Nama', value: user?.name },
-                { label: 'Departemen', value: user?.department || '-' },
-                { label: 'Jabatan', value: user?.position || '-' },
-                { label: 'ID Karyawan', value: user?.employee_id || '-' },
-              ].map(item => (
-                <div key={item.label} className="flex justify-between items-center py-2 border-b border-slate-50 last:border-0">
-                  <span className="text-xs text-slate-400 font-semibold uppercase tracking-wide">{item.label}</span>
-                  <span className="text-sm font-semibold text-slate-800 text-right max-w-[60%] truncate">{item.value}</span>
+                { icon: CheckCircle,     value: presentCount,   label: 'Hadir',      color: '#16A34A', bg: '#F0FDF4' },
+                { icon: AlertCircle,     value: lateCount,      label: 'Terlambat',  color: '#D97706', bg: '#FFFBEB' },
+                { icon: ClipboardCheck,  value: leaveSickCount, label: 'Izin/Sakit', color: '#0284C7', bg: '#F0F9FF' },
+              ].map(s => (
+                <div key={s.label} className="rounded-xl px-2 py-2.5 text-center" style={{ background: s.bg }}>
+                  <s.icon size={15} className="mx-auto" style={{ color: s.color }} />
+                  <div className="text-lg font-black mt-1 leading-none" style={{ color: s.color }}>{s.value}</div>
+                  <div className="text-[9.5px] font-bold text-stone-500 mt-1 leading-tight">{s.label}</div>
                 </div>
               ))}
             </div>
-            <Link to="/profile"
-              className="mt-4 w-full flex items-center justify-center gap-2 py-3 rounded-2xl bg-gradient-to-r from-slate-800 to-slate-900 text-white hover:from-slate-700 hover:to-slate-800 transition-all text-sm font-semibold shadow-lg shadow-slate-900/20 group">
-              Edit Profil
-              <ArrowRight size={14} className="group-hover:translate-x-0.5 transition-transform" />
+          </div>
+        </motion.div>
+
+        {/* Alokasi & sisa cuti */}
+        {quota && (
+          <motion.div {...fadeUp(0.14)} className="card-mobile p-5">
+            <div className="flex items-center gap-2.5">
+              <span className="section-bar" />
+              <h3 className="text-[14.5px] font-extrabold text-stone-900 tracking-tight">Alokasi &amp; Sisa Cuti Tahunan</h3>
+            </div>
+
+            <div className="mt-[22px] flex items-start">
+              <div className="flex-1 text-center">
+                <div className="text-2xl font-black text-stone-900 tabular-nums leading-none">{quotaTotal}</div>
+                <div className="text-[11px] text-stone-500 mt-1.5">Total Kuota</div>
+              </div>
+              <div className="w-px h-[34px] bg-stone-200 mt-0.5" />
+              <div className="flex-1 text-center">
+                <div className="text-2xl font-black text-stone-900 tabular-nums leading-none">{quotaUsed}</div>
+                <div className="text-[11px] text-stone-500 mt-1.5">Terpakai</div>
+              </div>
+              <div className="w-px h-[34px] bg-stone-200 mt-0.5" />
+              <div className="flex-1 text-center">
+                <div className="text-2xl font-black text-[#8B1F1F] tabular-nums leading-none">{quotaRemaining}</div>
+                <span className="inline-block mt-1.5 px-2 py-0.5 rounded-full bg-[#FFEBEE] text-[#8B1F1F] text-[10px] font-extrabold">
+                  Sisa Cuti
+                </span>
+              </div>
+            </div>
+
+            <div className="mt-[22px] h-[9px] rounded-lg bg-stone-100 overflow-hidden">
+              <motion.div
+                className="h-full rounded-lg"
+                style={{ background: 'linear-gradient(135deg, #8B1F1F, #EF5350)' }}
+                initial={{ width: 0 }}
+                animate={{ width: `${quotaPct}%` }}
+                transition={{ duration: 1, delay: 0.3, ease: 'easeOut' }}
+              />
+            </div>
+            <div className="mt-2.5 flex items-center justify-between">
+              <span className="text-[11px] text-stone-600 font-medium">
+                Terpakai {quotaUsed} dari {quotaTotal} hari
+              </span>
+              <span className="text-[11px] text-stone-900 font-extrabold">{Math.round(quotaPct)}%</span>
+            </div>
+
+            <Link
+              to="/leave/annual"
+              className="mt-4 w-full flex items-center justify-center gap-2 py-3 rounded-2xl border-2 border-[#FFCDD2] text-[#8B1F1F] hover:bg-[#FFEBEE] transition-all text-sm font-semibold"
+            >
+              Ajukan Cuti <ChevronRight size={15} />
             </Link>
           </motion.div>
-        </div>
+        )}
+
+        {/* Pengumuman perusahaan */}
+        {announcements.length > 0 && (
+          <motion.div {...fadeUp(0.16)}>
+            <div className="flex items-center gap-2.5 mb-4">
+              <span className="section-bar" />
+              <h3 className="text-[14.5px] font-extrabold text-stone-900 tracking-tight">Pengumuman Perusahaan</h3>
+            </div>
+            <div className="grid gap-3 lg:grid-cols-2">
+              {announcements.map((a, i) => {
+                const isHoliday = a.is_holiday === 1 || a.is_holiday === true || a.is_holiday === 'true';
+                const type = String(a.type || 'info').toLowerCase();
+                const style = isHoliday
+                  ? { Icon: PartyPopper, color: '#F59E0B' }
+                  : type === 'success' ? { Icon: CheckCircle, color: '#16A34A' }
+                  : type === 'warning' ? { Icon: AlertCircle, color: '#D97706' }
+                  : type === 'error'   ? { Icon: XCircle, color: '#DC2626' }
+                  : { Icon: Info, color: '#1D4ED8' };
+                return (
+                  <div key={a.id ?? i} className="card-mobile p-4 flex gap-3">
+                    <div
+                      className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                      style={{ background: `${style.color}1A` }}
+                    >
+                      <style.Icon size={17} style={{ color: style.color }} />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-[13px] font-extrabold text-stone-900">{a.title}</div>
+                      <p className="text-[11.5px] text-stone-600 mt-1 leading-relaxed line-clamp-3">{a.content}</p>
+                      {a.created_at && (
+                        <div className="text-[10px] text-stone-400 mt-1.5">
+                          {format(new Date(a.created_at), 'd MMM yyyy', { locale: id })}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </motion.div>
+        )}
+
+        {/* Pengajuan terakhir */}
+        {recentLeaves.length > 0 && (
+          <motion.div {...fadeUp(0.18)}>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2.5">
+                <span className="section-bar" />
+                <h3 className="text-[14.5px] font-extrabold text-stone-900 tracking-tight">Pengajuan Terakhir</h3>
+              </div>
+              <Link to="/leave" className="text-[12px] font-semibold text-[#8B1F1F] hover:underline flex items-center gap-0.5">
+                Lihat semua <ChevronRight size={14} />
+              </Link>
+            </div>
+            <div className="card-mobile divide-y divide-stone-100">
+              {recentLeaves.map(lv => {
+                const s = requestStatusConfig[lv.status] || requestStatusConfig.pending;
+                return (
+                  <div key={lv.id} className="flex items-center gap-3 px-4 py-3">
+                    <div className="w-10 h-10 rounded-xl bg-stone-50 border border-stone-200 flex flex-col items-center justify-center flex-shrink-0">
+                      <span className="text-xs font-bold text-stone-800 leading-none">
+                        {format(new Date(lv.start_date), 'd')}
+                      </span>
+                      <span className="text-[9px] text-stone-400 font-semibold uppercase">
+                        {format(new Date(lv.start_date), 'MMM', { locale: id })}
+                      </span>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-[13px] font-semibold text-stone-900 truncate">{lv.reason}</div>
+                      <div className="text-[11px] text-stone-400 mt-0.5">{lv.total_days} hari</div>
+                    </div>
+                    <span className={`${s.bg} ${s.color} border ${s.border} px-2.5 py-1 rounded-lg text-[11px] font-semibold flex-shrink-0`}>
+                      {s.label}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </motion.div>
+        )}
+
+        {/* Riwayat absensi terakhir */}
+        {thisMonth.length > 0 && (
+          <motion.div {...fadeUp(0.2)}>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2.5">
+                <span className="section-bar" />
+                <h3 className="text-[14.5px] font-extrabold text-stone-900 tracking-tight">Riwayat Absensi</h3>
+              </div>
+              <Link to="/attendance" className="text-[12px] font-semibold text-[#8B1F1F] hover:underline flex items-center gap-0.5">
+                Lihat semua <ChevronRight size={14} />
+              </Link>
+            </div>
+            <div className="card-mobile divide-y divide-stone-100">
+              {monthAtt.slice(0, 7).map(att => {
+                const s = statusConfig[att.status] || statusConfig.present;
+                return (
+                  <div key={att.id} className="flex items-center justify-between px-4 py-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-10 h-10 rounded-xl bg-stone-50 border border-stone-200 flex flex-col items-center justify-center flex-shrink-0">
+                        <span className="text-xs font-bold text-stone-800 leading-none">{format(new Date(att.date), 'd')}</span>
+                        <span className="text-[9px] text-stone-400 font-semibold uppercase">
+                          {format(new Date(att.date), 'MMM', { locale: id })}
+                        </span>
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-[13px] font-semibold text-stone-900">
+                          {format(new Date(att.date), 'EEEE', { locale: id })}
+                        </div>
+                        <div className="text-[11px] text-stone-400 flex items-center gap-1.5 mt-0.5 font-mono">
+                          <Clock size={10} />
+                          {fmtTime(att.check_in)} – {fmtTime(att.check_out)}
+                        </div>
+                      </div>
+                    </div>
+                    <span className={`${s.bg} ${s.color} border ${s.border} px-2.5 py-1 rounded-lg text-[11px] font-semibold flex items-center gap-1.5 flex-shrink-0`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />
+                      {s.label}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </motion.div>
+        )}
+
+        {/* Banner bantuan */}
+        <motion.div
+          {...fadeUp(0.22)}
+          className="rounded-2xl p-4 flex items-center gap-3.5 text-white"
+          style={{ background: 'linear-gradient(135deg, #4A0808, #8B1F1F, #EF5350)' }}
+        >
+          <div className="w-11 h-11 rounded-xl bg-white/15 border border-white/20 flex items-center justify-center flex-shrink-0">
+            <LifeBuoy size={20} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="text-sm font-bold">Butuh bantuan?</div>
+            <p className="text-[11.5px] text-white/75 mt-0.5">
+              Hubungi HRD bila ada kendala absensi atau pengajuan izin.
+            </p>
+          </div>
+          <Link
+            to="/profile"
+            className="text-[12px] font-semibold bg-white/15 border border-white/20 rounded-xl px-3.5 py-2 hover:bg-white/25 transition-colors flex-shrink-0"
+          >
+            Profil
+          </Link>
+        </motion.div>
       </div>
     </div>
   );

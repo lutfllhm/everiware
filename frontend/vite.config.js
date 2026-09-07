@@ -12,7 +12,7 @@ export default defineConfig({
         name: 'IWA',
         short_name: 'IWA',
         description: 'IWA - Sistem Absensi Digital Internal',
-        theme_color: '#1e293b',
+        theme_color: '#8B1F1F',
         background_color: '#ffffff',
         display: 'standalone',
         orientation: 'portrait',

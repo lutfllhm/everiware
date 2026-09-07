@@ -82,8 +82,12 @@ export default function EmployeeLayout({ children }) {
 
   const isActive = (path) => location.pathname === path;
 
+  // Dashboard memakai header foto full-bleed sendiri (meniru app mobile),
+  // jadi top header bawaan layout disembunyikan di halaman itu.
+  const isDashboard = location.pathname === '/dashboard';
+
   return (
-    <div className="min-h-screen bg-slate-50 flex">
+    <div className="min-h-screen bg-[#F6F8FD] flex">
 
       {/* ── Desktop Sidebar ── */}
       <aside className="hidden lg:flex flex-col w-60 bg-white border-r border-slate-100 fixed top-0 left-0 bottom-0 z-30">
@@ -103,7 +107,7 @@ export default function EmployeeLayout({ children }) {
         {/* User info */}
         <div className="px-4 py-3 border-b border-slate-100">
           <div className="flex items-center gap-3 bg-slate-50 rounded-xl p-3">
-            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-slate-900 to-slate-700 flex items-center justify-center text-white font-bold text-sm flex-shrink-0 overflow-hidden">
+            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#8B1F1F] to-[#EF5350] flex items-center justify-center text-white font-bold text-sm flex-shrink-0 overflow-hidden">
               {user?.avatar
                 ? <img src={`/uploads/avatar/${user.avatar}`} alt="" className="w-full h-full object-cover" />
                 : user?.name?.[0]}
@@ -122,7 +126,9 @@ export default function EmployeeLayout({ children }) {
             return (
               <Link key={item.path} to={item.path}
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-all duration-300 ease-out active:scale-[0.98] ${
-                  active ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 hover:translate-x-1'
+                  active
+                    ? 'bg-[#8B1F1F] text-white shadow-sm shadow-[#8B1F1F]/25'
+                    : 'text-stone-600 hover:bg-[#FFEBEE] hover:text-[#8B1F1F] hover:translate-x-1'
                 }`}>
                 <div className="relative">
                   <item.icon size={18} />
@@ -155,7 +161,7 @@ export default function EmployeeLayout({ children }) {
       <div className="flex-1 lg:ml-60 flex flex-col min-h-screen">
 
         {/* Top Header */}
-        <header className="bg-white border-b border-slate-100 px-4 lg:px-6 py-3.5 flex items-center justify-between sticky top-0 z-20">
+        <header className={`bg-white border-b border-slate-100 px-4 lg:px-6 py-3.5 items-center justify-between sticky top-0 z-20 ${isDashboard ? 'hidden' : 'flex'}`}>
           <div className="flex items-center gap-3">
             {/* Mobile logo */}
             <div className="lg:hidden flex items-center gap-2">
@@ -186,7 +192,7 @@ export default function EmployeeLayout({ children }) {
             </Link>
             {/* Desktop user chip */}
             <div className="hidden lg:flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5">
-              <div className="w-6 h-6 rounded-full bg-gradient-to-br from-slate-900 to-slate-700 flex items-center justify-center text-white font-bold text-xs overflow-hidden flex-shrink-0">
+              <div className="w-6 h-6 rounded-full bg-gradient-to-br from-[#8B1F1F] to-[#EF5350] flex items-center justify-center text-white font-bold text-xs overflow-hidden flex-shrink-0">
                 {user?.avatar
                   ? <img src={`/uploads/avatar/${user.avatar}`} alt="" className="w-full h-full object-cover" />
                   : user?.name?.[0]}
@@ -199,7 +205,7 @@ export default function EmployeeLayout({ children }) {
         {/* Page Content */}
         <main className="flex-1 pb-24 lg:pb-6">
           {/* Desktop: wider container */}
-          <div className="lg:max-w-5xl lg:mx-auto">
+          <div className={isDashboard ? '' : 'lg:max-w-5xl lg:mx-auto'}>
             <AnimatePresence mode="wait">
               <motion.div
                 key={location.pathname}
@@ -222,17 +228,17 @@ export default function EmployeeLayout({ children }) {
               return (
                 <Link key={item.path} to={item.path} className="flex flex-col items-center gap-1 px-3 py-2 relative">
                   {active && (
-                    <motion.div layoutId="mobile-nav-indicator" className="absolute inset-0 bg-slate-100 rounded-2xl" />
+                    <motion.div layoutId="mobile-nav-indicator" className="absolute inset-0 bg-[#FFEBEE] rounded-2xl" />
                   )}
                   <div className="relative z-10">
-                    <item.icon size={21} className={`transition-colors ${active ? 'text-slate-900' : 'text-slate-400'}`} />
+                    <item.icon size={21} className={`transition-colors ${active ? 'text-[#8B1F1F]' : 'text-stone-400'}`} />
                     {item.badge && unread > 0 && (
                       <span className="absolute -top-1 -right-1.5 min-w-[14px] h-3.5 bg-red-500 rounded-full text-white text-[8px] font-bold flex items-center justify-center px-0.5 animate-pulse">
                         {unread > 9 ? '9+' : unread}
                       </span>
                     )}
                   </div>
-                  <span className={`text-[10px] font-medium relative z-10 transition-colors ${active ? 'text-slate-900' : 'text-slate-400'}`}>
+                  <span className={`text-[10px] font-medium relative z-10 transition-colors ${active ? 'text-[#8B1F1F]' : 'text-stone-400'}`}>
                     {item.label}
                   </span>
                 </Link>

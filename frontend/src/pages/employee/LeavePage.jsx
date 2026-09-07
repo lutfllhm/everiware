@@ -8,7 +8,7 @@ import { id } from 'date-fns/locale';
 
 const tabs = ['Riwayat', 'Ajukan Izin'];
 
-export default function LeavePage({ defaultTab = 0 }) {
+export default function LeavePage({ defaultTab = 0, defaultType = null }) {
   const [activeTab, setActiveTab] = useState(defaultTab);
   const [leaves, setLeaves] = useState([]);
   const [quota, setQuota] = useState(null);
@@ -35,7 +35,14 @@ export default function LeavePage({ defaultTab = 0 }) {
     try {
       const { data } = await api.get('/leave-types/active');
       setLeaveTypes(data.leaveTypes);
-      if (data.leaveTypes.length) setForm(f => ({ ...f, type: data.leaveTypes[0].code }));
+      if (data.leaveTypes.length) {
+        // Kalau halaman dibuka lewat menu pintas (mis. /leave/late-permission),
+        // langsung pilih jenis izin yang dimaksud, bukan jenis pertama.
+        const preselected = defaultType && data.leaveTypes.some(t => t.code === defaultType)
+          ? defaultType
+          : data.leaveTypes[0].code;
+        setForm(f => ({ ...f, type: preselected }));
+      }
     } catch {}
   };
 
@@ -86,7 +93,7 @@ export default function LeavePage({ defaultTab = 0 }) {
       if (form.attachment) formData.append('attachment', form.attachment);
       const { data } = await api.post('/leave/submit', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
       toast.success(data.message);
-      setForm({ type: leaveTypes[0]?.code || '', start_date: '', end_date: '', time_start: '', time_end: '', reason: '', attachment: null });
+      setForm({ type: defaultType || leaveTypes[0]?.code || '', start_date: '', end_date: '', time_start: '', time_end: '', reason: '', attachment: null });
       setPreview(null);
       setActiveTab(0);
       fetchData();

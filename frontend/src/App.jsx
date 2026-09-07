@@ -137,8 +137,12 @@ export default function App() {
           <Route path="/dashboard" element={<EmployeeRoute><DashboardPage /></EmployeeRoute>} />
           <Route path="/attendance" element={<EmployeeRoute><AttendancePage /></EmployeeRoute>} />
           <Route path="/leave" element={<EmployeeRoute><LeavePage /></EmployeeRoute>} />
-          <Route path="/leave/annual" element={<EmployeeRoute><LeavePage defaultTab={1} /></EmployeeRoute>} />
-          <Route path="/leave/sick" element={<EmployeeRoute><LeavePage defaultTab={2} /></EmployeeRoute>} />
+          <Route path="/leave/annual" element={<EmployeeRoute><LeavePage defaultTab={1} defaultType="annual" /></EmployeeRoute>} />
+          <Route path="/leave/sick" element={<EmployeeRoute><LeavePage defaultTab={1} defaultType="sick" /></EmployeeRoute>} />
+          <Route path="/leave/late-permission" element={<EmployeeRoute><LeavePage defaultTab={1} defaultType="late_permission" /></EmployeeRoute>} />
+          <Route path="/leave/early-leave" element={<EmployeeRoute><LeavePage defaultTab={1} defaultType="early_leave" /></EmployeeRoute>} />
+          <Route path="/leave/dinas" element={<EmployeeRoute><LeavePage defaultTab={1} defaultType="dinas" /></EmployeeRoute>} />
+          <Route path="/leave/leave-office" element={<EmployeeRoute><LeavePage defaultTab={1} defaultType="leave_office" /></EmployeeRoute>} />
           <Route path="/profile" element={<EmployeeRoute><ProfilePage /></EmployeeRoute>} />
           <Route path="/notifications" element={<EmployeeRoute><NotificationsPage /></EmployeeRoute>} />
           <Route path="/overtime" element={<EmployeeRoute><OvertimePage /></EmployeeRoute>} />
