@@ -21,6 +21,7 @@ import MyStatsPage from './pages/employee/MyStatsPage';
 import HelpdeskPage from './pages/employee/HelpdeskPage';
 import HistoryPage from './pages/employee/HistoryPage';
 import CalendarPage from './pages/employee/CalendarPage';
+import FaceSetupPage from './pages/employee/FaceSetupPage';
 
 // Admin
 import AdminLayout from './components/layout/AdminLayout';
@@ -44,6 +45,16 @@ import AuditLogAdmin from './pages/admin/AuditLogAdmin';
 import RealtimeListener from './components/common/RealtimeListener';
 
 const queryClient = new QueryClient();
+
+// `face_registered` datang sebagai boolean dari /auth/login (lewat formatUser di
+// backend) tapi sebagai TINYINT 0/1 dari /auth/me, jadi selalu normalkan dulu.
+// Wajah baru dianggap terdaftar kalau flag-nya menyala DAN file fotonya ada,
+// aturan yang sama dipakai app mobile (UserModel.fromJson).
+const hasFaceRegistered = (u) =>
+  (u?.face_registered === true || u?.face_registered === 1) &&
+  typeof u?.face_photo === 'string' && u.face_photo.trim() !== '';
+
+const isEmployeeTier = (u) => !['superadmin', 'admin', 'hrd'].includes(u?.role);
 
 const ProtectedRoute = ({ children, roles }) => {
   const { isAuthenticated, user } = useAuthStore();
@@ -87,12 +98,32 @@ const FeatureRoute = ({ children, feature }) => {
 };
 
 const EmployeeRoute = ({ children }) => {
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, user } = useAuthStore();
   const stored = (() => { try { return JSON.parse(localStorage.getItem('iware-auth') || '{}'); } catch { return {}; } })();
   const auth = isAuthenticated || stored.isAuthenticated;
+  const currentUser = user || stored.user;
 
   if (!auth) return <Navigate to="/login" replace />;
+  // Karyawan wajib mendaftarkan wajah dulu sebelum bisa memakai portal —
+  // gerbang yang sama dipakai app mobile (redirect ke /intro dari HomeScreen).
+  if (isEmployeeTier(currentUser) && !hasFaceRegistered(currentUser)) {
+    return <Navigate to="/face-setup" replace />;
+  }
   return <EmployeeLayout>{children}</EmployeeLayout>;
+};
+
+// Halaman pendaftaran wajah tampil penuh tanpa navbar, dan hanya untuk karyawan
+// yang belum mendaftarkan wajahnya.
+const FaceSetupRoute = ({ children }) => {
+  const { isAuthenticated, user } = useAuthStore();
+  const stored = (() => { try { return JSON.parse(localStorage.getItem('iware-auth') || '{}'); } catch { return {}; } })();
+  const auth = isAuthenticated || stored.isAuthenticated;
+  const currentUser = user || stored.user;
+
+  if (!auth) return <Navigate to="/login" replace />;
+  if (!isEmployeeTier(currentUser)) return <Navigate to="/admin" replace />;
+  if (hasFaceRegistered(currentUser)) return <Navigate to="/dashboard" replace />;
+  return children;
 };
 
 // Ke mana user diarahkan setelah login/buka root path.
@@ -116,7 +147,11 @@ export default function App() {
   // logout + redirect halus, jadi tab lama tidak terasa "macet" sebelum ter-reload paksa.
   useEffect(() => {
     if (auth) {
-      api.get('/auth/me').catch(() => {});
+      // Sekalian menyegarkan data user (mis. face_registered) agar gerbang
+      // pendaftaran wajah tidak mengandalkan localStorage yang bisa basi.
+      api.get('/auth/me')
+        .then(({ data }) => { if (data?.user) useAuthStore.getState().updateUser(data.user); })
+        .catch(() => {});
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -154,6 +189,7 @@ export default function App() {
           <Route path="/helpdesk" element={<EmployeeRoute><HelpdeskPage /></EmployeeRoute>} />
           <Route path="/history" element={<EmployeeRoute><HistoryPage /></EmployeeRoute>} />
           <Route path="/calendar" element={<EmployeeRoute><CalendarPage /></EmployeeRoute>} />
+          <Route path="/face-setup" element={<FaceSetupRoute><FaceSetupPage /></FaceSetupRoute>} />
 
           {/* Admin Routes */}
           <Route path="/admin" element={<AdminRoute><FeatureRoute><AdminDashboard /></FeatureRoute></AdminRoute>} />
