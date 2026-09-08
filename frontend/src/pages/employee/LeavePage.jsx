@@ -5,6 +5,7 @@ import toast from 'react-hot-toast';
 import api from '../../api/axios';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
+import PageHeader from '../../components/ui/PageHeader';
 
 const tabs = ['Riwayat', 'Ajukan Izin'];
 
@@ -129,44 +130,51 @@ export default function LeavePage({ defaultTab = 0, defaultType = null }) {
   };
 
   return (
-    <div className="p-4 space-y-4">
-      {/* Header */}
-      <div className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-slate-700 rounded-2xl p-6 text-white">
-        <div className="absolute top-0 right-0 w-48 h-48 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/3 pointer-events-none" />
-        <h2 className="text-xl font-bold mb-1">Izin & Cuti</h2>
+    <div className="bg-[#F8F7F5] min-h-screen">
+      <PageHeader title="Izin & Cuti" subtitle="Ajukan dan pantau pengajuan Anda">
         {quota && (
-          <div className="mt-3 bg-white/10 border border-white/20 rounded-xl p-3">
-            <div className="flex justify-between text-sm mb-2">
-              <span className="text-slate-300">Jatah Cuti {quota.year}</span>
-              <span className="font-bold">{quota.remaining_days} hari tersisa</span>
+          <div className="mt-4 bg-white/[0.08] border border-white/[0.12] rounded-2xl p-3.5">
+            <div className="flex justify-between text-[13px] mb-2">
+              <span className="text-white/70">Jatah Cuti {quota.year}</span>
+              <span className="font-bold text-white">{quota.remaining_days} hari tersisa</span>
             </div>
-            <div className="w-full bg-white/20 rounded-full h-2">
-              <div className="bg-white h-2 rounded-full" style={{ width: `${((quota.total_days - quota.remaining_days) / quota.total_days) * 100}%` }} />
+            <div className="w-full bg-white/20 rounded-full h-2 overflow-hidden">
+              <motion.div className="bg-white h-2 rounded-full"
+                initial={{ width: 0 }}
+                animate={{ width: `${quota.total_days > 0 ? ((quota.total_days - quota.remaining_days) / quota.total_days) * 100 : 0}%` }}
+                transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }} />
             </div>
-            <div className="flex justify-between text-xs mt-1 text-slate-400">
+            <div className="flex justify-between text-[11px] mt-1.5 text-white/60">
               <span>Terpakai: {quota.used_days} hari</span>
               <span>Total: {quota.total_days} hari</span>
             </div>
           </div>
         )}
-      </div>
 
-      {/* Tabs */}
-      <div className="flex bg-slate-100 rounded-2xl p-1">
-        {tabs.map((tab, i) => (
-          <button key={tab} onClick={() => setActiveTab(i)}
-            className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${activeTab === i ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`}>
-            {tab}
-          </button>
-        ))}
-      </div>
+        {/* Tab bergaya mobile: garis merah di bawah label aktif */}
+        <div className="flex gap-7 mt-4 -mb-1">
+          {tabs.map((tab, i) => (
+            <button key={tab} onClick={() => setActiveTab(i)}
+              className={`relative pb-2.5 text-sm transition-colors ${
+                activeTab === i ? 'text-white font-bold' : 'text-white/70 font-medium hover:text-white/90'
+              }`}>
+              {tab}
+              {activeTab === i && (
+                <motion.span layoutId="leave-tab" className="absolute left-0 right-0 -bottom-px h-[3px] rounded-full bg-[#EF5350]" />
+              )}
+            </button>
+          ))}
+        </div>
+      </PageHeader>
+
+      <div className="px-4 pt-4 pb-8 lg:px-8 lg:max-w-3xl lg:mx-auto space-y-4">
 
       <AnimatePresence mode="wait">
         {/* Riwayat */}
         {activeTab === 0 && (
           <motion.div key="history" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-3">
             {leaves.length === 0 ? (
-              <div className="card p-8 text-center">
+              <div className="bg-white rounded-2xl border border-[#E7E5E4] shadow-[0_4px_16px_rgba(0,0,0,0.06)] p-8 text-center">
                 <FileText size={32} className="text-slate-300 mx-auto mb-2" />
                 <p className="text-slate-500">Belum ada pengajuan</p>
               </div>
@@ -175,7 +183,7 @@ export default function LeavePage({ defaultTab = 0, defaultType = null }) {
               const t = typeConfig[leave.type] || { label: leave.type, color: 'text-slate-600', bg: 'bg-slate-100' };
               return (
                 <motion.div key={leave.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-                  className="card p-4 cursor-pointer hover:shadow-md transition-shadow" onClick={() => setSelectedLeave(leave)}>
+                  className="bg-white rounded-2xl border border-[#E7E5E4] shadow-[0_4px_16px_rgba(0,0,0,0.06)] p-4 cursor-pointer hover:border-stone-300 hover:shadow-md transition-all" onClick={() => setSelectedLeave(leave)}>
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
@@ -199,10 +207,10 @@ export default function LeavePage({ defaultTab = 0, defaultType = null }) {
 
         {/* Ajukan Izin — unified form */}
         {activeTab === 1 && (
-          <motion.div key="form" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="card p-5">
-            <h3 className="font-bold text-slate-900 mb-4">Pengajuan Izin / Cuti</h3>
+          <motion.div key="form" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="bg-white rounded-2xl border border-[#E7E5E4] shadow-[0_4px_16px_rgba(0,0,0,0.06)] p-5">
+            <h3 className="font-extrabold text-stone-900 mb-4">Pengajuan Izin / Cuti</h3>
             {quota && (
-              <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 mb-4 text-sm text-blue-700">
+              <div className="bg-[#FFEBEE] border border-[#FFCDD2] rounded-xl p-3 mb-4 text-sm text-[#8B1F1F]">
                 📅 Sisa jatah cuti: <strong>{quota.remaining_days} hari</strong>
               </div>
             )}
@@ -213,7 +221,7 @@ export default function LeavePage({ defaultTab = 0, defaultType = null }) {
                 <div className="grid grid-cols-2 gap-2">
                   {leaveTypes.map(t => (
                     <button key={t.code} type="button" onClick={() => setForm({ ...form, type: t.code })}
-                      className={`py-2.5 px-3 rounded-xl text-sm font-medium border-2 transition-all text-left ${form.type === t.code ? 'border-slate-800 bg-slate-900 text-white' : 'border-slate-200 text-slate-600 hover:border-slate-400'}`}>
+                      className={`py-2.5 px-3 rounded-xl text-sm font-medium border-2 transition-all text-left ${form.type === t.code ? 'border-[#8B1F1F] bg-[#8B1F1F] text-white' : 'border-stone-200 text-stone-600 hover:border-[#8B1F1F]/40'}`}>
                       {t.name}
                       {t.deducts_quota && <span className="text-xs opacity-60 block">Kurangi kuota</span>}
                     </button>
@@ -224,18 +232,18 @@ export default function LeavePage({ defaultTab = 0, defaultType = null }) {
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Tanggal Mulai</label>
                   <input type="date" value={form.start_date} onChange={e => setForm({ ...form, start_date: e.target.value })}
-                    className="input-field" required />
+                    className="input-brand" required />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Tanggal Selesai</label>
                   <input type="date" value={form.end_date} onChange={e => setForm({ ...form, end_date: e.target.value })}
-                    className="input-field" required min={form.start_date} />
+                    className="input-brand" required min={form.start_date} />
                 </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Alasan / Keterangan</label>
                 <textarea value={form.reason} onChange={e => setForm({ ...form, reason: e.target.value })}
-                  className="input-field resize-none" rows={3} placeholder="Jelaskan alasan pengajuan..." required />
+                  className="input-brand resize-none" rows={3} placeholder="Jelaskan alasan pengajuan..." required />
               </div>
               {/* Lampiran — tampil jika tipe butuh attachment */}
               {/* Time inputs — tampil untuk late_permission, early_leave, leave_office */}
@@ -247,7 +255,7 @@ export default function LeavePage({ defaultTab = 0, defaultType = null }) {
                         {form.type === 'late_permission' ? 'Rencana Jam Masuk' : 'Jam Tinggalkan Kantor'}
                       </label>
                       <input type="time" value={form.time_start || ''} onChange={e => setForm({ ...form, time_start: e.target.value })}
-                        className="input-field" />
+                        className="input-brand" />
                     </div>
                   )}
                   {(form.type === 'early_leave' || form.type === 'leave_office') && (
@@ -256,7 +264,7 @@ export default function LeavePage({ defaultTab = 0, defaultType = null }) {
                         {form.type === 'early_leave' ? 'Rencana Jam Pulang' : 'Rencana Jam Kembali'}
                       </label>
                       <input type="time" value={form.time_end || ''} onChange={e => setForm({ ...form, time_end: e.target.value })}
-                        className="input-field" />
+                        className="input-brand" />
                     </div>
                   )}
                 </div>
@@ -293,13 +301,14 @@ export default function LeavePage({ defaultTab = 0, defaultType = null }) {
                   )}
                 </div>
               )}
-              <button type="submit" disabled={loading} className="btn-primary w-full">
+              <button type="submit" disabled={loading} className="btn-brand w-full">
                 {loading ? 'Mengajukan...' : 'Kirim Pengajuan'}
               </button>
             </form>
           </motion.div>
         )}
       </AnimatePresence>
+      </div>
 
       {/* Detail Modal */}
       <AnimatePresence>

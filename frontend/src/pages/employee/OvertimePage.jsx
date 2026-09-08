@@ -5,6 +5,7 @@ import toast from 'react-hot-toast';
 import api from '../../api/axios';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
+import PageHeader from '../../components/ui/PageHeader';
 
 const statusConfig = {
   pending:  { label: 'Menunggu',  color: 'text-amber-600',   bg: 'bg-amber-50',   border: 'border-amber-200',  icon: AlertCircle },
@@ -123,18 +124,8 @@ export default function OvertimePage() {
   };
 
   return (
-    <div className="p-4 space-y-4">
-      {/* Header */}
-      <div className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-slate-700 rounded-2xl p-6 text-white">
-        <div className="absolute top-0 right-0 w-48 h-48 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/3 pointer-events-none" />
-        <div className="flex items-center gap-3 mb-1">
-          <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center">
-            <Clock size={20} />
-          </div>
-          <h2 className="text-xl font-bold">Lembur</h2>
-        </div>
-        <p className="text-slate-400 text-sm mt-1">Ajukan dan pantau status lembur kamu</p>
-
+    <div className="bg-[#F8F7F5] min-h-screen">
+      <PageHeader title="Lembur" subtitle="Ajukan dan pantau status lembur kamu">
         {/* Ringkasan bulan ini */}
         {overtimes.length > 0 && (() => {
           const thisMonth = new Date().getMonth();
@@ -146,29 +137,36 @@ export default function OvertimePage() {
           const totalMins = monthData.reduce((s, o) => s + o.duration_minutes, 0);
           if (!monthData.length) return null;
           return (
-            <div className="mt-4 bg-white/10 border border-white/20 rounded-xl p-3 flex items-center justify-between">
+            <div className="mt-4 bg-white/[0.08] border border-white/[0.12] rounded-2xl p-3.5 flex items-center justify-between">
               <div>
-                <p className="text-xs text-slate-400">Total lembur bulan ini</p>
-                <p className="text-lg font-bold">{formatDuration(totalMins)}</p>
+                <p className="text-[11px] text-white/60">Total lembur bulan ini</p>
+                <p className="text-lg font-bold text-white">{formatDuration(totalMins)}</p>
               </div>
               <div className="text-right">
-                <p className="text-xs text-slate-400">Sesi disetujui</p>
-                <p className="text-lg font-bold">{monthData.length}x</p>
+                <p className="text-[11px] text-white/60">Sesi disetujui</p>
+                <p className="text-lg font-bold text-white">{monthData.length}x</p>
               </div>
             </div>
           );
         })()}
-      </div>
 
-      {/* Tabs */}
-      <div className="flex bg-slate-100 rounded-2xl p-1">
-        {tabs.map((tab, i) => (
-          <button key={tab} onClick={() => setActiveTab(i)}
-            className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${activeTab === i ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`}>
-            {tab}
-          </button>
-        ))}
-      </div>
+        {/* Tab bergaya mobile: garis merah di bawah label aktif */}
+        <div className="flex gap-7 mt-4 -mb-1">
+          {tabs.map((tab, i) => (
+            <button key={tab} onClick={() => setActiveTab(i)}
+              className={`relative pb-2.5 text-sm transition-colors ${
+                activeTab === i ? 'text-white font-bold' : 'text-white/70 font-medium hover:text-white/90'
+              }`}>
+              {tab}
+              {activeTab === i && (
+                <motion.span layoutId="overtime-tab" className="absolute left-0 right-0 -bottom-px h-[3px] rounded-full bg-[#EF5350]" />
+              )}
+            </button>
+          ))}
+        </div>
+      </PageHeader>
+
+      <div className="px-4 pt-4 pb-8 lg:px-8 lg:max-w-3xl lg:mx-auto space-y-4">
 
       <AnimatePresence mode="wait">
         {/* Riwayat */}
@@ -177,7 +175,7 @@ export default function OvertimePage() {
             {loading ? (
               <div className="text-center py-8 text-slate-400">Memuat data...</div>
             ) : overtimes.length === 0 ? (
-              <div className="card p-10 text-center">
+              <div className="bg-white rounded-2xl border border-[#E7E5E4] shadow-[0_4px_16px_rgba(0,0,0,0.06)] p-10 text-center">
                 <Clock size={36} className="text-slate-300 mx-auto mb-3" />
                 <p className="text-slate-500 font-medium">Belum ada pengajuan lembur</p>
                 <p className="text-slate-400 text-sm mt-1">Tap "Ajukan Lembur" untuk membuat pengajuan baru</p>
@@ -186,7 +184,7 @@ export default function OvertimePage() {
               const s = statusConfig[ot.status] || { label: ot.status, color: 'text-slate-600', bg: 'bg-slate-50', border: 'border-slate-200', icon: AlertCircle };
               return (
                 <motion.div key={ot.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-                  className="card p-4 cursor-pointer hover:shadow-md transition-shadow"
+                  className="bg-white rounded-2xl border border-[#E7E5E4] shadow-[0_4px_16px_rgba(0,0,0,0.06)] p-4 cursor-pointer hover:border-stone-300 hover:shadow-md transition-all"
                   onClick={() => setSelected(ot)}>
                   <div className="flex items-start justify-between gap-3">
                     <div className={`w-10 h-10 ${s.bg} border ${s.border} rounded-xl flex items-center justify-center flex-shrink-0`}>
@@ -217,14 +215,14 @@ export default function OvertimePage() {
         {/* Form Ajukan */}
         {activeTab === 1 && (
           <motion.div key="form" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            <div className="card p-5">
+            <div className="bg-white rounded-2xl border border-[#E7E5E4] shadow-[0_4px_16px_rgba(0,0,0,0.06)] p-5">
               <h3 className="font-bold text-slate-900 mb-4">Pengajuan Lembur</h3>
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Tanggal Lembur</label>
                   <input type="date" value={form.date}
                     onChange={e => setForm({ ...form, date: e.target.value })}
-                    className="input-field" required />
+                    className="input-brand" required />
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
@@ -232,13 +230,13 @@ export default function OvertimePage() {
                     <label className="block text-sm font-medium text-slate-700 mb-1">Jam Mulai</label>
                     <input type="time" value={form.start_time}
                       onChange={e => setForm({ ...form, start_time: e.target.value })}
-                      className="input-field" required />
+                      className="input-brand" required />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Jam Selesai</label>
                     <input type="time" value={form.end_time}
                       onChange={e => setForm({ ...form, end_time: e.target.value })}
-                      className="input-field" required />
+                      className="input-brand" required />
                   </div>
                 </div>
 
@@ -260,7 +258,7 @@ export default function OvertimePage() {
                   <label className="block text-sm font-medium text-slate-700 mb-1">Alasan / Pekerjaan yang Dilakukan</label>
                   <textarea value={form.reason}
                     onChange={e => setForm({ ...form, reason: e.target.value })}
-                    className="input-field resize-none" rows={3}
+                    className="input-brand resize-none" rows={3}
                     placeholder="Jelaskan pekerjaan yang dikerjakan saat lembur..." required />
                 </div>
 
@@ -307,7 +305,7 @@ export default function OvertimePage() {
                   )}
                 </div>
 
-                <button type="submit" disabled={submitting || !previewDuration} className="btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-50">
+                <button type="submit" disabled={submitting || !previewDuration} className="btn-brand w-full flex items-center justify-center gap-2 disabled:opacity-50">
                   <Plus size={18} />
                   {submitting ? 'Mengajukan...' : 'Kirim Pengajuan Lembur'}
                 </button>
@@ -316,6 +314,7 @@ export default function OvertimePage() {
           </motion.div>
         )}
       </AnimatePresence>
+      </div>
 
       {/* Detail Modal */}
       <AnimatePresence>

@@ -113,12 +113,13 @@ export default function EmployeeLayout({ children }) {
 
   const isActive = (path) => location.pathname === path;
 
-  // Dashboard memakai header foto full-bleed sendiri (meniru app mobile),
-  // jadi top header bawaan layout disembunyikan di halaman itu.
-  const isDashboard = location.pathname === '/dashboard';
+  // Halaman-halaman ini memakai PageHeader foto full-bleed sendiri (meniru app
+  // mobile), jadi top header bawaan layout disembunyikan di sana.
+  const selfHeaderPaths = ['/dashboard', '/profile', '/my-stats', '/helpdesk', '/notifications'];
+  const hasOwnHeader = selfHeaderPaths.includes(location.pathname);
 
   return (
-    <div className="min-h-screen bg-[#F6F8FD] flex">
+    <div className="min-h-screen bg-[#F8F7F5] flex">
 
       {/* ── Desktop Sidebar ── */}
       <aside className="hidden lg:flex flex-col w-60 bg-white border-r border-slate-100 fixed top-0 left-0 bottom-0 z-30">
@@ -192,7 +193,7 @@ export default function EmployeeLayout({ children }) {
       <div className="flex-1 lg:ml-60 flex flex-col min-h-screen">
 
         {/* Top Header */}
-        <header className={`bg-white border-b border-slate-100 px-4 lg:px-6 py-3.5 items-center justify-between sticky top-0 z-20 ${isDashboard ? 'hidden' : 'flex'}`}>
+        <header className={`bg-white border-b border-slate-100 px-4 lg:px-6 py-3.5 items-center justify-between sticky top-0 z-20 ${hasOwnHeader ? 'hidden' : 'flex'}`}>
           <div className="flex items-center gap-3">
             {/* Mobile logo */}
             <div className="lg:hidden flex items-center gap-2">
@@ -236,7 +237,7 @@ export default function EmployeeLayout({ children }) {
         {/* Page Content */}
         <main className="flex-1 pb-28 lg:pb-6">
           {/* Desktop: wider container */}
-          <div className={isDashboard ? '' : 'lg:max-w-5xl lg:mx-auto'}>
+          <div className={hasOwnHeader ? '' : 'lg:max-w-5xl lg:mx-auto'}>
             <AnimatePresence mode="wait">
               <motion.div
                 key={location.pathname}

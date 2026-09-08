@@ -8,7 +8,7 @@
     --brand-primary: #8B1F1F;       /* Crimson Red */
     --brand-primary-dark: #4A0808;  /* Deep Dark Red */
     --brand-primary-light: #EF5350; /* Light Coral Red */
-    --brand-surface: #F6F8FD;       /* background dashboard mobile */
+    --brand-surface: #F8F7F5;       /* warm off-white, sama dengan AppColors.surface */
     --brand-border: #E7E5E4;        /* warm border (stone-200) */
     --brand-text: #1C1917;          /* stone-900 */
     --brand-text-muted: #78716C;    /* stone-500 */
@@ -75,6 +75,20 @@
     @apply bg-slate-900 text-white font-semibold px-6 py-3 rounded-xl 
            hover:bg-slate-700 active:scale-[0.97] transition-all duration-300 ease-out
            disabled:opacity-50 disabled:cursor-not-allowed shadow-sm;
+  }
+
+  /* Tombol utama bergaya app mobile (crimson brand) — dipakai halaman karyawan */
+  .btn-brand {
+    @apply bg-[#8B1F1F] text-white font-semibold px-6 py-3 rounded-xl
+           hover:bg-[#6d1818] active:scale-[0.97] transition-all duration-300 ease-out
+           disabled:opacity-50 disabled:cursor-not-allowed shadow-sm;
+  }
+
+  /* Input bergaya mobile: border warm + fokus crimson */
+  .input-brand {
+    @apply w-full px-4 py-3 rounded-xl border border-[#E7E5E4] bg-white text-stone-900
+           placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-[#8B1F1F]/15
+           focus:border-[#8B1F1F]/40 transition-all duration-300 ease-out;
   }
 
   .btn-secondary {

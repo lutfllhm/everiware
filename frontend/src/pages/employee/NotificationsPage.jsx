@@ -1,19 +1,33 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Bell, CheckCheck, Info, CheckCircle, AlertTriangle, XCircle, RefreshCw, Trash2, X } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import {
+  Bell, BellRing, CheckCheck, Info, CheckCircle, AlertTriangle, XCircle,
+  RefreshCw, Trash2, X, Clock,
+} from 'lucide-react';
 import api from '../../api/axios';
 import { formatDistanceToNow, format } from 'date-fns';
 import { id } from 'date-fns/locale';
 import toast from 'react-hot-toast';
+import PageHeader from '../../components/ui/PageHeader';
 
 const typeConfig = {
-  info:    { icon: Info,          bg: 'bg-sky-50',     border: 'border-sky-200',    text: 'text-sky-600',    dot: 'bg-sky-500' },
-  success: { icon: CheckCircle,   bg: 'bg-teal-50',    border: 'border-teal-200',   text: 'text-teal-600',   dot: 'bg-teal-500' },
-  warning: { icon: AlertTriangle, bg: 'bg-amber-50',   border: 'border-amber-200',  text: 'text-amber-600',  dot: 'bg-amber-500' },
-  error:   { icon: XCircle,       bg: 'bg-red-50',     border: 'border-red-200',    text: 'text-red-600',    dot: 'bg-red-500' },
+  info:    { icon: Info,          color: '#0284C7', bg: '#F0F9FF' },
+  success: { icon: CheckCircle,   color: '#0D9488', bg: '#F0FDFA' },
+  warning: { icon: AlertTriangle, color: '#D97706', bg: '#FFFBEB' },
+  error:   { icon: XCircle,       color: '#DC2626', bg: '#FEF2F2' },
+};
+
+/** Tebak halaman tujuan dari judul notifikasi, seperti di app mobile. */
+const routeForTitle = (title = '') => {
+  if (title.includes('Lembur')) return '/overtime';
+  if (title.includes('Izin') || title.includes('Cuti')) return '/leave';
+  if (title.includes('Absen')) return '/attendance';
+  return null;
 };
 
 export default function NotificationsPage() {
+  const navigate = useNavigate();
   const [notifications, setNotifications] = useState([]);
   const [unread, setUnread] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -85,141 +99,208 @@ export default function NotificationsPage() {
     }
   };
 
+  const handleOpen = (notif) => {
+    const route = routeForTitle(notif.title);
+    if (!route) return;
+    if (!notif.is_read) {
+      api.put('/users/notifications/read').catch(() => {});
+      setNotifications(prev => prev.map(n => (n.id === notif.id ? { ...n, is_read: true } : n)));
+      setUnread(u => Math.max(0, u - 1));
+    }
+    navigate(route);
+  };
+
   const readCount = notifications.filter(n => n.is_read).length;
 
-  return (
-    <div className="p-4 space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="font-bold text-slate-900 text-lg">Notifikasi</h2>
-          <p className="text-slate-400 text-sm">
-            {unread > 0 ? `${unread} belum dibaca` : 'Semua sudah dibaca'}
-            {' · '}
-            <span className="text-slate-300 text-xs">Otomatis hapus setelah 7 hari</span>
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button onClick={fetchNotifications} className="p-2 rounded-xl hover:bg-slate-100 transition-colors">
-            <RefreshCw size={16} className={`text-slate-500 ${loading ? 'animate-spin' : ''}`} />
-          </button>
-          {unread > 0 && (
-            <button onClick={handleMarkAllRead}
-              className="flex items-center gap-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 px-3 py-2 rounded-xl transition-colors">
-              <CheckCheck size={14} /> Baca semua
-            </button>
-          )}
-          {/* Menu hapus */}
-          {notifications.length > 0 && (
-            <div className="relative">
-              <button onClick={() => setShowDeleteMenu(v => !v)}
-                className="p-2 rounded-xl hover:bg-red-50 transition-colors group">
-                <Trash2 size={16} className="text-slate-400 group-hover:text-red-500 transition-colors" />
-              </button>
-              <AnimatePresence>
-                {showDeleteMenu && (
-                  <>
-                    <div className="fixed inset-0 z-10" onClick={() => setShowDeleteMenu(false)} />
-                    <motion.div initial={{ opacity: 0, scale: 0.95, y: -8 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: -8 }}
-                      className="absolute right-0 top-10 z-20 bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden w-52">
-                      {readCount > 0 && (
-                        <button onClick={() => handleDeleteAll(true)}
-                          className="w-full flex items-center gap-3 px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 transition-colors text-left">
-                          <CheckCheck size={15} className="text-slate-400" />
-                          <div>
-                            <div className="font-medium">Hapus yang dibaca</div>
-                            <div className="text-xs text-slate-400">{readCount} notifikasi</div>
-                          </div>
-                        </button>
-                      )}
-                      <button onClick={() => handleDeleteAll(false)}
-                        className="w-full flex items-center gap-3 px-4 py-3 text-sm text-red-600 hover:bg-red-50 transition-colors text-left border-t border-slate-100">
-                        <Trash2 size={15} className="text-red-500" />
-                        <div>
-                          <div className="font-medium">Hapus semua</div>
-                          <div className="text-xs text-red-400">{notifications.length} notifikasi</div>
-                        </div>
-                      </button>
-                    </motion.div>
-                  </>
-                )}
-              </AnimatePresence>
-            </div>
-          )}
-        </div>
-      </div>
+  const headerActions = (
+    <div className="flex items-center gap-1.5 flex-shrink-0">
+      {unread > 0 && (
+        <HeaderIconButton onClick={handleMarkAllRead} label="Tandai semua dibaca">
+          <CheckCheck size={18} className="text-white" />
+        </HeaderIconButton>
+      )}
 
-      {/* List */}
-      {loading ? (
-        <div className="space-y-3">
-          {[1,2,3].map(i => (
-            <div key={i} className="card p-4 animate-pulse">
-              <div className="flex gap-3">
-                <div className="w-9 h-9 bg-slate-100 rounded-xl flex-shrink-0" />
-                <div className="flex-1 space-y-2">
-                  <div className="h-3 bg-slate-100 rounded w-3/4" />
-                  <div className="h-3 bg-slate-100 rounded w-full" />
-                  <div className="h-2 bg-slate-100 rounded w-1/3" />
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : notifications.length === 0 ? (
-        <div className="card p-12 text-center">
-          <div className="w-14 h-14 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-3">
-            <Bell size={24} className="text-slate-300" />
-          </div>
-          <p className="font-semibold text-slate-500">Belum ada notifikasi</p>
-          <p className="text-slate-400 text-sm mt-1">Notifikasi akan muncul di sini</p>
-        </div>
-      ) : (
-        <div className="space-y-2">
+      {notifications.length > 0 && (
+        <div className="relative">
+          <HeaderIconButton onClick={() => setShowDeleteMenu(v => !v)} label="Hapus notifikasi">
+            <Trash2 size={17} className="text-white" />
+          </HeaderIconButton>
+
           <AnimatePresence>
-            {notifications.map((notif, i) => {
-              const cfg = typeConfig[notif.type] || typeConfig.info;
-              const Icon = cfg.icon;
-              return (
-                <motion.div key={notif.id}
-                  initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, x: 40, height: 0, marginBottom: 0 }}
-                  transition={{ delay: i * 0.03 }}
-                  className={`card p-4 border ${cfg.border} ${!notif.is_read ? cfg.bg : 'bg-white'} group relative`}>
-                  <div className="flex gap-3">
-                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${!notif.is_read ? 'bg-white shadow-sm' : 'bg-slate-100'}`}>
-                      <Icon size={17} className={cfg.text} />
-                    </div>
-                    <div className="flex-1 min-w-0 pr-6">
-                      <div className="flex items-start justify-between gap-2">
-                        <p className={`font-semibold text-sm ${!notif.is_read ? 'text-slate-900' : 'text-slate-600'}`}>
-                          {notif.title}
-                        </p>
-                        {!notif.is_read && <span className={`w-2 h-2 rounded-full flex-shrink-0 mt-1 ${cfg.dot}`} />}
-                      </div>
-                      <p className="text-slate-500 text-sm mt-0.5 leading-relaxed">{notif.message}</p>
-                      <p className="text-slate-400 text-xs mt-2">
-                        {formatDistanceToNow(new Date(notif.created_at), { addSuffix: true, locale: id })}
-                        {' · '}
-                        {format(new Date(notif.created_at), 'dd MMM yyyy HH:mm', { locale: id })}
-                      </p>
-                    </div>
-                  </div>
-                  {/* Tombol hapus per item — muncul saat hover */}
-                  <button
-                    onClick={() => handleDeleteOne(notif.id)}
-                    disabled={deletingId === notif.id}
-                    className="absolute top-3 right-3 p-1.5 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-red-50 transition-all disabled:opacity-50">
-                    {deletingId === notif.id
-                      ? <RefreshCw size={13} className="text-slate-400 animate-spin" />
-                      : <X size={13} className="text-slate-400 hover:text-red-500 transition-colors" />}
+            {showDeleteMenu && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setShowDeleteMenu(false)} />
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95, y: -8 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95, y: -8 }}
+                  className="absolute right-0 top-11 z-20 bg-white rounded-2xl shadow-xl border border-[#E7E5E4] overflow-hidden w-52"
+                >
+                  {readCount > 0 && (
+                    <button onClick={() => handleDeleteAll(true)}
+                      className="w-full flex items-center gap-3 px-4 py-3 text-sm text-stone-700 hover:bg-stone-50 transition-colors text-left">
+                      <CheckCheck size={15} className="text-stone-400" />
+                      <span>
+                        <span className="block font-medium">Hapus yang dibaca</span>
+                        <span className="block text-xs text-stone-400">{readCount} notifikasi</span>
+                      </span>
+                    </button>
+                  )}
+                  <button onClick={() => handleDeleteAll(false)}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-sm text-red-600 hover:bg-red-50 transition-colors text-left border-t border-[#F5F5F4]">
+                    <Trash2 size={15} className="text-red-500" />
+                    <span>
+                      <span className="block font-medium">Hapus semua</span>
+                      <span className="block text-xs text-red-400">{notifications.length} notifikasi</span>
+                    </span>
                   </button>
                 </motion.div>
-              );
-            })}
+              </>
+            )}
           </AnimatePresence>
         </div>
       )}
+
+      <HeaderIconButton onClick={fetchNotifications} label="Segarkan">
+        <RefreshCw size={17} className={`text-white ${loading ? 'animate-spin' : ''}`} />
+      </HeaderIconButton>
+    </div>
+  );
+
+  return (
+    <div className="bg-[#F8F7F5] min-h-screen">
+      <PageHeader
+        title="Pemberitahuan HRD"
+        showBack
+        subtitle={`${unread > 0 ? `${unread} belum dibaca` : 'Semua sudah dibaca'} · Otomatis hapus setelah 7 hari`}
+        right={headerActions}
+      >
+        <div className="flex justify-center py-5">
+          <div className="w-[100px] h-[100px] rounded-full bg-white shadow-[0_4px_12px_rgba(0,0,0,0.25)] flex items-center justify-center">
+            <div className="w-[84px] h-[84px] rounded-full flex items-center justify-center"
+              style={{ background: 'linear-gradient(135deg, #8B1F1F 0%, #DC2626 100%)' }}>
+              <BellRing size={40} className="text-white" />
+            </div>
+          </div>
+        </div>
+      </PageHeader>
+
+      <div className="px-4 pt-4 pb-8 lg:px-8 lg:max-w-3xl lg:mx-auto">
+        {loading ? (
+          <div className="space-y-2.5">
+            {[1, 2, 3].map(i => (
+              <div key={i} className="bg-white rounded-[14px] border border-[#E7E5E4] p-3 animate-pulse">
+                <div className="flex gap-3">
+                  <div className="w-10 h-10 bg-stone-100 rounded-[10px] flex-shrink-0" />
+                  <div className="flex-1 space-y-2 pt-1">
+                    <div className="h-3 bg-stone-100 rounded w-3/4" />
+                    <div className="h-3 bg-stone-100 rounded w-full" />
+                    <div className="h-2 bg-stone-100 rounded w-1/3" />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : notifications.length === 0 ? (
+          <div className="bg-white rounded-2xl border border-[#E7E5E4] p-12 text-center">
+            <div className="w-14 h-14 bg-stone-100 rounded-2xl flex items-center justify-center mx-auto mb-3">
+              <Bell size={24} className="text-stone-300" />
+            </div>
+            <p className="font-semibold text-stone-500">Belum ada notifikasi</p>
+            <p className="text-stone-400 text-sm mt-1">Notifikasi akan muncul di sini</p>
+          </div>
+        ) : (
+          <div className="space-y-2.5">
+            <AnimatePresence>
+              {notifications.map((notif, i) => {
+                const cfg = typeConfig[notif.type] || typeConfig.info;
+                const Icon = cfg.icon;
+                const isRead = !!notif.is_read;
+                const route = routeForTitle(notif.title);
+
+                return (
+                  <motion.div key={notif.id}
+                    initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, x: 40, height: 0, marginBottom: 0 }}
+                    transition={{ delay: i * 0.03 }}
+                    onClick={() => handleOpen(notif)}
+                    className={`relative group rounded-[14px] border p-3 transition-colors ${
+                      route ? 'cursor-pointer' : ''
+                    }`}
+                    style={{
+                      backgroundColor: isRead ? '#FFFFFF' : cfg.bg,
+                      borderColor: isRead ? '#E7E5E4' : `${cfg.color}33`,
+                    }}
+                  >
+                    <div className="flex gap-3">
+                      <span className="w-10 h-10 rounded-[10px] flex items-center justify-center flex-shrink-0"
+                        style={{ backgroundColor: isRead ? '#F5F5F4' : `${cfg.color}1F` }}>
+                        <Icon size={20} style={{ color: isRead ? '#A8A29E' : cfg.color }} />
+                      </span>
+
+                      <div className="flex-1 min-w-0 pr-5">
+                        <div className="flex items-start justify-between gap-2">
+                          <p className={`font-bold text-[13px] ${isRead ? 'text-stone-600' : 'text-stone-900'}`}>
+                            {notif.title}
+                          </p>
+                          {!isRead && (
+                            <span className="w-[7px] h-[7px] rounded-full flex-shrink-0 mt-1"
+                              style={{ backgroundColor: cfg.color }} />
+                          )}
+                        </div>
+
+                        <p className={`text-xs mt-1 leading-relaxed ${isRead ? 'text-stone-400' : 'text-stone-600'}`}>
+                          {notif.message}
+                        </p>
+
+                        <div className="flex items-center gap-1 mt-1.5">
+                          <Clock size={10} className="text-stone-400 flex-shrink-0" />
+                          <span className="text-[11px] text-stone-400">
+                            {formatDistanceToNow(new Date(notif.created_at), { addSuffix: true, locale: id })}
+                            {' · '}
+                            {format(new Date(notif.created_at), 'dd MMM yyyy HH:mm', { locale: id })}
+                          </span>
+                          {route && (
+                            <span className="ml-auto text-[11px] font-semibold flex-shrink-0"
+                              style={{ color: cfg.color }}>
+                              Lihat →
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Tombol hapus per item — muncul saat hover */}
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleDeleteOne(notif.id); }}
+                      disabled={deletingId === notif.id}
+                      className="absolute top-2.5 right-2.5 p-1.5 rounded-lg opacity-0 group-hover:opacity-100 focus:opacity-100 hover:bg-red-50 transition-all disabled:opacity-50"
+                      aria-label="Hapus notifikasi"
+                    >
+                      {deletingId === notif.id
+                        ? <RefreshCw size={13} className="text-stone-400 animate-spin" />
+                        : <X size={13} className="text-stone-400 hover:text-red-500 transition-colors" />}
+                    </button>
+                  </motion.div>
+                );
+              })}
+            </AnimatePresence>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
 
+function HeaderIconButton({ onClick, label, children }) {
+  return (
+    <button
+      onClick={onClick}
+      aria-label={label}
+      title={label}
+      className="w-9 h-9 rounded-xl bg-white/20 border border-white/[0.12] flex items-center justify-center hover:bg-white/30 active:scale-95 transition-all"
+    >
+      {children}
+    </button>
+  );
+}

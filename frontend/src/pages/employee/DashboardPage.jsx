@@ -21,7 +21,7 @@ const menuItems = [
   { label: 'Dinas Luar/\nKelilingan', icon: '/menu/05_dinas_luar.svg',       to: '/leave/dinas' },
   { label: 'Izin Keluar\nKantor',  icon: '/menu/06_izin_keluar_kantor.svg',  to: '/leave/leave-office' },
   { label: 'Ajukan\nLembur',       icon: '/menu/07_ajukan_lembur.svg',       to: '/overtime' },
-  { label: 'Statistik\nUser',      icon: '/menu/08_statistik_user.svg',      to: '/attendance' },
+  { label: 'Statistik\nUser',      icon: '/menu/08_statistik_user.svg',      to: '/my-stats' },
 ];
 
 const statusConfig = {
@@ -161,7 +161,7 @@ export default function DashboardPage() {
   const quotaPct = quotaTotal > 0 ? Math.min((quotaUsed / quotaTotal) * 100, 100) : 0;
 
   return (
-    <div className="bg-[#F6F8FD] min-h-screen -m-px">
+    <div className="bg-[#F8F7F5] min-h-screen -m-px">
 
       {/* ── Header: foto latar + overlay gelap, identik dengan mobile ── */}
       <div
@@ -600,7 +600,7 @@ export default function DashboardPage() {
             </p>
           </div>
           <Link
-            to="/profile"
+            to="/helpdesk"
             className="text-[12px] font-semibold bg-white/15 border border-white/20 rounded-xl px-3.5 py-2 hover:bg-white/25 transition-colors flex-shrink-0"
           >
             Profil

@@ -6,6 +6,7 @@ import toast from 'react-hot-toast';
 import api from '../../api/axios';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
+import PageHeader from '../../components/ui/PageHeader';
 
 export default function AttendancePage() {
   const [todayAtt, setTodayAtt] = useState(null);
@@ -127,13 +128,13 @@ export default function AttendancePage() {
   const hasLeaveOffice = activePermits.some(p => p.leave_type_code === 'leave_office');
 
   return (
-    <div className="p-4 space-y-4">
-      {/* Header */}
-      <div className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-slate-700 rounded-2xl p-6 text-white">
-        <div className="absolute top-0 right-0 w-48 h-48 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/3 pointer-events-none" />
-        <h2 className="text-xl font-bold mb-1">Absensi Harian</h2>
-        <p className="text-slate-400 text-sm">{format(new Date(), 'EEEE, d MMMM yyyy', { locale: id })}</p>
-      </div>
+    <div className="bg-[#F8F7F5] min-h-screen">
+      <PageHeader
+        title="Absensi Harian"
+        subtitle={format(new Date(), 'EEEE, d MMMM yyyy', { locale: id })}
+      />
+
+      <div className="px-4 pt-4 pb-8 lg:px-8 lg:max-w-3xl lg:mx-auto space-y-4">
 
       {/* Active Permits Banner */}
       {activePermits.length > 0 && (
@@ -166,7 +167,7 @@ export default function AttendancePage() {
       )}
 
       {/* Today Status */}
-      <div className="card p-5">
+      <div className="bg-white rounded-2xl border border-[#E7E5E4] shadow-[0_4px_16px_rgba(0,0,0,0.06)] p-5">
         <h3 className="font-bold text-slate-900 mb-4">Status Hari Ini</h3>
         {todayAtt ? (
           <div className={`border rounded-2xl p-4 ${statusConfig[todayAtt.status]?.bg || 'bg-slate-50 border-slate-200'}`}>
@@ -202,16 +203,16 @@ export default function AttendancePage() {
       </div>
 
       {/* Riwayat Absensi */}
-      <div className="card p-5">
+      <div className="bg-white rounded-2xl border border-[#E7E5E4] shadow-[0_4px_16px_rgba(0,0,0,0.06)] p-5">
         <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
           <h3 className="font-bold text-slate-900">Riwayat Absensi</h3>
           <div className="flex gap-2">
             <select value={selectedMonth} onChange={(e) => setSelectedMonth(Number(e.target.value))}
-              className="input-field py-2 text-sm w-auto">
+              className="input-brand py-2 text-sm w-auto">
               {months.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
             </select>
             <select value={selectedYear} onChange={(e) => setSelectedYear(Number(e.target.value))}
-              className="input-field py-2 text-sm w-auto">
+              className="input-brand py-2 text-sm w-auto">
               {years.map(y => <option key={y} value={y}>{y}</option>)}
             </select>
           </div>
@@ -266,7 +267,7 @@ export default function AttendancePage() {
           className={`p-5 rounded-2xl font-bold text-white transition-all active:scale-95 ${
             todayAtt?.check_in
               ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
-              : 'bg-gradient-to-br from-slate-900 via-slate-800 to-slate-700 shadow-lg shadow-slate-300'
+              : 'bg-gradient-to-br from-[#8B1F1F] via-[#6d1818] to-[#4A0808] shadow-lg shadow-[#8B1F1F]/25'
           }`}>
           <Clock size={28} className="mb-2" />
           <div>Absen Masuk</div>
@@ -278,7 +279,7 @@ export default function AttendancePage() {
           className={`p-5 rounded-2xl font-bold text-white transition-all active:scale-95 ${
             !todayAtt?.check_in || todayAtt?.check_out
               ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
-              : 'bg-gradient-to-br from-slate-700 via-slate-600 to-slate-500 shadow-lg shadow-slate-300'
+              : 'bg-gradient-to-br from-[#C62828] via-[#A02020] to-[#8B1F1F] shadow-lg shadow-[#8B1F1F]/25'
           }`}>
           <Clock size={28} className="mb-2" />
           <div>Absen Pulang</div>
@@ -287,9 +288,9 @@ export default function AttendancePage() {
       </div>
 
       {/* Info */}
-      <div className="card p-4">
+      <div className="bg-white rounded-2xl border border-[#E7E5E4] shadow-[0_4px_16px_rgba(0,0,0,0.06)] p-4">
         <div className="flex items-start gap-3">
-          <MapPin size={18} className="text-indigo-500 mt-0.5 flex-shrink-0" />
+          <MapPin size={18} className="mt-0.5 flex-shrink-0" style={{ color: '#8B1F1F' }} />
           <div>
             <p className="font-medium text-slate-900 text-sm">Syarat Absensi</p>
             <ul className="text-slate-500 text-xs mt-1 space-y-1">
@@ -318,6 +319,7 @@ export default function AttendancePage() {
           </div>
         </div>
       )}
+      </div>
 
       {/* Camera Modal */}
       <AnimatePresence>
@@ -379,7 +381,7 @@ export default function AttendancePage() {
                     Ulangi
                   </button>
                   <button onClick={submitAttendance} disabled={loading || !location}
-                    className="flex-1 py-3 rounded-2xl bg-gradient-to-br from-slate-900 to-slate-700 text-white font-bold disabled:opacity-50">
+                    className="flex-1 py-3 rounded-2xl bg-gradient-to-br from-[#8B1F1F] to-[#4A0808] text-white font-bold disabled:opacity-50">
                     {loading ? 'Memproses...' : 'Kirim Absensi'}
                   </button>
                 </>
