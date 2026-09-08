@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Clock, FileText, User, Bell, LogOut, Timer } from 'lucide-react';
+import { Home, Clock, FileText, User, Bell, LogOut, Timer, Fingerprint } from 'lucide-react';
 import useAuthStore from '../../store/authStore';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
@@ -15,6 +15,15 @@ const navItems = [
   { path: '/overtime', icon: Timer, label: 'Lembur' },
   { path: '/notifications', icon: Bell, label: 'Notifikasi', badge: true },
   { path: '/profile', icon: User, label: 'Profil' },
+];
+
+// Bottom nav mobile — meniru app: 5 slot dengan tombol absensi mengambang di tengah.
+const mobileNavItems = [
+  { path: '/dashboard', icon: Home, label: 'Beranda' },
+  { path: '/leave', icon: FileText, label: 'Izin & Cuti' },
+  { path: '/attendance', icon: Fingerprint, label: 'Absensi', center: true },
+  { path: '/overtime', icon: Timer, label: 'Lembur' },
+  { path: '/profile', icon: User, label: 'Akun' },
 ];
 
 export default function EmployeeLayout({ children }) {
@@ -73,6 +82,28 @@ export default function EmployeeLayout({ children }) {
       prevUnreadRef.current = 0;
     }
   }, [isNotifPage, unread]);
+
+  // Bottom nav mobile ikut disembunyikan saat scroll ke bawah (seperti app).
+  const [navVisible, setNavVisible] = useState(true);
+  const lastScrollRef = useRef(0);
+
+  useEffect(() => {
+    const onScroll = () => {
+      const y = window.scrollY;
+      const delta = y - lastScrollRef.current;
+      if (Math.abs(delta) < 6) return;
+      setNavVisible(delta < 0 || y < 40);
+      lastScrollRef.current = y;
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  // Selalu tampilkan lagi saat pindah halaman.
+  useEffect(() => {
+    setNavVisible(true);
+    lastScrollRef.current = window.scrollY;
+  }, [location.pathname]);
 
   const handleLogout = () => {
     logout();
@@ -203,7 +234,7 @@ export default function EmployeeLayout({ children }) {
         </header>
 
         {/* Page Content */}
-        <main className="flex-1 pb-24 lg:pb-6">
+        <main className="flex-1 pb-28 lg:pb-6">
           {/* Desktop: wider container */}
           <div className={isDashboard ? '' : 'lg:max-w-5xl lg:mx-auto'}>
             <AnimatePresence mode="wait">
@@ -220,30 +251,65 @@ export default function EmployeeLayout({ children }) {
           </div>
         </main>
 
-        {/* ── Mobile Bottom Navigation ── */}
-        <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-100 z-30 pb-safe">
-          <div className="flex items-center justify-around px-1 py-2">
-            {navItems.map((item) => {
+        {/* ── Mobile Bottom Navigation (meniru app mobile) ── */}
+        <nav
+          className={`lg:hidden fixed bottom-0 left-0 right-0 z-30 transition-transform duration-300 ease-out ${
+            navVisible ? 'translate-y-0' : 'translate-y-[150%]'
+          }`}
+        >
+          <div className="relative">
+            {/* Tombol absensi mengambang di tengah */}
+            {mobileNavItems.filter((i) => i.center).map((item) => {
               const active = isActive(item.path);
               return (
-                <Link key={item.path} to={item.path} className="flex flex-col items-center gap-1 px-3 py-2 relative">
-                  {active && (
-                    <motion.div layoutId="mobile-nav-indicator" className="absolute inset-0 bg-[#FFEBEE] rounded-2xl" />
-                  )}
-                  <div className="relative z-10">
-                    <item.icon size={21} className={`transition-colors ${active ? 'text-[#8B1F1F]' : 'text-stone-400'}`} />
-                    {item.badge && unread > 0 && (
-                      <span className="absolute -top-1 -right-1.5 min-w-[14px] h-3.5 bg-red-500 rounded-full text-white text-[8px] font-bold flex items-center justify-center px-0.5 animate-pulse">
-                        {unread > 9 ? '9+' : unread}
-                      </span>
-                    )}
-                  </div>
-                  <span className={`text-[10px] font-medium relative z-10 transition-colors ${active ? 'text-[#8B1F1F]' : 'text-stone-400'}`}>
-                    {item.label}
-                  </span>
+                <Link
+                  key={item.path}
+                  to={item.path}
+                  aria-label={item.label}
+                  className="absolute left-1/2 -translate-x-1/2 -top-[26px] z-10 w-[76px] h-[76px] rounded-full flex items-center justify-center shadow-[0_4px_10px_rgba(0,0,0,0.5)] transition-transform duration-150 active:scale-90"
+                  style={{
+                    background:
+                      'radial-gradient(circle at 50% 50%, #8B1A1A 0%, #4A0808 55%, #160102 100%)',
+                  }}
+                >
+                  <item.icon size={40} className="text-white" strokeWidth={active ? 2.2 : 1.8} />
                 </Link>
               );
             })}
+
+            <div className="bg-[#160102] rounded-t-[30px] pb-safe">
+              <div className="flex items-stretch h-[70px]">
+                {mobileNavItems.map((item) => {
+                  if (item.center) return <div key={item.path} className="flex-1" />;
+                  const active = isActive(item.path);
+                  return (
+                    <Link
+                      key={item.path}
+                      to={item.path}
+                      className="flex-1 flex flex-col items-center justify-center gap-1"
+                    >
+                      <motion.span
+                        animate={{ scale: active ? 1.18 : 1 }}
+                        transition={{ type: 'spring', stiffness: 400, damping: 12 }}
+                        className="block"
+                      >
+                        <item.icon
+                          size={24}
+                          className={active ? 'text-[#EF5350]' : 'text-white/50'}
+                        />
+                      </motion.span>
+                      <span
+                        className={`text-[11px] transition-colors ${
+                          active ? 'text-[#EF5350] font-bold' : 'text-white/50 font-medium'
+                        }`}
+                      >
+                        {item.label}
+                      </span>
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         </nav>
       </div>
