@@ -4,6 +4,7 @@ const { authenticate, authorize } = require('../middleware/auth');
 const {
   getContracts, getContractHistory, createContract, updateContract, deleteContract,
   updateEmployment, terminateEmployee, reactivateEmployee, getExpiringContracts, getMasterData,
+  searchEmployees, createEmployeeWithContract,
 } = require('../controllers/contractController');
 const { getYearlyRecap, getRecapDetail } = require('../controllers/contractRecapController');
 
@@ -16,6 +17,10 @@ const hrOnly = authorize('superadmin', 'admin', 'hrd');
 router.get('/', hrOnly, getContracts);
 router.get('/master', hrOnly, getMasterData);
 router.get('/expiring', hrOnly, getExpiringContracts);
+router.get('/search-employees', hrOnly, searchEmployees);   // autocomplete form kontrak
+
+// Daftarkan karyawan baru sekaligus kontrak pertamanya (akun + email aktivasi)
+router.post('/employee', hrOnly, createEmployeeWithContract);
 
 // Rekap tahunan
 router.get('/recap', hrOnly, getYearlyRecap);

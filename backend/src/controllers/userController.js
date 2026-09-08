@@ -570,4 +570,4 @@ const registerFace = async (req, res) => {
 };
 
 
-module.exports = { getAllUsers, getUser, createUser, updateUser, deleteUser, permanentDeleteUser, updateProfile, changePassword, getNotifications, markNotificationRead, deleteNotification, deleteAllNotifications, broadcastNotification, getDashboardStats, getSettings, updateSettings, saveFcmToken, removeFcmToken, registerFace };
+module.exports = { getAllUsers, getUser, createUser, updateUser, deleteUser, permanentDeleteUser, updateProfile, changePassword, getNotifications, markNotificationRead, deleteNotification, deleteAllNotifications, broadcastNotification, getDashboardStats, getSettings, updateSettings, saveFcmToken, removeFcmToken, registerFace, sendInvitationEmail };
