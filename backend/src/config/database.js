@@ -111,6 +111,104 @@ const testConnection = async () => {
       )
     `);
 
+    // ── Modul Status Hubungan Kerja (PKWT/PKWTT/Daily Worker) ────────────────
+    // Kolom tambahan pada users: penempatan (site), instansi (badan usaha), dan
+    // checklist berkas. Status & data kontrak aktif TIDAK disimpan di sini —
+    // dibaca dari employment_contracts agar histori perpanjangan tetap utuh.
+    const [empCols] = await conn.query(`
+      SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'penempatan'
+    `);
+    if (empCols.length === 0) {
+      await conn.query(`
+        ALTER TABLE users
+        ADD COLUMN penempatan VARCHAR(100) DEFAULT NULL,
+        ADD COLUMN instansi VARCHAR(100) DEFAULT NULL,
+        ADD COLUMN has_skck BOOLEAN DEFAULT FALSE,
+        ADD COLUMN has_formjobs BOOLEAN DEFAULT FALSE,
+        ADD COLUMN resign_date DATE DEFAULT NULL,
+        ADD COLUMN resign_reason ENUM('resign','tidak_lanjut_kontrak','phk','pensiun','lainnya') DEFAULT NULL,
+        ADD COLUMN resign_note VARCHAR(255) DEFAULT NULL
+      `);
+      console.log('✅ Migrasi kolom status hubungan kerja berhasil ditambahkan ke users.');
+    }
+
+    // Riwayat kontrak. Satu baris = satu periode kontrak. Perpanjangan membuat
+    // baris BARU (bukan update) sehingga histori sebelumnya tetap tersimpan.
+    // pkwt_year dihitung sistem saat insert dari urutan kontrak PKWT karyawan.
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS employment_contracts (
+        id VARCHAR(36) PRIMARY KEY,
+        user_id VARCHAR(36) NOT NULL,
+        contract_type ENUM('PKWT','PKWTT','DAILY_WORKER') NOT NULL,
+        duration_months TINYINT DEFAULT NULL,
+        pkwt_year TINYINT DEFAULT NULL,
+        start_date DATE NOT NULL,
+        end_date DATE DEFAULT NULL,
+        sequence_no INT NOT NULL DEFAULT 1,
+        status ENUM('active','expired','terminated','renewed') DEFAULT 'active',
+        is_signed BOOLEAN DEFAULT FALSE,
+        signed_at DATETIME DEFAULT NULL,
+        reminder_sent_at DATETIME DEFAULT NULL,
+        note VARCHAR(255) DEFAULT NULL,
+        created_by VARCHAR(36) DEFAULT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL,
+        INDEX idx_contract_user (user_id),
+        INDEX idx_contract_status (status),
+        INDEX idx_contract_end (end_date)
+      )
+    `);
+
+    // Master penempatan & instansi (dropdown di form kontrak)
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS work_placements (
+        id VARCHAR(36) PRIMARY KEY,
+        name VARCHAR(100) NOT NULL UNIQUE,
+        instansi VARCHAR(100) DEFAULT NULL,
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS work_institutions (
+        id VARCHAR(36) PRIMARY KEY,
+        name VARCHAR(100) NOT NULL UNIQUE,
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Seed master penempatan & instansi sesuai daftar HRD
+    const [placementCount] = await conn.query('SELECT COUNT(*) as count FROM work_placements');
+    if (placementCount[0].count === 0) {
+      const { generateId: genId } = require('../utils/helpers');
+      const placements = [
+        ['IW- Babatan', 'RAJAWALI BINA MAJU'],
+        ['IW- RBB', 'RAJAWALI BINA MAJU'],
+        ['IW- JURUMUDI', 'RAJAWALI BINA MAJU'],
+        ['IW - BALI', 'RAJAWALI BINA MAJU'],
+        ['IW- JOGJA', 'RAJAWALI BINA MAJU'],
+        ['IW- SEMARANG', 'RAJAWALI BINA MAJU'],
+        ['ALGOO - BABATAN', 'ALGOO'],
+        ['ILUMI - M2S', 'ILUMINDO PERKASA MAS'],
+        ['IW -LABEL ROMO', 'RAJAWALI BINA MAJU'],
+        ['WMP - BABATAN', 'WIJAYA MEGA PUTERA'],
+        ['WMP- LEGUNDI', 'WIJAYA MEGA PUTERA'],
+        ['WMP - BMB', 'WIJAYA MEGA PUTERA'],
+      ];
+      for (const [name, instansi] of placements) {
+        await conn.query('INSERT INTO work_placements (id, name, instansi) VALUES (?, ?, ?)', [genId(), name, instansi]);
+      }
+      const institutions = ['RAJAWALI BINA MAJU', 'ALGOO', 'ILUMINDO PERKASA MAS', 'WIJAYA MEGA PUTERA'];
+      for (const name of institutions) {
+        await conn.query('INSERT INTO work_institutions (id, name) VALUES (?, ?)', [genId(), name]);
+      }
+      console.log('✅ Seeded master penempatan & instansi');
+    }
+
     // Seed initial announcements if empty
     const [rows] = await conn.query('SELECT COUNT(*) as count FROM company_announcements');
     if (rows[0].count === 0) {

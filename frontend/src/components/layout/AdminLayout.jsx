@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   LayoutDashboard, Users, Clock, FileText, BarChart3, Settings,
   Bell, LogOut, Menu, X, MapPin, Database, Shield, ChevronRight,
-  CalendarClock, ListChecks, CalendarDays, Building
+  CalendarClock, ListChecks, CalendarDays, Building, FileSignature
 } from 'lucide-react';
 import useAuthStore from '../../store/authStore';
 import toast from 'react-hot-toast';
@@ -27,6 +27,7 @@ const navGroups = [
       { path: '/admin/shifts',      icon: CalendarClock, label: 'Shift Kerja',          roles: ['superadmin', 'admin', 'hrd'], feature: 'shifts.manage' },
       { path: '/admin/leave-types', icon: ListChecks,    label: 'Jenis Izin',           roles: ['superadmin', 'admin', 'hrd'] },
       { path: '/admin/departments', icon: Building,      label: 'Departemen & Jabatan', roles: ['superadmin', 'admin', 'hrd'] },
+      { path: '/admin/contracts',   icon: FileSignature, label: 'Status Hubungan Kerja', roles: ['superadmin', 'admin', 'hrd'] },
       { path: '/admin/holidays',    icon: CalendarDays,  label: 'Hari Libur Nasional',  roles: ['superadmin', 'admin', 'hrd'] },
       { path: '/admin/locations',   icon: MapPin,        label: 'Lokasi Absensi', roles: ['superadmin', 'admin', 'hrd'] },
     ]

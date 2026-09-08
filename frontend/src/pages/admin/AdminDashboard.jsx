@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import {
   Users, Clock, FileText, TrendingUp, CheckCircle, AlertCircle,
-  Calendar, ArrowRight, UserX, Activity, BarChart3, RefreshCw
+  Calendar, ArrowRight, UserX, Activity, BarChart3, RefreshCw, FileSignature, AlertTriangle
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import {
@@ -34,6 +34,7 @@ export default function AdminDashboard() {
   const [topLate, setTopLate]       = useState([]);
   const [recentLeaves, setLeaves]   = useState([]);
   const [recentAtt, setRecentAtt]   = useState([]);
+  const [expiring, setExpiring]     = useState([]);
   const [loading, setLoading]       = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -44,7 +45,7 @@ export default function AdminDashboard() {
     if (!silent) setLoading(true);
     else setRefreshing(true);
     try {
-      const [statsR, trendR, heatR, deptR, lateR, leavesR, attR] = await Promise.all([
+      const [statsR, trendR, heatR, deptR, lateR, leavesR, attR, expR] = await Promise.all([
         api.get('/analytics/dashboard'),
         api.get('/analytics/trend?months=6'),
         api.get(`/analytics/checkin-heatmap?month=${curMonth}&year=${curYear}`),
@@ -52,6 +53,8 @@ export default function AdminDashboard() {
         api.get(`/analytics/top-late?month=${curMonth}&year=${curYear}&limit=5`),
         api.get('/leave/all?status=pending'),
         api.get(`/attendance/all?month=${curMonth}&year=${curYear}&limit=6`),
+        // Kontrak yang akan berakhir 30 hari ke depan; yang <= 14 hari disorot merah
+        api.get('/contracts/expiring?days=30').catch(() => ({ data: { contracts: [] } })),
       ]);
       setStats(statsR.data.stats);
       setTrend(trendR.data.trend);
@@ -60,6 +63,7 @@ export default function AdminDashboard() {
       setTopLate(lateR.data.topLate);
       setLeaves(leavesR.data.leaves.slice(0, 5));
       setRecentAtt(attR.data.attendances.slice(0, 6));
+      setExpiring(expR.data.contracts || []);
     } catch {}
     finally { setLoading(false); setRefreshing(false); }
   };
@@ -158,6 +162,61 @@ export default function AdminDashboard() {
             ))
         }
       </div>
+
+      {/* ── Kontrak Akan Berakhir ── */}
+      {!loading && expiring.length > 0 && (
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}
+          className="card p-5">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <div className="w-1 h-5 bg-red-500 rounded-full" />
+              <h3 className="font-bold text-slate-900 text-sm">Kontrak Akan Berakhir</h3>
+              <span className="px-2 py-0.5 rounded-lg text-[11px] font-bold bg-red-50 text-red-700 border border-red-200">
+                {expiring.filter(c => c.is_expiring_soon).length} mendesak
+              </span>
+            </div>
+            <Link to="/admin/contracts" className="text-xs text-slate-400 hover:text-slate-700 transition-colors">
+              Kelola kontrak →
+            </Link>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2">
+            {expiring.slice(0, 6).map((c) => (
+              <div key={c.contract_id}
+                className={`flex items-center gap-3 p-3 rounded-xl border ${
+                  c.is_expiring_soon ? 'bg-red-50/60 border-red-200' : 'bg-slate-50 border-slate-200'
+                }`}>
+                <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                  c.is_expiring_soon ? 'bg-red-100 text-red-600' : 'bg-slate-200 text-slate-500'
+                }`}>
+                  {c.is_expiring_soon ? <AlertTriangle size={16} /> : <FileSignature size={16} />}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium text-slate-900 text-sm truncate">{c.name}</div>
+                  <div className="text-xs text-slate-500 truncate">
+                    {c.contract_type}{c.pkwt_year ? ` · Thn ke-${c.pkwt_year}` : ''}
+                    {c.penempatan ? ` · ${c.penempatan}` : ''}
+                  </div>
+                  <div className="text-xs text-slate-400 mt-0.5">
+                    Berakhir {format(new Date(`${String(c.end_date).slice(0, 10)}T00:00:00`), 'd MMM yyyy', { locale: id })}
+                  </div>
+                </div>
+                <div className={`text-right flex-shrink-0 ${c.is_expiring_soon ? 'text-red-600' : 'text-slate-500'}`}>
+                  <div className="text-lg font-bold leading-none">{c.days_remaining}</div>
+                  <div className="text-[10px] font-medium">hari lagi</div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {expiring.length > 6 && (
+            <Link to="/admin/contracts"
+              className="block text-center text-xs text-slate-500 hover:text-slate-800 mt-3 py-2 rounded-xl hover:bg-slate-50 transition-colors">
+              +{expiring.length - 6} kontrak lainnya akan berakhir
+            </Link>
+          )}
+        </motion.div>
+      )}
 
       {/* ── Row 1: Tren + Pie ── */}
       {!loading && (

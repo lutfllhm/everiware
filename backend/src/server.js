@@ -8,6 +8,7 @@ require('dotenv').config();
 
 const { testConnection } = require('./config/database');
 const { startAttendanceReminderJob } = require('./jobs/attendanceReminder');
+const { startContractReminderJob } = require('./jobs/contractReminder');
 const authRoutes = require('./routes/auth');
 const attendanceRoutes = require('./routes/attendance');
 const leaveRoutes = require('./routes/leave');
@@ -22,6 +23,7 @@ const holidayRoutes    = require('./routes/holidays');
 const auditLogRoutes   = require('./routes/auditLog');
 const realtimeRoutes   = require('./routes/realtime');
 const announcementRoutes = require('./routes/announcements');
+const contractRoutes = require('./routes/contracts');
 
 // Jangan biarkan error tak tertangani membuat proses menyangkut diam-diam tanpa jejak di log
 process.on('unhandledRejection', (reason) => {
@@ -115,6 +117,7 @@ app.use('/api/holidays', holidayRoutes);
 app.use('/api/audit-logs', auditLogRoutes);
 app.use('/api/realtime', realtimeRoutes);
 app.use('/api/announcements', announcementRoutes);
+app.use('/api/contracts', contractRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => res.json({ status: 'OK', message: 'iWare Presence API is running 🚀', timestamp: new Date() }));
@@ -133,6 +136,7 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, '0.0.0.0', async () => {
   await testConnection();
   startAttendanceReminderJob();
+  startContractReminderJob();
   console.log(`🚀 iWare Presence API running on port ${PORT}`);
 });
 

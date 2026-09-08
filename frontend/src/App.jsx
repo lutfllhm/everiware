@@ -42,6 +42,7 @@ import DepartmentsAdmin from './pages/admin/DepartmentsAdmin';
 import OvertimeAdmin from './pages/admin/OvertimeAdmin';
 import HolidaysAdmin from './pages/admin/HolidaysAdmin';
 import AuditLogAdmin from './pages/admin/AuditLogAdmin';
+import ContractsAdmin from './pages/admin/ContractsAdmin';
 import RealtimeListener from './components/common/RealtimeListener';
 
 const queryClient = new QueryClient();
@@ -208,6 +209,7 @@ export default function App() {
           <Route path="/admin/departments" element={<AdminRoute><FeatureRoute><DepartmentsAdmin /></FeatureRoute></AdminRoute>} />
           <Route path="/admin/overtime" element={<AdminRoute><FeatureRoute><OvertimeAdmin /></FeatureRoute></AdminRoute>} />
           <Route path="/admin/holidays" element={<AdminRoute><FeatureRoute><HolidaysAdmin /></FeatureRoute></AdminRoute>} />
+          <Route path="/admin/contracts" element={<AdminRoute><FeatureRoute><ContractsAdmin /></FeatureRoute></AdminRoute>} />
           <Route path="/admin/audit-log" element={<AdminRoute><ProtectedRoute roles={['superadmin', 'admin']}><AuditLogAdmin /></ProtectedRoute></AdminRoute>} />
 
           <Route path="*" element={<Navigate to="/login" replace />} />
