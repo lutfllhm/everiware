@@ -219,7 +219,7 @@ export default function OvertimePage() {
               <h3 className="font-bold text-slate-900 mb-4">Pengajuan Lembur</h3>
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Tanggal Lembur</label>
+                  <label className="block text-sm font-semibold text-stone-700 mb-1">Tanggal Lembur</label>
                   <input type="date" value={form.date}
                     onChange={e => setForm({ ...form, date: e.target.value })}
                     className="input-brand" required />
@@ -227,13 +227,13 @@ export default function OvertimePage() {
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Jam Mulai</label>
+                    <label className="block text-sm font-semibold text-stone-700 mb-1">Jam Mulai</label>
                     <input type="time" value={form.start_time}
                       onChange={e => setForm({ ...form, start_time: e.target.value })}
                       className="input-brand" required />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Jam Selesai</label>
+                    <label className="block text-sm font-semibold text-stone-700 mb-1">Jam Selesai</label>
                     <input type="time" value={form.end_time}
                       onChange={e => setForm({ ...form, end_time: e.target.value })}
                       className="input-brand" required />
@@ -255,7 +255,7 @@ export default function OvertimePage() {
                 ) : null}
 
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Alasan / Pekerjaan yang Dilakukan</label>
+                  <label className="block text-sm font-semibold text-stone-700 mb-1">Alasan / Pekerjaan yang Dilakukan</label>
                   <textarea value={form.reason}
                     onChange={e => setForm({ ...form, reason: e.target.value })}
                     className="input-brand resize-none" rows={3}
@@ -264,7 +264,7 @@ export default function OvertimePage() {
 
                 {/* Lampiran Foto */}
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                  <label className="block text-sm font-semibold text-stone-700 mb-1">
                     Foto Bukti Lembur <span className="text-slate-400 font-normal">(opsional)</span>
                   </label>
                   <input

@@ -19,6 +19,8 @@ import NotificationsPage from './pages/employee/NotificationsPage';
 import OvertimePage from './pages/employee/OvertimePage';
 import MyStatsPage from './pages/employee/MyStatsPage';
 import HelpdeskPage from './pages/employee/HelpdeskPage';
+import HistoryPage from './pages/employee/HistoryPage';
+import CalendarPage from './pages/employee/CalendarPage';
 
 // Admin
 import AdminLayout from './components/layout/AdminLayout';
@@ -150,6 +152,8 @@ export default function App() {
           <Route path="/overtime" element={<EmployeeRoute><OvertimePage /></EmployeeRoute>} />
           <Route path="/my-stats" element={<EmployeeRoute><MyStatsPage /></EmployeeRoute>} />
           <Route path="/helpdesk" element={<EmployeeRoute><HelpdeskPage /></EmployeeRoute>} />
+          <Route path="/history" element={<EmployeeRoute><HistoryPage /></EmployeeRoute>} />
+          <Route path="/calendar" element={<EmployeeRoute><CalendarPage /></EmployeeRoute>} />
 
           {/* Admin Routes */}
           <Route path="/admin" element={<AdminRoute><FeatureRoute><AdminDashboard /></FeatureRoute></AdminRoute>} />

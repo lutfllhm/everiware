@@ -217,31 +217,40 @@ export default function LeavePage({ defaultTab = 0, defaultType = null }) {
             <form onSubmit={handleSubmit} className="space-y-4">
               {/* Jenis izin */}
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Jenis Izin</label>
+                <label className="block text-sm font-semibold text-stone-700 mb-2">Jenis Izin</label>
                 <div className="grid grid-cols-2 gap-2">
-                  {leaveTypes.map(t => (
-                    <button key={t.code} type="button" onClick={() => setForm({ ...form, type: t.code })}
-                      className={`py-2.5 px-3 rounded-xl text-sm font-medium border-2 transition-all text-left ${form.type === t.code ? 'border-[#8B1F1F] bg-[#8B1F1F] text-white' : 'border-stone-200 text-stone-600 hover:border-[#8B1F1F]/40'}`}>
-                      {t.name}
-                      {t.deducts_quota && <span className="text-xs opacity-60 block">Kurangi kuota</span>}
-                    </button>
-                  ))}
+                  {leaveTypes.map(t => {
+                    const active = form.type === t.code;
+                    return (
+                      <button key={t.code} type="button" onClick={() => setForm({ ...form, type: t.code })}
+                        className={`flex flex-col justify-center min-h-[62px] py-2.5 px-3 rounded-xl border-2 transition-all text-left ${
+                          active
+                            ? 'border-[#8B1F1F] bg-[#8B1F1F] text-white shadow-sm shadow-[#8B1F1F]/25'
+                            : 'border-stone-200 text-stone-700 hover:border-[#8B1F1F]/40 hover:bg-[#FFEBEE]/40'
+                        }`}>
+                        <span className="text-sm font-semibold leading-tight">{t.name}</span>
+                        <span className={`text-[11px] leading-tight mt-0.5 ${active ? 'text-white/70' : 'text-stone-400'}`}>
+                          {Number(t.deducts_quota) === 1 ? 'Mengurangi kuota cuti' : 'Tidak mengurangi kuota'}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Tanggal Mulai</label>
+                  <label className="block text-sm font-semibold text-stone-700 mb-1">Tanggal Mulai</label>
                   <input type="date" value={form.start_date} onChange={e => setForm({ ...form, start_date: e.target.value })}
                     className="input-brand" required />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Tanggal Selesai</label>
+                  <label className="block text-sm font-semibold text-stone-700 mb-1">Tanggal Selesai</label>
                   <input type="date" value={form.end_date} onChange={e => setForm({ ...form, end_date: e.target.value })}
                     className="input-brand" required min={form.start_date} />
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Alasan / Keterangan</label>
+                <label className="block text-sm font-semibold text-stone-700 mb-1">Alasan / Keterangan</label>
                 <textarea value={form.reason} onChange={e => setForm({ ...form, reason: e.target.value })}
                   className="input-brand resize-none" rows={3} placeholder="Jelaskan alasan pengajuan..." required />
               </div>
@@ -251,7 +260,7 @@ export default function LeavePage({ defaultTab = 0, defaultType = null }) {
                 <div className="grid grid-cols-2 gap-3">
                   {(form.type === 'late_permission' || form.type === 'leave_office') && (
                     <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">
+                      <label className="block text-sm font-semibold text-stone-700 mb-1">
                         {form.type === 'late_permission' ? 'Rencana Jam Masuk' : 'Jam Tinggalkan Kantor'}
                       </label>
                       <input type="time" value={form.time_start || ''} onChange={e => setForm({ ...form, time_start: e.target.value })}
@@ -260,7 +269,7 @@ export default function LeavePage({ defaultTab = 0, defaultType = null }) {
                   )}
                   {(form.type === 'early_leave' || form.type === 'leave_office') && (
                     <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">
+                      <label className="block text-sm font-semibold text-stone-700 mb-1">
                         {form.type === 'early_leave' ? 'Rencana Jam Pulang' : 'Rencana Jam Kembali'}
                       </label>
                       <input type="time" value={form.time_end || ''} onChange={e => setForm({ ...form, time_end: e.target.value })}
@@ -279,9 +288,9 @@ export default function LeavePage({ defaultTab = 0, defaultType = null }) {
                 <p className="text-xs text-slate-500">Izin keluar kantor maksimal 2 jam. Pastikan jam kembali lebih dari jam keluar.</p>
               )}
 
-              {selectedType?.requires_attachment && (
+              {Number(selectedType?.requires_attachment) === 1 && (
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                  <label className="block text-sm font-semibold text-stone-700 mb-2">
                     Bukti / Lampiran <span className="text-red-500">*</span>
                   </label>
                   {preview ? (

@@ -508,7 +508,7 @@ export default function DashboardPage() {
                 <span className="section-bar" />
                 <h3 className="text-[14.5px] font-extrabold text-stone-900 tracking-tight">Pengajuan Terakhir</h3>
               </div>
-              <Link to="/leave" className="text-[12px] font-semibold text-[#8B1F1F] hover:underline flex items-center gap-0.5">
+              <Link to="/history?tab=requests" className="text-[12px] font-semibold text-[#8B1F1F] hover:underline flex items-center gap-0.5">
                 Lihat semua <ChevronRight size={14} />
               </Link>
             </div>
@@ -547,7 +547,7 @@ export default function DashboardPage() {
                 <span className="section-bar" />
                 <h3 className="text-[14.5px] font-extrabold text-stone-900 tracking-tight">Riwayat Absensi</h3>
               </div>
-              <Link to="/attendance" className="text-[12px] font-semibold text-[#8B1F1F] hover:underline flex items-center gap-0.5">
+              <Link to="/history" className="text-[12px] font-semibold text-[#8B1F1F] hover:underline flex items-center gap-0.5">
                 Lihat semua <ChevronRight size={14} />
               </Link>
             </div>

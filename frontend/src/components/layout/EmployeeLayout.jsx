@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Clock, FileText, User, Bell, LogOut, Timer, Fingerprint } from 'lucide-react';
+import { Home, Clock, FileText, User, Bell, LogOut, Timer, Fingerprint, History, CalendarDays } from 'lucide-react';
 import useAuthStore from '../../store/authStore';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
@@ -10,19 +10,23 @@ import { useAutoRefresh } from '../../hooks/useAutoRefresh';
 
 const navItems = [
   { path: '/dashboard', icon: Home, label: 'Beranda' },
+  { path: '/history', icon: History, label: 'Riwayat' },
   { path: '/attendance', icon: Clock, label: 'Absensi' },
+  { path: '/calendar', icon: CalendarDays, label: 'Kalender' },
   { path: '/leave', icon: FileText, label: 'Izin & Cuti' },
   { path: '/overtime', icon: Timer, label: 'Lembur' },
   { path: '/notifications', icon: Bell, label: 'Notifikasi', badge: true },
   { path: '/profile', icon: User, label: 'Profil' },
 ];
 
-// Bottom nav mobile — meniru app: 5 slot dengan tombol absensi mengambang di tengah.
+// Bottom nav mobile — susunan persis app: 5 slot dengan tombol absensi mengambang
+// di tengah. Izin & Lembur tidak punya slot sendiri; keduanya ada di dalam Riwayat
+// dan diajukan lewat menu ikon di Beranda, sama seperti di app.
 const mobileNavItems = [
   { path: '/dashboard', icon: Home, label: 'Beranda' },
-  { path: '/leave', icon: FileText, label: 'Izin & Cuti' },
+  { path: '/history', icon: History, label: 'Riwayat' },
   { path: '/attendance', icon: Fingerprint, label: 'Absensi', center: true },
-  { path: '/overtime', icon: Timer, label: 'Lembur' },
+  { path: '/calendar', icon: CalendarDays, label: 'Kalender' },
   { path: '/profile', icon: User, label: 'Akun' },
 ];
 
@@ -113,9 +117,24 @@ export default function EmployeeLayout({ children }) {
 
   const isActive = (path) => location.pathname === path;
 
+  // Bottom nav mobile hanya punya 5 slot — sama seperti app. Halaman yang tidak
+  // punya slot sendiri menyalakan tab induknya: pengajuan izin/lembur ada di
+  // dalam Riwayat, statistik & bantuan ada di dalam Akun.
+  const navGroups = {
+    '/history': ['/leave', '/overtime'],
+    '/profile': ['/my-stats', '/helpdesk'],
+  };
+
+  const isMobileNavActive = (path) => {
+    if (location.pathname === path) return true;
+    return (navGroups[path] || []).some(
+      (prefix) => location.pathname === prefix || location.pathname.startsWith(`${prefix}/`),
+    );
+  };
+
   // Halaman-halaman ini memakai PageHeader foto full-bleed sendiri (meniru app
   // mobile), jadi top header bawaan layout disembunyikan di sana.
-  const selfHeaderPaths = ['/dashboard', '/profile', '/my-stats', '/helpdesk', '/notifications'];
+  const selfHeaderPaths = ['/dashboard', '/profile', '/my-stats', '/helpdesk', '/notifications', '/history', '/calendar'];
   const hasOwnHeader = selfHeaderPaths.includes(location.pathname);
 
   return (
@@ -205,7 +224,7 @@ export default function EmployeeLayout({ children }) {
             {/* Desktop page title */}
             <div className="hidden lg:block">
               <h1 className="font-bold text-slate-900">
-                {navItems.find(n => isActive(n.path))?.label || 'Dashboard'}
+                {navItems.find(n => n.path === location.pathname)?.label || 'Dashboard'}
               </h1>
               <p className="text-xs text-slate-400">
                 {new Date().toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
@@ -261,7 +280,7 @@ export default function EmployeeLayout({ children }) {
           <div className="relative">
             {/* Tombol absensi mengambang di tengah */}
             {mobileNavItems.filter((i) => i.center).map((item) => {
-              const active = isActive(item.path);
+              const active = isMobileNavActive(item.path);
               return (
                 <Link
                   key={item.path}
@@ -282,7 +301,7 @@ export default function EmployeeLayout({ children }) {
               <div className="flex items-stretch h-[70px]">
                 {mobileNavItems.map((item) => {
                   if (item.center) return <div key={item.path} className="flex-1" />;
-                  const active = isActive(item.path);
+                  const active = isMobileNavActive(item.path);
                   return (
                     <Link
                       key={item.path}
