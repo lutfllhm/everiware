@@ -50,6 +50,10 @@ const getContracts = async (req, res) => {
         u.id, u.name, u.employee_id, u.email, u.position, u.department,
         u.penempatan, u.instansi, u.join_date, u.is_active,
         u.has_skck, u.has_formjobs, u.resign_date, u.resign_reason,
+        -- Akun yang password-nya masih NULL berarti karyawan belum membuat kata
+        -- sandi lewat tautan aktivasi. Dipakai tabel untuk menandai & menawarkan
+        -- kirim ulang aktivasi.
+        (u.password IS NULL) AS pending_activation,
         c.id AS contract_id, c.contract_type, c.duration_months, c.pkwt_year,
         c.start_date, c.end_date, c.sequence_no, c.status AS contract_status,
         c.is_signed, c.signed_at, c.note
@@ -561,6 +565,9 @@ const createEmployeeWithContract = async (req, res) => {
       user_id: userId,
       email_sent: emailSent,
       activation_token: activationToken,
+      // Tautan lengkap dikembalikan supaya HR bisa menyalin & mengirimnya sendiri
+      // (mis. lewat WhatsApp) saat email tidak dikirim atau gagal terkirim.
+      activation_link: `${process.env.WEB_URL || 'http://localhost:3000'}/activate/${activationToken}`,
       contract: { id: contractId, end_date: endDate, pkwt_year: pkwtYear },
     });
   } catch (err) {
@@ -569,6 +576,73 @@ const createEmployeeWithContract = async (req, res) => {
     res.status(500).json({ success: false, message: 'Terjadi kesalahan server' });
   } finally {
     conn.release();
+  }
+};
+
+// ── KIRIM ULANG AKTIVASI ─────────────────────────────────────────────────────
+// Token aktivasi hanya berlaku 7 hari. Kalau karyawan belum sempat membukanya,
+// HR perlu jalan untuk membuat token baru — tanpa ini akun yang tokennya
+// kedaluwarsa tidak bisa diaktifkan sama sekali (harus dihapus & didaftar ulang).
+// Token lama otomatis batal karena kolomnya ditimpa.
+const resendActivation = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { send_email } = req.body;
+
+    const [users] = await pool.query(
+      'SELECT id, name, email, password, is_verified FROM users WHERE id = ?',
+      [userId]
+    );
+    if (!users.length) return res.status(404).json({ success: false, message: 'Karyawan tidak ditemukan' });
+    const user = users[0];
+
+    // Akun yang sudah punya password berarti sudah diaktifkan karyawannya.
+    // Menerbitkan token baru untuknya sama saja memberi jalan reset password
+    // lewat pintu belakang, jadi ditolak — pakai fitur lupa password.
+    if (user.password !== null) {
+      return res.status(400).json({
+        success: false,
+        message: 'Akun ini sudah aktif. Gunakan fitur lupa password jika karyawan lupa kata sandinya.',
+      });
+    }
+
+    const activationToken = generateId();
+    const tokenExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    await pool.query(
+      'UPDATE users SET otp_code = ?, otp_expires = ? WHERE id = ?',
+      [activationToken, tokenExpires, userId]
+    );
+
+    const activationLink = `${process.env.WEB_URL || 'http://localhost:3000'}/activate/${activationToken}`;
+
+    let emailSent = false;
+    if (send_email !== false && send_email !== 'false') {
+      try {
+        const { sendInvitationEmail } = require('./userController');
+        await sendInvitationEmail(user.email, user.name, activationLink);
+        emailSent = true;
+      } catch (emailErr) {
+        console.error('[resendActivation] gagal kirim email:', emailErr.message);
+      }
+    }
+
+    await auditLog(req, 'RESEND_ACTIVATION', 'user', userId,
+      `Kirim ulang aktivasi untuk ${user.name}${emailSent ? ' (email terkirim)' : ' (tautan disalin manual)'}`);
+
+    res.json({
+      success: true,
+      message: emailSent
+        ? 'Email aktivasi berhasil dikirim ulang.'
+        : (send_email === false || send_email === 'false')
+          ? 'Tautan aktivasi baru berhasil dibuat.'
+          : 'Tautan aktivasi baru dibuat, tetapi email gagal terkirim. Silakan salin tautannya.',
+      email_sent: emailSent,
+      activation_link: activationLink,
+      expires_at: tokenExpires,
+    });
+  } catch (err) {
+    console.error('[resendActivation]', err);
+    res.status(500).json({ success: false, message: 'Terjadi kesalahan server' });
   }
 };
 
@@ -597,6 +671,7 @@ module.exports = {
   getContracts,
   searchEmployees,
   createEmployeeWithContract,
+  resendActivation,
   getContractHistory,
   createContract,
   updateContract,

@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   FileSignature, Search, Plus, RefreshCw, X, History, AlertTriangle,
   CheckCircle2, Clock, UserMinus, UserCheck, BarChart3, Users, Filter, Pencil,
-  UserPlus, Mail, CornerDownLeft,
+  UserPlus, Mail, CornerDownLeft, Copy,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../../api/axios';
@@ -104,6 +104,12 @@ export default function ContractsAdmin() {
   const [form, setForm] = useState({ contract_type: 'PKWT', duration_months: 6, start_date: todayISO(), note: '', is_signed: false });
   const [empForm, setEmpForm] = useState({ penempatan: '', instansi: '', join_date: '', position: '', has_skck: false, has_formjobs: false });
   const [termForm, setTermForm] = useState({ resign_date: todayISO(), resign_reason: 'resign', resign_note: '' });
+
+  // Kotak tautan aktivasi — tampil saat email tidak dikirim / gagal terkirim,
+  // supaya HR punya cara membagikannya sendiri (mis. lewat WhatsApp).
+  const [activationModal, setActivationModal] = useState(null);
+  const [resendModal, setResendModal] = useState(null);
+  const [copied, setCopied] = useState(false);
 
   // Modal "Tambah Karyawan" — cari karyawan yang sudah ada, atau daftarkan baru
   const [addModal, setAddModal] = useState(null); // null | { step: 'search'|'form', prefillName }
@@ -324,12 +330,51 @@ export default function ContractsAdmin() {
         start_date: newForm.start_date || newForm.join_date,
       });
       toast.success(data.message || 'Karyawan berhasil didaftarkan');
-      setAddModal(null);
       fetchRows();
+      // Kalau email tidak dikirim (atau gagal), tautan aktivasi wajib ditampilkan —
+      // tanpa itu karyawan tidak punya cara masuk sama sekali.
+      if (!data.email_sent && data.activation_link) {
+        setActivationModal({
+          name: newForm.name,
+          email: newForm.email,
+          link: data.activation_link,
+          failed: newForm.send_invitation, // dicentang tapi tetap gagal kirim
+        });
+      }
+      setAddModal(null);
     } catch (err) {
       toast.error(err.response?.data?.message || 'Gagal mendaftarkan karyawan');
     } finally {
       setSaving(false);
+    }
+  };
+
+  // Kirim ulang aktivasi: token lama diganti baru (berlaku 7 hari lagi).
+  // Dipakai kalau tautan sebelumnya kedaluwarsa atau tidak pernah sampai.
+  const handleResendActivation = async (row, sendEmail) => {
+    try {
+      const { data } = await api.post(`/contracts/resend-activation/${row.id}`, { send_email: sendEmail });
+      toast.success(data.message);
+      if (!data.email_sent && data.activation_link) {
+        setActivationModal({
+          name: row.name, email: row.email, link: data.activation_link, failed: sendEmail,
+        });
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Gagal mengirim ulang aktivasi');
+    }
+  };
+
+  const copyLink = async (link) => {
+    try {
+      await navigator.clipboard.writeText(link);
+      setCopied(true);
+      toast.success('Tautan disalin');
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Clipboard API butuh HTTPS/localhost — kalau ditolak, HR masih bisa
+      // menyalin manual karena tautannya ditampilkan sebagai teks terpilih.
+      toast.error('Gagal menyalin otomatis. Silakan salin manual dari kotak tautan.');
     }
   };
 
@@ -495,6 +540,11 @@ export default function ContractsAdmin() {
                       <td className="px-4 py-3">
                         <div className="font-medium text-slate-900 whitespace-nowrap">{row.name}</div>
                         <div className="text-xs text-slate-400">{row.employee_id || '-'}</div>
+                        {row.is_active && row.pending_activation === 1 && (
+                          <span className="inline-flex items-center gap-1 mt-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                            <Mail size={9} /> Belum aktivasi
+                          </span>
+                        )}
                         {!row.is_active && (
                           <span className="inline-block mt-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-200 text-slate-600">
                             Keluar {fmtDate(row.resign_date)}
@@ -549,6 +599,12 @@ export default function ContractsAdmin() {
                             <button onClick={() => openContractModal(row, 'edit')} title="Koreksi kontrak"
                               className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100">
                               <Pencil size={15} />
+                            </button>
+                          )}
+                          {row.is_active && row.pending_activation === 1 && (
+                            <button onClick={() => setResendModal(row)} title="Kirim ulang aktivasi akun"
+                              className="p-1.5 rounded-lg text-amber-600 hover:bg-amber-50">
+                              <Mail size={15} />
                             </button>
                           )}
                           <button onClick={() => openHistory(row)} title="Riwayat kontrak"
@@ -968,6 +1024,103 @@ export default function ContractsAdmin() {
                 </button>
               </div>
             </form>
+          </Modal>
+        )}
+
+        {/* ── Kotak Tautan Aktivasi ─────────────────────────────────────────── */}
+        {activationModal && (
+          <Modal onClose={() => setActivationModal(null)} title="Tautan Aktivasi Akun"
+            subtitle={`${activationModal.name} · ${activationModal.email}`}>
+            <div className="space-y-4">
+              <div className={`border rounded-xl px-3 py-2.5 text-xs ${
+                activationModal.failed
+                  ? 'bg-red-50 border-red-200 text-red-800'
+                  : 'bg-amber-50 border-amber-200 text-amber-800'
+              }`}>
+                {activationModal.failed
+                  ? <>Email aktivasi <b>gagal terkirim</b>. Bagikan tautan di bawah ini secara manual agar karyawan tetap bisa membuat kata sandi.</>
+                  : <>Email aktivasi <b>tidak dikirim</b>. Bagikan tautan di bawah ini ke karyawan (mis. lewat WhatsApp) agar dia bisa membuat kata sandinya sendiri.</>}
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-500 mb-1.5">Tautan Aktivasi</label>
+                <div className="flex gap-2">
+                  <input
+                    readOnly
+                    value={activationModal.link}
+                    onFocus={e => e.target.select()}
+                    className="flex-1 px-3 py-2 text-xs font-mono bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900/10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => copyLink(activationModal.link)}
+                    className="px-3 py-2 text-sm font-medium text-white bg-slate-900 rounded-xl hover:bg-slate-800 flex items-center gap-1.5 flex-shrink-0"
+                  >
+                    {copied ? <CheckCircle2 size={15} /> : <Copy size={15} />}
+                    {copied ? 'Tersalin' : 'Salin'}
+                  </button>
+                </div>
+              </div>
+
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-slate-600 space-y-1.5">
+                <p className="font-semibold text-slate-700">Yang terjadi selanjutnya:</p>
+                <p>1. Karyawan membuka tautan ini di browser.</p>
+                <p>2. Dia membuat kata sandinya sendiri, lalu langsung masuk.</p>
+                <p>3. Setelah itu dia login memakai email + kata sandi tersebut.</p>
+                <p className="text-slate-400 pt-1">Tautan berlaku 7 hari dan hanya bisa dipakai sekali. Kalau kedaluwarsa, pakai tombol kirim ulang aktivasi di tabel.</p>
+              </div>
+
+              <button onClick={() => setActivationModal(null)}
+                className="w-full px-4 py-2.5 text-sm font-medium text-slate-600 bg-slate-100 rounded-xl hover:bg-slate-200">
+                Tutup
+              </button>
+            </div>
+          </Modal>
+        )}
+
+        {/* ── Modal Kirim Ulang Aktivasi ────────────────────────────────────── */}
+        {resendModal && (
+          <Modal onClose={() => setResendModal(null)} title="Kirim Ulang Aktivasi"
+            subtitle={`${resendModal.name} · ${resendModal.email}`}>
+            <div className="space-y-4">
+              <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5 text-xs text-amber-800">
+                Karyawan ini <b>belum membuat kata sandi</b>. Tautan aktivasi baru akan dibuat
+                dan berlaku 7 hari; tautan lama otomatis batal.
+              </div>
+
+              <div className="grid grid-cols-1 gap-2">
+                <button
+                  onClick={async () => { const r = resendModal; setResendModal(null); await handleResendActivation(r, true); }}
+                  className="flex items-center gap-3 p-3 rounded-xl border border-slate-200 hover:border-slate-900/20 hover:bg-slate-50 transition-colors text-left"
+                >
+                  <div className="w-9 h-9 rounded-xl bg-slate-900 text-white flex items-center justify-center flex-shrink-0">
+                    <Mail size={16} />
+                  </div>
+                  <div>
+                    <div className="font-medium text-slate-900 text-sm">Kirim lewat email</div>
+                    <div className="text-xs text-slate-500">Dikirim ke {resendModal.email}</div>
+                  </div>
+                </button>
+
+                <button
+                  onClick={async () => { const r = resendModal; setResendModal(null); await handleResendActivation(r, false); }}
+                  className="flex items-center gap-3 p-3 rounded-xl border border-slate-200 hover:border-slate-900/20 hover:bg-slate-50 transition-colors text-left"
+                >
+                  <div className="w-9 h-9 rounded-xl bg-slate-200 text-slate-600 flex items-center justify-center flex-shrink-0">
+                    <Copy size={16} />
+                  </div>
+                  <div>
+                    <div className="font-medium text-slate-900 text-sm">Buat tautan untuk disalin</div>
+                    <div className="text-xs text-slate-500">Tanpa email — bagikan sendiri via WhatsApp/chat</div>
+                  </div>
+                </button>
+              </div>
+
+              <button onClick={() => setResendModal(null)}
+                className="w-full px-4 py-2.5 text-sm font-medium text-slate-600 bg-slate-100 rounded-xl hover:bg-slate-200">
+                Batal
+              </button>
+            </div>
           </Modal>
         )}
 

@@ -4,7 +4,7 @@ const { authenticate, authorize } = require('../middleware/auth');
 const {
   getContracts, getContractHistory, createContract, updateContract, deleteContract,
   updateEmployment, terminateEmployee, reactivateEmployee, getExpiringContracts, getMasterData,
-  searchEmployees, createEmployeeWithContract,
+  searchEmployees, createEmployeeWithContract, resendActivation,
 } = require('../controllers/contractController');
 const { getYearlyRecap, getRecapDetail } = require('../controllers/contractRecapController');
 
@@ -21,6 +21,9 @@ router.get('/search-employees', hrOnly, searchEmployees);   // autocomplete form
 
 // Daftarkan karyawan baru sekaligus kontrak pertamanya (akun + email aktivasi)
 router.post('/employee', hrOnly, createEmployeeWithContract);
+
+// Terbitkan ulang tautan aktivasi untuk karyawan yang belum membuat kata sandi
+router.post('/resend-activation/:userId', hrOnly, resendActivation);
 
 // Rekap tahunan
 router.get('/recap', hrOnly, getYearlyRecap);
