@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   FileSignature, Search, Plus, RefreshCw, X, History, AlertTriangle,
   CheckCircle2, Clock, UserMinus, UserCheck, BarChart3, Users, Filter, Pencil,
-  UserPlus, Mail, CornerDownLeft, Copy,
+  Mail, Copy,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../../api/axios';
@@ -110,15 +110,6 @@ export default function ContractsAdmin() {
   const [activationModal, setActivationModal] = useState(null);
   const [resendModal, setResendModal] = useState(null);
   const [copied, setCopied] = useState(false);
-
-  // Modal "Tambah Karyawan" — cari karyawan yang sudah ada, atau daftarkan baru
-  const [addModal, setAddModal] = useState(null); // null | { step: 'search'|'form', prefillName }
-  const [newForm, setNewForm] = useState({
-    name: '', email: '', phone: '', employee_id: '', position: '',
-    penempatan: '', instansi: '', join_date: todayISO(),
-    has_skck: false, has_formjobs: false, send_invitation: true,
-    contract_type: 'PKWT', duration_months: 6, start_date: '', note: '', is_signed: false,
-  });
 
   useEffect(() => { fetchMaster(); }, []);
   useEffect(() => {
@@ -287,68 +278,6 @@ export default function ContractsAdmin() {
     }
   };
 
-  // Preview tanggal berakhir untuk form pendaftaran karyawan baru.
-  // Rumusnya sama dengan backend; tanggal mulai kontrak default = tanggal masuk.
-  const newPreviewEnd = useMemo(() => {
-    const start = newForm.start_date || newForm.join_date;
-    if (newForm.contract_type !== 'PKWT' || !start || !newForm.duration_months) return null;
-    const [y, m, d] = start.split('-').map(Number);
-    const dueIdx = (m - 1) + Number(newForm.duration_months);
-    const dueYear = y + Math.floor(dueIdx / 12);
-    const dueMonth = dueIdx % 12;
-    const daysInDue = new Date(Date.UTC(dueYear, dueMonth + 1, 0)).getUTCDate();
-    if (d > daysInDue) return new Date(Date.UTC(dueYear, dueMonth, daysInDue)).toISOString().slice(0, 10);
-    const end = new Date(Date.UTC(dueYear, dueMonth, d));
-    end.setUTCDate(end.getUTCDate() - 1);
-    return end.toISOString().slice(0, 10);
-  }, [newForm.contract_type, newForm.start_date, newForm.join_date, newForm.duration_months]);
-
-  const openAddModal = () => {
-    setNewForm({
-      name: '', email: '', phone: '', employee_id: '', position: '',
-      penempatan: '', instansi: '', join_date: todayISO(),
-      has_skck: false, has_formjobs: false, send_invitation: true,
-      contract_type: 'PKWT', duration_months: 6, start_date: '', note: '', is_signed: false,
-    });
-    setAddModal({ step: 'search' });
-  };
-
-  // Karyawan yang sudah terdaftar dipilih dari hasil cari -> langsung ke form kontrak,
-  // supaya tidak pernah terbentuk data karyawan ganda.
-  const pickExistingEmployee = (emp) => {
-    setAddModal(null);
-    openContractModal({ ...emp, contract_type: emp.contract_type || 'PKWT' }, emp.has_contract ? 'renew' : 'new');
-  };
-
-  const handleSaveNewEmployee = async (e) => {
-    e.preventDefault();
-    setSaving(true);
-    try {
-      const { data } = await api.post('/contracts/employee', {
-        ...newForm,
-        duration_months: newForm.contract_type === 'PKWT' ? Number(newForm.duration_months) : null,
-        start_date: newForm.start_date || newForm.join_date,
-      });
-      toast.success(data.message || 'Karyawan berhasil didaftarkan');
-      fetchRows();
-      // Kalau email tidak dikirim (atau gagal), tautan aktivasi wajib ditampilkan —
-      // tanpa itu karyawan tidak punya cara masuk sama sekali.
-      if (!data.email_sent && data.activation_link) {
-        setActivationModal({
-          name: newForm.name,
-          email: newForm.email,
-          link: data.activation_link,
-          failed: newForm.send_invitation, // dicentang tapi tetap gagal kirim
-        });
-      }
-      setAddModal(null);
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Gagal mendaftarkan karyawan');
-    } finally {
-      setSaving(false);
-    }
-  };
-
   // Kirim ulang aktivasi: token lama diganti baru (berlaku 7 hari lagi).
   // Dipakai kalau tautan sebelumnya kedaluwarsa atau tidak pernah sampai.
   const handleResendActivation = async (row, sendEmail) => {
@@ -418,14 +347,6 @@ export default function ContractsAdmin() {
         ))}
       </div>
 
-        {tab === 'data' && (
-          <button
-            onClick={openAddModal}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-slate-900 rounded-xl hover:bg-slate-800 transition-colors"
-          >
-            <UserPlus size={16} /> Tambah Karyawan
-          </button>
-        )}
       </div>
 
       {tab === 'recap' ? <ContractRecap /> : (
@@ -843,190 +764,6 @@ export default function ContractsAdmin() {
           </Modal>
         )}
 
-        {/* ── Modal Tambah Karyawan: cari dulu, baru daftar ─────────────────── */}
-        {addModal?.step === 'search' && (
-          <Modal onClose={() => setAddModal(null)} title="Tambah Karyawan ke Kontrak"
-            subtitle="Cari karyawan yang sudah terdaftar, atau daftarkan yang baru">
-            <EmployeeSearch
-              onPick={pickExistingEmployee}
-              onCreateNew={(name) => {
-                setNewForm(f => ({ ...f, name }));
-                setAddModal({ step: 'form' });
-              }}
-            />
-          </Modal>
-        )}
-
-        {/* ── Modal Daftar Karyawan Baru + Kontrak Pertama ──────────────────── */}
-        {addModal?.step === 'form' && (
-          <Modal onClose={() => setAddModal(null)} title="Daftarkan Karyawan Baru"
-            subtitle="Akun karyawan, email aktivasi, dan kontrak pertama dibuat sekaligus" wide>
-            <form onSubmit={handleSaveNewEmployee} className="space-y-4">
-              {/* Data karyawan */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <Field label="Nama Lengkap *">
-                  <input required value={newForm.name}
-                    onChange={e => setNewForm(f => ({ ...f, name: e.target.value }))}
-                    placeholder="Nama karyawan"
-                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900/10" />
-                </Field>
-                <Field label="Email *">
-                  <input required type="email" value={newForm.email}
-                    onChange={e => setNewForm(f => ({ ...f, email: e.target.value }))}
-                    placeholder="email@perusahaan.com"
-                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900/10" />
-                </Field>
-                <Field label="No. HP">
-                  <input value={newForm.phone}
-                    onChange={e => setNewForm(f => ({ ...f, phone: e.target.value }))}
-                    placeholder="08xxxxxxxxxx"
-                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900/10" />
-                </Field>
-                <Field label="ID Karyawan / NIK">
-                  <input value={newForm.employee_id}
-                    onChange={e => setNewForm(f => ({ ...f, employee_id: e.target.value }))}
-                    placeholder="Opsional"
-                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900/10" />
-                </Field>
-                <Field label="Posisi">
-                  <input list="new-position-options" value={newForm.position}
-                    onChange={e => setNewForm(f => ({ ...f, position: e.target.value }))}
-                    placeholder="Posisi karyawan"
-                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900/10" />
-                  <datalist id="new-position-options">
-                    {(master.positions || []).map(p => <option key={p} value={p} />)}
-                  </datalist>
-                </Field>
-                <Field label="Tanggal Masuk *">
-                  <input required type="date" value={newForm.join_date}
-                    onChange={e => setNewForm(f => ({ ...f, join_date: e.target.value }))}
-                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900/10" />
-                </Field>
-                <Field label="Penempatan">
-                  <select value={newForm.penempatan}
-                    onChange={e => {
-                      const name = e.target.value;
-                      const match = master.placements.find(p => p.name === name);
-                      setNewForm(f => ({ ...f, penempatan: name, instansi: match?.instansi || f.instansi }));
-                    }}
-                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none">
-                    <option value="">— Pilih Penempatan —</option>
-                    {master.placements.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
-                  </select>
-                </Field>
-                <Field label="Instansi">
-                  <select value={newForm.instansi}
-                    onChange={e => setNewForm(f => ({ ...f, instansi: e.target.value }))}
-                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none">
-                    <option value="">— Pilih Instansi —</option>
-                    {master.institutions.map(i => <option key={i.id} value={i.name}>{i.name}</option>)}
-                  </select>
-                </Field>
-              </div>
-
-              {/* Kontrak pertama */}
-              <div className="border-t border-slate-100 pt-4 space-y-3">
-                <p className="text-xs font-semibold text-slate-700">Status Hubungan Kerja</p>
-
-                <Field label="Jenis Kontrak">
-                  <div className="grid grid-cols-3 gap-2">
-                    {['PKWT', 'PKWTT', 'DAILY_WORKER'].map(t => (
-                      <button key={t} type="button" onClick={() => setNewForm(f => ({ ...f, contract_type: t }))}
-                        className={`px-3 py-2 rounded-xl text-sm font-medium border transition-all ${
-                          newForm.contract_type === t ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
-                        }`}>
-                        {TYPE_LABELS[t]}
-                      </button>
-                    ))}
-                  </div>
-                </Field>
-
-                {newForm.contract_type === 'PKWT' && (
-                  <Field label="Durasi Kontrak">
-                    <div className="grid grid-cols-3 gap-2">
-                      {(master.durations || [3, 6, 12]).map(d => (
-                        <button key={d} type="button" onClick={() => setNewForm(f => ({ ...f, duration_months: d }))}
-                          className={`px-3 py-2 rounded-xl text-sm font-medium border transition-all ${
-                            Number(newForm.duration_months) === d ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
-                          }`}>
-                          {d} Bulan
-                        </button>
-                      ))}
-                    </div>
-                  </Field>
-                )}
-
-                <Field label="Tanggal Mulai Kontrak">
-                  <input type="date" value={newForm.start_date || newForm.join_date}
-                    onChange={e => setNewForm(f => ({ ...f, start_date: e.target.value }))}
-                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900/10" />
-                  <p className="text-[11px] text-slate-400 mt-1">Kosongkan untuk mengikuti tanggal masuk kerja.</p>
-                </Field>
-
-                {newForm.contract_type === 'PKWT' && newPreviewEnd && (
-                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-1.5">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-slate-500">Tanggal Berakhir</span>
-                      <span className="font-semibold text-slate-900">{fmtDateLong(newPreviewEnd)}</span>
-                    </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-slate-500">Tahun PKWT</span>
-                      <span className="font-semibold text-slate-900">Tahun ke-1</span>
-                    </div>
-                    <p className="text-[11px] text-slate-400 pt-1">Dihitung otomatis oleh sistem.</p>
-                  </div>
-                )}
-
-                <div className="flex flex-wrap gap-4">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" checked={newForm.is_signed}
-                      onChange={e => setNewForm(f => ({ ...f, is_signed: e.target.checked }))}
-                      className="w-4 h-4 rounded border-slate-300" />
-                    <span className="text-sm text-slate-600">Sudah TTD kontrak</span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" checked={newForm.has_skck}
-                      onChange={e => setNewForm(f => ({ ...f, has_skck: e.target.checked }))}
-                      className="w-4 h-4 rounded border-slate-300" />
-                    <span className="text-sm text-slate-600">SKCK</span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" checked={newForm.has_formjobs}
-                      onChange={e => setNewForm(f => ({ ...f, has_formjobs: e.target.checked }))}
-                      className="w-4 h-4 rounded border-slate-300" />
-                    <span className="text-sm text-slate-600">Formjobs</span>
-                  </label>
-                </div>
-              </div>
-
-              {/* Aktivasi akun */}
-              <label className="flex items-start gap-2 cursor-pointer bg-blue-50 border border-blue-200 rounded-xl p-3">
-                <input type="checkbox" checked={newForm.send_invitation}
-                  onChange={e => setNewForm(f => ({ ...f, send_invitation: e.target.checked }))}
-                  className="w-4 h-4 rounded border-slate-300 mt-0.5" />
-                <span className="text-xs text-blue-900">
-                  <b className="flex items-center gap-1.5"><Mail size={13} /> Kirim email aktivasi akun</b>
-                  <span className="block mt-0.5 text-blue-700">
-                    Karyawan menerima tautan untuk membuat kata sandi dan langsung bisa absensi.
-                    Karyawan ini otomatis muncul juga di menu Karyawan.
-                  </span>
-                </span>
-              </label>
-
-              <div className="flex gap-2 pt-1">
-                <button type="button" onClick={() => setAddModal({ step: 'search' })}
-                  className="px-4 py-2.5 text-sm font-medium text-slate-600 bg-slate-100 rounded-xl hover:bg-slate-200">
-                  Kembali
-                </button>
-                <button type="submit" disabled={saving}
-                  className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-slate-900 rounded-xl hover:bg-slate-800 disabled:opacity-50">
-                  {saving ? 'Menyimpan...' : 'Daftarkan Karyawan & Kontrak'}
-                </button>
-              </div>
-            </form>
-          </Modal>
-        )}
-
         {/* ── Kotak Tautan Aktivasi ─────────────────────────────────────────── */}
         {activationModal && (
           <Modal onClose={() => setActivationModal(null)} title="Tautan Aktivasi Akun"
@@ -1168,109 +905,6 @@ export default function ContractsAdmin() {
           </Modal>
         )}
       </AnimatePresence>
-    </div>
-  );
-}
-
-// ── Kolom cari karyawan ───────────────────────────────────────────────────────
-// HR mengetik nama, sistem menawarkan karyawan yang SUDAH terdaftar supaya
-// kontrak selalu terkait ke akun sungguhan (bukan nama teks bebas, yang akan
-// membuat data ganda dan merusak rekap turn over serta reminder H-14).
-// Kalau tidak ketemu, HR ditawari mendaftarkan orang itu sebagai karyawan baru.
-function EmployeeSearch({ onPick, onCreateNew }) {
-  const [q, setQ] = useState('');
-  const [results, setResults] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [touched, setTouched] = useState(false);
-
-  useEffect(() => {
-    const t = setTimeout(async () => {
-      setLoading(true);
-      try {
-        const { data } = await api.get('/contracts/search-employees', { params: { q: q || undefined } });
-        setResults(data.employees || []);
-      } catch {
-        setResults([]);
-      } finally {
-        setLoading(false);
-        setTouched(true);
-      }
-    }, q ? 300 : 0);
-    return () => clearTimeout(t);
-  }, [q]);
-
-  return (
-    <div className="space-y-3">
-      <div className="relative">
-        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-        <input
-          autoFocus
-          value={q}
-          onChange={e => setQ(e.target.value)}
-          placeholder="Ketik nama, email, atau NIK karyawan..."
-          className="w-full pl-9 pr-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900/10"
-        />
-      </div>
-
-      <div className="max-h-72 overflow-y-auto space-y-1.5">
-        {loading && <div className="text-center py-6 text-slate-400 text-sm">Mencari...</div>}
-
-        {!loading && results.map(emp => (
-          <button
-            key={emp.id}
-            type="button"
-            onClick={() => onPick(emp)}
-            className="w-full text-left flex items-center gap-3 p-3 rounded-xl border border-slate-200 hover:border-slate-900/20 hover:bg-slate-50 transition-colors"
-          >
-            <div className="w-9 h-9 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center font-semibold text-sm flex-shrink-0">
-              {emp.name?.[0]?.toUpperCase()}
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="font-medium text-slate-900 text-sm truncate">{emp.name}</div>
-              <div className="text-xs text-slate-500 truncate">
-                {emp.employee_id ? `${emp.employee_id} · ` : ''}{emp.email}
-              </div>
-              {emp.penempatan && <div className="text-[11px] text-slate-400 truncate">{emp.penempatan}</div>}
-            </div>
-            <div className="flex-shrink-0 text-right">
-              {emp.has_contract ? (
-                <span className={`px-2 py-0.5 rounded-lg text-[11px] font-semibold border ${TYPE_BADGE[emp.contract_type]}`}>
-                  {TYPE_LABELS[emp.contract_type]}
-                  {emp.pkwt_year ? ` · Thn ${emp.pkwt_year}` : ''}
-                </span>
-              ) : (
-                <span className="px-2 py-0.5 rounded-lg text-[11px] font-medium bg-slate-100 text-slate-500 border border-slate-200">
-                  Belum ada kontrak
-                </span>
-              )}
-            </div>
-          </button>
-        ))}
-
-        {!loading && touched && results.length === 0 && (
-          <div className="text-center py-6 text-slate-400 text-sm">
-            {q ? `Tidak ada karyawan cocok dengan "${q}"` : 'Belum ada karyawan aktif'}
-          </div>
-        )}
-      </div>
-
-      {/* Jalan keluar kalau orangnya memang belum terdaftar */}
-      <button
-        type="button"
-        onClick={() => onCreateNew(q.trim())}
-        className="w-full flex items-center gap-2.5 p-3 rounded-xl border border-dashed border-slate-300 text-slate-600 hover:border-slate-900/30 hover:bg-slate-50 transition-colors"
-      >
-        <div className="w-9 h-9 rounded-full bg-slate-900 text-white flex items-center justify-center flex-shrink-0">
-          <UserPlus size={16} />
-        </div>
-        <div className="flex-1 text-left">
-          <div className="font-medium text-slate-900 text-sm">
-            {q.trim() ? `Daftarkan "${q.trim()}" sebagai karyawan baru` : 'Daftarkan karyawan baru'}
-          </div>
-          <div className="text-xs text-slate-500">Buat akun + kontrak pertama sekaligus</div>
-        </div>
-        <CornerDownLeft size={15} className="text-slate-400 flex-shrink-0" />
-      </button>
     </div>
   );
 }

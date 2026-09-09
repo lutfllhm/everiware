@@ -1,9 +1,29 @@
 import { useState, useEffect, useMemo, Fragment } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Plus, Edit, Trash2, X, User, Mail, Phone, Building, Briefcase, Calendar, AlertTriangle, ChevronDown, ChevronRight } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, X, User, Mail, Phone, Building, Briefcase, Calendar, AlertTriangle, ChevronDown, ChevronRight, MailCheck, Copy, CheckCircle2, Send } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../../api/axios';
 import { FEATURES } from '../../constants/features';
+
+const CONTRACT_TYPES = [
+  { key: 'PKWT', label: 'PKWT' },
+  { key: 'PKWTT', label: 'PKWTT' },
+  { key: 'DAILY_WORKER', label: 'Daily Worker' },
+];
+
+const todayISO = () => new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+// Satu sumber nilai awal form supaya reset di tombol tambah, setelah simpan,
+// dan saat batal edit tidak pernah berbeda isinya.
+const emptyForm = () => ({
+  name: '', email: '', password: '', phone: '', role: 'employee', department: '',
+  position: '', employee_id: '', join_date: todayISO(), manager_id: '',
+  send_invitation: true, location_id: '',
+  // Status hubungan kerja — sebelumnya diisi lewat form terpisah di menu
+  // Status Hubungan Kerja; sekarang jadi satu supaya tidak ada data ganda.
+  penempatan: '', instansi: '', has_skck: false, has_formjobs: false,
+  contract_type: 'PKWT', duration_months: 6, start_date: '', note: '', is_signed: false,
+});
 
 export default function EmployeesAdmin() {
   const [users, setUsers] = useState([]);
@@ -15,7 +35,7 @@ export default function EmployeesAdmin() {
   const [deleteModal, setDeleteModal] = useState(null);
   const [managers, setManagers] = useState([]);
   const [departments, setDepartments] = useState([]);
-  const [form, setForm] = useState({ name: '', email: '', password: '', phone: '', role: 'employee', department: '', position: '', employee_id: '', join_date: '', manager_id: '', send_invitation: true, location_id: '' });
+  const [form, setForm] = useState(emptyForm());
   const [avatarFile, setAvatarFile] = useState(null);
   const [avatarPreview, setAvatarPreview] = useState(null);
   const [quotaForm, setQuotaForm] = useState({ total_days: 12, year: new Date().getFullYear() });
@@ -24,8 +44,16 @@ export default function EmployeesAdmin() {
   const [permissions, setPermissions] = useState([]);
   const [expandedDept, setExpandedDept] = useState({});
   const [deptSearch, setDeptSearch] = useState({});
+  const [saving, setSaving] = useState(false);
+  // Master penempatan & instansi dipakai bagian status hubungan kerja di form.
+  const [master, setMaster] = useState({ placements: [], institutions: [], durations: [3, 6, 12] });
+  // Ditampilkan kalau email aktivasi tidak dikirim / gagal terkirim — tanpa ini
+  // karyawan tidak punya cara masuk sama sekali.
+  const [activationModal, setActivationModal] = useState(null);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => { fetchUsers(); fetchManagers(); fetchDepartments(); fetchLocations(); }, [locationFilter]);
+  useEffect(() => { fetchMaster(); }, []);
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -60,11 +88,39 @@ export default function EmployeesAdmin() {
     } catch {}
   };
 
+  const fetchMaster = async () => {
+    try {
+      const { data } = await api.get('/contracts/master');
+      setMaster(m => ({ ...m, ...data }));
+    } catch {}
+  };
+
+  // Preview tanggal berakhir kontrak. Rumusnya sama persis dengan backend
+  // (mulai + durasi bulan - 1 hari); yang disimpan tetap hasil hitungan server.
+  const previewEndDate = useMemo(() => {
+    const start = form.start_date || form.join_date;
+    if (form.contract_type !== 'PKWT' || !start || !form.duration_months) return null;
+    const [y, m, d] = start.split('-').map(Number);
+    const dueIdx = (m - 1) + Number(form.duration_months);
+    const dueYear = y + Math.floor(dueIdx / 12);
+    const dueMonth = dueIdx % 12;
+    const daysInDue = new Date(Date.UTC(dueYear, dueMonth + 1, 0)).getUTCDate();
+    if (d > daysInDue) return new Date(Date.UTC(dueYear, dueMonth, daysInDue)).toISOString().slice(0, 10);
+    const end = new Date(Date.UTC(dueYear, dueMonth, d));
+    end.setUTCDate(end.getUTCDate() - 1);
+    return end.toISOString().slice(0, 10);
+  }, [form.contract_type, form.start_date, form.join_date, form.duration_months]);
+
+  const fmtDateLong = (d) => d
+    ? new Date(`${d}T00:00:00`).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })
+    : '-';
+
   // Posisi yang tersedia berdasarkan departemen yang dipilih
   const availablePositions = departments.find(d => d.name === form.department)?.positions?.filter(p => p.is_active) || [];
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setSaving(true);
     try {
       if (editUser) {
         await api.put(`/users/${editUser.id}`, form);
@@ -74,30 +130,78 @@ export default function EmployeesAdmin() {
         toast.success('Data karyawan berhasil diperbarui');
       } else {
         // Create user with avatar upload
+        const payload = {
+          ...form,
+          // Tanggal mulai kontrak default mengikuti tanggal bergabung.
+          start_date: form.start_date || form.join_date,
+          duration_months: form.contract_type === 'PKWT' ? Number(form.duration_months) : '',
+        };
         const formData = new FormData();
-        Object.keys(form).forEach(key => {
-          if (form[key] !== null && form[key] !== undefined && form[key] !== '') {
-            formData.append(key, form[key]);
-          }
+        Object.keys(payload).forEach(key => {
+          const val = payload[key];
+          // Boolean false tetap harus dikirim (mis. send_invitation dimatikan),
+          // sedangkan string kosong / null diabaikan agar kolomnya NULL di DB.
+          if (typeof val === 'boolean') { formData.append(key, val ? 'true' : 'false'); return; }
+          if (val !== null && val !== undefined && val !== '') formData.append(key, val);
         });
         if (avatarFile) {
           formData.append('avatar', avatarFile);
         }
-        
-        await api.post('/users', formData, {
+
+        const { data } = await api.post('/users', formData, {
           headers: { 'Content-Type': 'multipart/form-data' }
         });
-        toast.success('Karyawan berhasil ditambahkan. Email undangan telah dikirim.');
+        toast.success(data.message || 'Karyawan berhasil ditambahkan');
+
+        // Kalau email tidak dikirim (atau gagal), tautan aktivasi wajib
+        // ditampilkan supaya HR bisa membagikannya manual.
+        if (!data.email_sent && data.activation_link) {
+          setActivationModal({
+            name: form.name,
+            email: form.email,
+            link: data.activation_link,
+            failed: form.send_invitation, // diminta kirim tapi tetap gagal
+          });
+        }
       }
       setShowModal(false);
       setEditUser(null);
-      setForm({ name: '', email: '', password: '', phone: '', role: 'employee', department: '', position: '', employee_id: '', join_date: '', manager_id: '', send_invitation: true, location_id: '' });
+      setForm(emptyForm());
       setAvatarFile(null);
       setAvatarPreview(null);
       setPermissions([]);
       fetchUsers();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Gagal menyimpan data');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Kirim ulang tautan aktivasi untuk karyawan yang belum membuat kata sandi.
+  // Token lama otomatis batal, yang baru berlaku 7 hari.
+  const handleResendActivation = async (user, sendEmail) => {
+    try {
+      const { data } = await api.post(`/contracts/resend-activation/${user.id}`, { send_email: sendEmail });
+      toast.success(data.message);
+      if (!data.email_sent && data.activation_link) {
+        setActivationModal({ name: user.name, email: user.email, link: data.activation_link, failed: sendEmail });
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Gagal mengirim ulang aktivasi');
+    }
+  };
+
+  const copyLink = async (link) => {
+    try {
+      await navigator.clipboard.writeText(link);
+      setCopied(true);
+      toast.success('Tautan disalin');
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Clipboard API butuh HTTPS/localhost — kalau ditolak, tautannya tetap
+      // tampil sebagai teks sehingga masih bisa disalin manual.
+      toast.error('Gagal menyalin otomatis. Silakan salin manual dari kotak tautan.');
     }
   };
 
@@ -222,7 +326,7 @@ export default function EmployeesAdmin() {
             ))}
           </select>
         </div>
-        <button onClick={() => { setEditUser(null); setForm({ name: '', email: '', password: '', phone: '', role: 'employee', department: '', position: '', employee_id: '', join_date: '', manager_id: '', send_invitation: true, location_id: '' }); setAvatarFile(null); setAvatarPreview(null); setPermissions([]); setShowModal(true); }}
+        <button onClick={() => { setEditUser(null); setForm(emptyForm()); setAvatarFile(null); setAvatarPreview(null); setPermissions([]); setShowModal(true); }}
           className="btn-primary py-2.5 flex items-center gap-2 text-sm">
           <Plus size={16} /> Tambah Karyawan
         </button>
@@ -329,6 +433,16 @@ export default function EmployeesAdmin() {
                                 </td>
                                 <td className="px-4 py-3">
                                   <div className="flex items-center gap-1">
+                                    {/* Karyawan yang belum pernah membuat kata sandi
+                                        (is_verified masih false) diberi jalan kirim
+                                        ulang tautan aktivasi ke email terdaftarnya. */}
+                                    {!user.is_verified && (
+                                      <button onClick={() => handleResendActivation(user, true)}
+                                        className="p-1.5 hover:bg-blue-50 rounded-lg transition-colors"
+                                        title={`Kirim aktivasi ke ${user.email}`}>
+                                        <Send size={15} className="text-blue-500" />
+                                      </button>
+                                    )}
                                     <button onClick={() => openEdit(user)} className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors" title="Edit">
                                       <Edit size={15} className="text-slate-500" />
                                     </button>
@@ -510,28 +624,161 @@ export default function EmployeesAdmin() {
                     </div>
                   </div>
                 )}
+                {/* ── Status Hubungan Kerja ────────────────────────────────
+                    Digabung ke sini supaya akun + kontrak pertama dibuat sekali
+                    jalan; form tambah karyawan terpisah di menu Status Hubungan
+                    Kerja sudah dihapus agar tidak ada data ganda. */}
                 {!editUser && (
-                  <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4">
-                    <div className="flex items-start gap-3">
-                      <Mail size={18} className="text-blue-600 mt-0.5 flex-shrink-0" />
-                      <div className="flex-1">
-                        <label className="flex items-center gap-2 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={form.send_invitation}
-                            onChange={e => setForm({ ...form, send_invitation: e.target.checked })}
-                            className="w-4 h-4 text-blue-600 rounded"
-                          />
-                          <span className="text-sm font-medium text-slate-700">Kirim email undangan</span>
-                        </label>
-                        <p className="text-xs text-slate-500 mt-1">Karyawan akan menerima email untuk mengatur password dan mengaktifkan akun</p>
+                  <div className="border border-slate-200 rounded-2xl p-4 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Briefcase size={15} className="text-slate-500" />
+                      <h4 className="text-sm font-semibold text-slate-800">Status Hubungan Kerja</h4>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-xs font-medium text-slate-600 mb-1 block">Penempatan</label>
+                        <select
+                          value={form.penempatan}
+                          onChange={e => {
+                            const name = e.target.value;
+                            const match = master.placements.find(pl => pl.name === name);
+                            // Instansi ikut terisi otomatis karena satu penempatan
+                            // selalu bernaung di bawah instansi yang sama.
+                            setForm(f => ({ ...f, penempatan: name, instansi: match?.instansi || f.instansi }));
+                          }}
+                          className="input-field text-sm"
+                        >
+                          <option value="">-- Pilih Penempatan --</option>
+                          {master.placements.map(pl => <option key={pl.id} value={pl.name}>{pl.name}</option>)}
+                        </select>
                       </div>
+                      <div>
+                        <label className="text-xs font-medium text-slate-600 mb-1 block">Instansi</label>
+                        <select
+                          value={form.instansi}
+                          onChange={e => setForm({ ...form, instansi: e.target.value })}
+                          className="input-field text-sm"
+                        >
+                          <option value="">-- Pilih Instansi --</option>
+                          {master.institutions.map(i => <option key={i.id} value={i.name}>{i.name}</option>)}
+                        </select>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-medium text-slate-600 mb-1 block">Jenis Kontrak *</label>
+                      <div className="grid grid-cols-3 gap-2">
+                        {CONTRACT_TYPES.map(t => (
+                          <button key={t.key} type="button"
+                            onClick={() => setForm({ ...form, contract_type: t.key })}
+                            className={`px-3 py-2 rounded-xl text-sm font-medium border transition-all ${
+                              form.contract_type === t.key
+                                ? 'bg-slate-900 text-white border-slate-900'
+                                : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
+                            }`}>
+                            {t.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {form.contract_type === 'PKWT' && (
+                      <div>
+                        <label className="text-xs font-medium text-slate-600 mb-1 block">Durasi Kontrak</label>
+                        <div className="grid grid-cols-3 gap-2">
+                          {(master.durations || [3, 6, 12]).map(d => (
+                            <button key={d} type="button"
+                              onClick={() => setForm({ ...form, duration_months: d })}
+                              className={`px-3 py-2 rounded-xl text-sm font-medium border transition-all ${
+                                Number(form.duration_months) === d
+                                  ? 'bg-slate-900 text-white border-slate-900'
+                                  : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
+                              }`}>
+                              {d} Bulan
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <div>
+                      <label className="text-xs font-medium text-slate-600 mb-1 block">Tanggal Mulai Kontrak</label>
+                      <input type="date" value={form.start_date || form.join_date}
+                        onChange={e => setForm({ ...form, start_date: e.target.value })}
+                        className="input-field text-sm" />
+                      <p className="text-xs text-slate-400 mt-1">Kosongkan untuk mengikuti tanggal bergabung.</p>
+                    </div>
+
+                    {form.contract_type === 'PKWT' && previewEndDate && (
+                      <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-1.5">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-slate-500">Tanggal Berakhir</span>
+                          <span className="font-semibold text-slate-900">{fmtDateLong(previewEndDate)}</span>
+                        </div>
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-slate-500">Tahun PKWT</span>
+                          <span className="font-semibold text-slate-900">Tahun ke-1</span>
+                        </div>
+                        <p className="text-xs text-slate-400 pt-1">Dihitung otomatis oleh sistem.</p>
+                      </div>
+                    )}
+
+                    <div className="flex flex-wrap gap-4">
+                      {[
+                        { key: 'is_signed', label: 'Sudah TTD kontrak' },
+                        { key: 'has_skck', label: 'SKCK' },
+                        { key: 'has_formjobs', label: 'Formjobs' },
+                      ].map(c => (
+                        <label key={c.key} className="flex items-center gap-2 cursor-pointer">
+                          <input type="checkbox" checked={form[c.key]}
+                            onChange={e => setForm({ ...form, [c.key]: e.target.checked })}
+                            className="w-4 h-4 rounded border-slate-300" />
+                          <span className="text-sm text-slate-600">{c.label}</span>
+                        </label>
+                      ))}
                     </div>
                   </div>
                 )}
+                {!editUser && (
+                  <button
+                    type="button"
+                    onClick={() => setForm({ ...form, send_invitation: !form.send_invitation })}
+                    aria-pressed={form.send_invitation}
+                    className={`w-full flex items-center gap-3 p-4 rounded-2xl border text-left transition-colors ${
+                      form.send_invitation
+                        ? 'bg-blue-50 border-blue-200 hover:border-blue-300'
+                        : 'bg-slate-50 border-slate-200 hover:border-slate-300'
+                    }`}
+                  >
+                    <div className={`w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0 ${
+                      form.send_invitation ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-500'
+                    }`}>
+                      {form.send_invitation ? <MailCheck size={18} /> : <Mail size={18} />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className={`text-sm font-medium ${form.send_invitation ? 'text-blue-900' : 'text-slate-700'}`}>
+                        {form.send_invitation ? 'Email aktivasi akan dikirim' : 'Email aktivasi tidak dikirim'}
+                      </div>
+                      <p className={`text-xs mt-0.5 truncate ${form.send_invitation ? 'text-blue-700' : 'text-slate-500'}`}>
+                        {form.send_invitation
+                          ? `Tautan aktivasi dikirim ke ${form.email || 'email yang didaftarkan'}`
+                          : 'Tautan aktivasi ditampilkan untuk dibagikan manual'}
+                      </p>
+                    </div>
+                    {/* Klik ikon = hidupkan/matikan pengiriman email aktivasi */}
+                    <div className={`w-10 h-6 rounded-full flex items-center px-0.5 flex-shrink-0 transition-colors ${
+                      form.send_invitation ? 'bg-blue-600 justify-end' : 'bg-slate-300 justify-start'
+                    }`}>
+                      <div className="w-5 h-5 rounded-full bg-white" />
+                    </div>
+                  </button>
+                )}
                 <div className="flex gap-3 pt-2">
                   <button type="button" onClick={() => setShowModal(false)} className="btn-secondary flex-1 py-2.5 text-sm">Batal</button>
-                  <button type="submit" className="btn-primary flex-1 py-2.5 text-sm">{editUser ? 'Simpan Perubahan' : 'Tambah Karyawan'}</button>
+                  <button type="submit" disabled={saving} className="btn-primary flex-1 py-2.5 text-sm disabled:opacity-50">
+                    {saving ? 'Menyimpan...' : editUser ? 'Simpan Perubahan' : 'Tambah Karyawan'}
+                  </button>
                 </div>
               </form>
             </motion.div>
@@ -603,6 +850,49 @@ export default function EmployeesAdmin() {
                   Batal
                 </button>
               </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      {/* Kotak Tautan Aktivasi — muncul saat email tidak dikirim atau gagal */}
+      <AnimatePresence>
+        {activationModal && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setActivationModal(null)}>
+            <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} exit={{ scale: 0.9 }}
+              className="bg-white rounded-3xl p-6 w-full max-w-md" onClick={e => e.stopPropagation()}>
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="font-bold text-slate-900">Tautan Aktivasi Akun</h3>
+                  <p className="text-sm text-slate-500">{activationModal.name} · {activationModal.email}</p>
+                </div>
+                <button onClick={() => setActivationModal(null)} className="p-2 rounded-xl hover:bg-slate-100"><X size={18} /></button>
+              </div>
+
+              <div className={`border rounded-xl px-3 py-2.5 text-xs mb-4 ${
+                activationModal.failed
+                  ? 'bg-red-50 border-red-200 text-red-800'
+                  : 'bg-amber-50 border-amber-200 text-amber-800'
+              }`}>
+                {activationModal.failed
+                  ? <>Email aktivasi <b>gagal terkirim</b>. Bagikan tautan di bawah ini secara manual agar karyawan tetap bisa membuat kata sandi.</>
+                  : <>Email aktivasi <b>tidak dikirim</b>. Bagikan tautan di bawah ini ke karyawan (mis. lewat WhatsApp) agar dia bisa membuat kata sandinya sendiri.</>}
+              </div>
+
+              <label className="block text-xs font-medium text-slate-500 mb-1.5">Tautan Aktivasi</label>
+              <div className="flex gap-2 mb-4">
+                <input readOnly value={activationModal.link} onFocus={e => e.target.select()}
+                  className="input-field text-xs font-mono flex-1" />
+                <button type="button" onClick={() => copyLink(activationModal.link)}
+                  className="btn-primary px-3 py-2 text-sm flex items-center gap-1.5 flex-shrink-0">
+                  {copied ? <CheckCircle2 size={15} /> : <Copy size={15} />}
+                  {copied ? 'Tersalin' : 'Salin'}
+                </button>
+              </div>
+
+              <p className="text-xs text-slate-400 mb-4">Tautan berlaku 7 hari dan hanya bisa dipakai sekali. Kalau kedaluwarsa, pakai tombol kirim aktivasi di baris karyawan.</p>
+
+              <button onClick={() => setActivationModal(null)} className="btn-secondary w-full py-2.5 text-sm">Tutup</button>
             </motion.div>
           </motion.div>
         )}

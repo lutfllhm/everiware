@@ -5,6 +5,14 @@ const { auditLog } = require('../utils/auditLog');
 const { validateRegistrationFace } = require('../utils/faceVerification');
 const { sendPushToMany } = require('../utils/fcm');
 const { resolveScope } = require('../utils/permissionScope');
+const { calculateEndDate, calculatePkwtYear } = require('../utils/contractHelper');
+
+const CONTRACT_TYPES = ['PKWT', 'PKWTT', 'DAILY_WORKER'];
+const ALLOWED_DURATIONS = [3, 6, 12];
+
+// Form karyawan dikirim sebagai multipart (ada upload foto), jadi checkbox
+// sampai di sini sebagai string 'true'/'false' — bukan boolean.
+const truthy = (v) => v === true || v === 'true' || v === 1 || v === '1';
 
 
 // Get all users (admin, atau kepala divisi dengan grant shifts.manage — hasil dibatasi ke divisinya sendiri)
@@ -79,67 +87,151 @@ const getUser = async (req, res) => {
 };
 
 // Create user (admin)
+// Satu pintu pendaftaran karyawan: akun + kontrak pertama dibuat sekaligus,
+// supaya tidak ada lagi form tambah karyawan terpisah di menu Status Hubungan
+// Kerja yang bisa membuat data ganda. Field kontrak (contract_type dkk) opsional
+// di level API agar pemanggil lama tetap jalan, tapi form web selalu mengirimnya.
 const createUser = async (req, res) => {
+  const conn = await pool.getConnection();
+  let committed = false;
   try {
-    const { name, email, phone, role, department, position, employee_id, join_date, send_invitation, location_id } = req.body;
+    const {
+      name, email, phone, role, department, position, employee_id, join_date,
+      send_invitation, location_id, manager_id,
+      penempatan, instansi, has_skck, has_formjobs,
+      contract_type, duration_months, start_date, note, is_signed,
+    } = req.body;
     const avatar = req.file ? req.file.filename : null;
-    
+
     // Validasi email
     if (!email || !name) {
       return res.status(400).json({ success: false, message: 'Nama dan email wajib diisi' });
     }
 
-    const [existing] = await pool.query('SELECT id FROM users WHERE email = ?', [email]);
+    const withContract = !!contract_type;
+    let months = null;
+    let contractStart = null;
+    if (withContract) {
+      if (!CONTRACT_TYPES.includes(contract_type)) {
+        return res.status(400).json({ success: false, message: 'Jenis kontrak tidak valid' });
+      }
+      if (contract_type === 'PKWT') {
+        months = Number(duration_months);
+        if (!ALLOWED_DURATIONS.includes(months)) {
+          return res.status(400).json({ success: false, message: 'Durasi PKWT harus 3, 6, atau 12 bulan' });
+        }
+      }
+      // Tanggal mulai kontrak default mengikuti tanggal bergabung.
+      contractStart = start_date || join_date;
+      if (!contractStart) {
+        return res.status(400).json({ success: false, message: 'Tanggal bergabung wajib diisi untuk membuat kontrak' });
+      }
+    }
+
+    const [existing] = await conn.query('SELECT id FROM users WHERE email = ?', [email]);
     if (existing.length) {
       return res.status(400).json({ success: false, message: 'Email sudah terdaftar' });
     }
 
+    // Validasi location_id & manager_id agar tidak menabrak foreign key constraint
+    // (opsi yang sudah dihapus di database masih bisa tersisa di form yang terbuka lama).
+    if (location_id) {
+      const [loc] = await conn.query('SELECT id FROM attendance_locations WHERE id = ?', [location_id]);
+      if (!loc.length) {
+        return res.status(400).json({ success: false, message: 'Lokasi penempatan tidak ditemukan. Silakan muat ulang halaman dan coba lagi.' });
+      }
+    }
+    if (manager_id) {
+      const [mgr] = await conn.query('SELECT id FROM users WHERE id = ?', [manager_id]);
+      if (!mgr.length) {
+        return res.status(400).json({ success: false, message: 'Atasan/manager tidak ditemukan. Silakan muat ulang halaman dan coba lagi.' });
+      }
+    }
+    if (employee_id) {
+      const [dupNik] = await conn.query('SELECT id FROM users WHERE employee_id = ?', [employee_id]);
+      if (dupNik.length) {
+        return res.status(400).json({ success: false, message: 'ID Karyawan sudah digunakan oleh karyawan lain. Silakan gunakan ID yang berbeda.' });
+      }
+    }
+
     const id = generateId();
-    
+
     // Generate activation token (valid 7 hari)
     const activationToken = generateId(); // UUID sebagai token
     const tokenExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 hari
+    const activationLink = `${process.env.WEB_URL || 'http://localhost:3000'}/activate/${activationToken}`;
+
+    await conn.beginTransaction();
 
     // Buat user dengan password NULL dan is_verified FALSE
-    await pool.query(
-      `INSERT INTO users (id, name, email, password, phone, role, department, position, employee_id, join_date, avatar, is_verified, otp_code, otp_expires, location_id)
-       VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, FALSE, ?, ?, ?)`,
-      [id, name, email, phone, role || 'employee', department, position, employee_id || null, join_date || null, avatar, activationToken, tokenExpires, location_id || null]
+    await conn.query(
+      `INSERT INTO users (id, name, email, password, phone, role, department, position, employee_id, join_date, avatar, is_verified, otp_code, otp_expires, location_id, manager_id, penempatan, instansi, has_skck, has_formjobs)
+       VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, FALSE, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, name, email, phone, role || 'employee', department, position, employee_id || null, join_date || null, avatar, activationToken, tokenExpires, location_id || null, manager_id || null,
+       penempatan || null, instansi || null, truthy(has_skck) ? 1 : 0, truthy(has_formjobs) ? 1 : 0]
     );
 
-    // Kirim email undangan jika diminta
-    if (send_invitation !== 'false' && send_invitation !== false) {
-      const activationLink = `${process.env.WEB_URL || 'http://localhost:3000'}/activate/${activationToken}`;
-      console.log('[createUser] Sending invitation email to:', email);
-      console.log('[createUser] Activation link:', activationLink);
-      console.log('[createUser] send_invitation value:', send_invitation);
-      try {
-        await sendInvitationEmail(email, name, activationLink);
-        console.log('[createUser] ✅ Email sent successfully to:', email);
-      } catch (emailErr) {
-        console.error('[createUser] ❌ Failed to send invitation email:', emailErr);
-        // Tidak gagalkan request jika email gagal
-      }
-    } else {
-      console.log('[createUser] Email invitation skipped. send_invitation:', send_invitation);
+    let contract = null;
+    if (withContract) {
+      const endDate = contract_type === 'PKWT' ? calculateEndDate(contractStart, months) : null;
+      // Karyawan baru: belum punya kontrak PKWT sebelumnya, jadi selalu tahun ke-1.
+      const pkwtYear = contract_type === 'PKWT' ? calculatePkwtYear(0) : null;
+      const contractId = generateId();
+      await conn.query(
+        `INSERT INTO employment_contracts
+          (id, user_id, contract_type, duration_months, pkwt_year, start_date, end_date,
+           sequence_no, status, is_signed, signed_at, note, created_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 1, 'active', ?, ?, ?, ?)`,
+        [contractId, id, contract_type, months, pkwtYear, contractStart, endDate,
+         truthy(is_signed) ? 1 : 0, truthy(is_signed) ? new Date() : null, note || null, req.user.id]
+      );
+      contract = { id: contractId, end_date: endDate, pkwt_year: pkwtYear };
     }
 
-    await auditLog(req, 'CREATE_USER', 'user', id, `Membuat akun karyawan baru: ${name} (${email})`);
+    await conn.commit();
+    committed = true;
 
-    res.status(201).json({ 
-      success: true, 
-      message: (send_invitation !== 'false' && send_invitation !== false)
-        ? 'Karyawan berhasil ditambahkan. Email undangan telah dikirim.' 
-        : 'Karyawan berhasil ditambahkan.',
+    // Email undangan dikirim SETELAH commit — kegagalan kirim email tidak boleh
+    // membatalkan data karyawan yang sudah tersimpan.
+    const wantEmail = send_invitation !== 'false' && send_invitation !== false;
+    let emailSent = false;
+    if (wantEmail) {
+      try {
+        await sendInvitationEmail(email, name, activationLink);
+        emailSent = true;
+      } catch (emailErr) {
+        console.error('[createUser] Gagal kirim email undangan:', emailErr.message);
+        // Tidak gagalkan request jika email gagal
+      }
+    }
+
+    await auditLog(req, 'CREATE_USER', 'user', id,
+      `Membuat akun karyawan baru: ${name} (${email})` + (contract ? ` + kontrak ${contract_type}` : ''));
+
+    res.status(201).json({
+      success: true,
+      message: emailSent
+        ? 'Karyawan berhasil ditambahkan. Email aktivasi telah dikirim.'
+        : wantEmail
+          ? 'Karyawan berhasil ditambahkan, tetapi email aktivasi gagal terkirim.'
+          : 'Karyawan berhasil ditambahkan.',
       id,
+      email_sent: emailSent,
       activation_token: activationToken, // Return token untuk testing/manual share
+      // Tautan lengkap dikembalikan supaya HR bisa menyalin & mengirimnya sendiri
+      // (mis. lewat WhatsApp) saat email tidak dikirim atau gagal terkirim.
+      activation_link: activationLink,
+      contract,
     });
   } catch (err) {
+    if (!committed) await conn.rollback().catch(() => {});
     console.error(err);
     if (err.code === 'ER_DUP_ENTRY' && err.sqlMessage?.includes('employee_id')) {
       return res.status(400).json({ success: false, message: 'ID Karyawan sudah digunakan oleh karyawan lain. Silakan gunakan ID yang berbeda.' });
     }
     res.status(500).json({ success: false, message: 'Terjadi kesalahan server' });
+  } finally {
+    conn.release();
   }
 };
 
