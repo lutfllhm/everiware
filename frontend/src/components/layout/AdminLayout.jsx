@@ -237,11 +237,15 @@ function SidebarNav({ filteredGroups, location, user, onLinkClick, onLogout, dep
             })}
             <div className="mt-1 pt-1 border-t border-slate-700">
               <Link
-                to="/admin/employees"
+                to="/admin/employees?all=1"
                 onClick={() => { closeFlyout(); onLinkClick(); }}
-                className="block px-3 py-2 mx-1.5 rounded-lg text-[13px] text-slate-400 hover:bg-slate-700/70 hover:text-white transition-colors"
+                className={`block px-3 py-2 mx-1.5 rounded-lg text-[13px] transition-colors ${
+                  location.pathname === '/admin/employees' && location.search.includes('all=1')
+                    ? 'bg-slate-700 text-white font-medium'
+                    : 'text-slate-400 hover:bg-slate-700/70 hover:text-white'
+                }`}
               >
-                Semua Departemen
+                Semua Karyawan
               </Link>
             </div>
           </motion.div>

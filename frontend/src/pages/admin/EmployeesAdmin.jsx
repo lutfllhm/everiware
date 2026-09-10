@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, Fragment } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Plus, Edit, Trash2, X, User, Mail, Phone, Building, Briefcase, Calendar, AlertTriangle, ChevronDown, ChevronRight, ChevronLeft, MailCheck, Copy, CheckCircle2, Check, Send } from 'lucide-react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, useSearchParams, Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import api from '../../api/axios';
 import { FEATURES } from '../../constants/features';
@@ -46,6 +46,11 @@ export default function EmployeesAdmin() {
   // useParams() sudah mengembalikan nilai ter-decode. Men-decode ulang bikin
   // URIError untuk nama divisi yang mengandung '%' dan mematikan halaman.
   const activeDept = deptParam || null;
+  // ?all=1 (dari menu "Semua Karyawan") menampilkan seluruh karyawan sekaligus,
+  // dikelompokkan per departemen. Tanpa itu, /admin/employees tetap menampilkan
+  // placeholder supaya daftar nama tidak muncul sebelum divisi dipilih.
+  const [searchParams] = useSearchParams();
+  const showAll = searchParams.get('all') === '1';
 
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -412,7 +417,7 @@ export default function EmployeesAdmin() {
   // Landing /admin/employees tidak lagi menampilkan kartu departemen — pilihan
   // divisi ada di sidebar. Pencarian tetap boleh menembus semua divisi supaya
   // HR masih bisa mencari nama tanpa tahu divisinya.
-  const showDeptPicker = !activeDept && !search.trim();
+  const showDeptPicker = !activeDept && !showAll && !search.trim();
 
   const toggleDept = (dept) => setExpandedDept(prev => ({ ...prev, [dept]: !prev[dept] }));
   const setDeptSearchValue = (dept, value) => setDeptSearch(prev => ({ ...prev, [dept]: value }));
@@ -421,9 +426,9 @@ export default function EmployeesAdmin() {
     <div className="space-y-4">
       {/* Breadcrumb kembali — hanya saat sedang melihat satu divisi */}
       {activeDept && (
-        <Link to="/admin/employees"
+        <Link to="/admin/employees?all=1"
           className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-900 transition-colors">
-          <ChevronLeft size={15} /> Semua Departemen
+          <ChevronLeft size={15} /> Semua Karyawan
         </Link>
       )}
 
@@ -432,7 +437,7 @@ export default function EmployeesAdmin() {
         <div className="flex flex-1 flex-wrap gap-3 items-center min-w-48">
           <div className="relative flex-1 min-w-48">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input placeholder={activeDept ? `Cari karyawan di ${activeDept}...` : 'Cari karyawan...'} value={search} onChange={(e) => setSearch(e.target.value)} className="input-field pl-9 py-2.5 text-sm" />
+            <input placeholder={activeDept ? `Cari karyawan di ${activeDept}...` : 'Cari semua karyawan...'} value={search} onChange={(e) => setSearch(e.target.value)} className="input-field pl-9 py-2.5 text-sm" />
           </div>
           <select
             value={locationFilter}
@@ -476,7 +481,7 @@ export default function EmployeesAdmin() {
           groupedByDept.map(({ department, members }) => {
             // Di mode satu divisi header tidak bisa ditutup — tidak ada gunanya
             // menyembunyikan satu-satunya tabel di halaman.
-            const isOpen = activeDept ? true : !!expandedDept[department];
+            const isOpen = (activeDept || showAll) ? true : !!expandedDept[department];
             const activeCount = members.filter(m => m.is_active).length;
             const deptQuery = (deptSearch[department] || '').toLowerCase();
             const visibleMembers = deptQuery
