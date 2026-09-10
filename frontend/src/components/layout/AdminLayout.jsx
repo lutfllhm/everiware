@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, Fragment } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -306,8 +306,28 @@ export default function AdminLayout({ children }) {
         // Rute yang pindah ke dalam flyout tetap menyalakan item induknya.
         (item.ownedPaths || []).some(p => location.pathname.startsWith(p));
 
-  const currentLabel =
-    navGroups.flatMap(g => g.items).find(n => isActive(n))?.label || 'Dashboard';
+  const currentItem = navGroups.flatMap(g => g.items).find(n => isActive(n));
+  const currentLabel = currentItem?.label || 'Dashboard';
+
+  // Breadcrumb sebagai data supaya tiap potongan (kecuali yang terakhir)
+  // bisa dirender jadi link ke halamannya sendiri.
+  const crumbs = (() => {
+    // Menu Karyawan diarahkan ke daftar lengkapnya, bukan ke halaman
+    // placeholder "pilih departemen dulu" yang tidak menampilkan apa-apa.
+    const rootTo = currentItem?.path === '/admin/employees'
+      ? '/admin/employees?all=1'
+      : (currentItem?.path || '/admin');
+    const list = [{ label: currentLabel, to: rootTo }];
+    const deptSlug = location.pathname.startsWith('/admin/employees/')
+      ? location.pathname.split('/admin/employees/')[1]
+      : null;
+    if (deptSlug) {
+      list.push({ label: safeDecode(deptSlug), to: location.pathname });
+    } else if (location.pathname.startsWith('/admin/departments')) {
+      list.push({ label: 'Departemen & Jabatan', to: '/admin/departments' });
+    }
+    return list;
+  })();
 
   const filteredGroups = navGroups
     .map(g => ({
@@ -380,25 +400,37 @@ export default function AdminLayout({ children }) {
               <Menu size={18} className="text-slate-600" />
             </button>
             <div className="flex items-center gap-2">
-              <span className="text-slate-400 text-sm hidden sm:block">Everiware</span>
+              <Link
+                to="/admin"
+                className="text-slate-400 hover:text-slate-900 text-sm hidden sm:block transition-colors"
+              >
+                Everiware
+              </Link>
               <span className="text-slate-300 hidden sm:block">/</span>
-              <span className="font-semibold text-slate-900 text-sm">{currentLabel}</span>
-              {/* Nama divisi ikut muncul saat membuka karyawan per departemen */}
-              {location.pathname.startsWith('/admin/employees/') && (
-                <>
-                  <span className="text-slate-300">/</span>
-                  <span className="font-semibold text-slate-900 text-sm truncate max-w-[40vw]">
-                    {safeDecode(location.pathname.split('/admin/employees/')[1] || '')}
-                  </span>
-                </>
-              )}
-              {/* Departemen & Jabatan kini anak dari Karyawan */}
-              {location.pathname.startsWith('/admin/departments') && (
-                <>
-                  <span className="text-slate-300">/</span>
-                  <span className="font-semibold text-slate-900 text-sm">Departemen &amp; Jabatan</span>
-                </>
-              )}
+              {crumbs.map((crumb, i) => {
+                const isLast = i === crumbs.length - 1;
+                return (
+                  <Fragment key={crumb.to + crumb.label}>
+                    {i > 0 && <span className="text-slate-300">/</span>}
+                    {isLast ? (
+                      // Crumb terakhir = halaman aktif, tidak perlu jadi link.
+                      <span
+                        aria-current="page"
+                        className="font-semibold text-slate-900 text-sm truncate max-w-[40vw]"
+                      >
+                        {crumb.label}
+                      </span>
+                    ) : (
+                      <Link
+                        to={crumb.to}
+                        className="font-semibold text-slate-500 hover:text-slate-900 text-sm truncate max-w-[40vw] transition-colors"
+                      >
+                        {crumb.label}
+                      </Link>
+                    )}
+                  </Fragment>
+                );
+              })}
             </div>
           </div>
           <div className="flex items-center gap-2">
