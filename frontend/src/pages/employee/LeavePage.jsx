@@ -9,6 +9,24 @@ import PageHeader from '../../components/ui/PageHeader';
 
 const tabs = ['Riwayat', 'Ajukan Izin'];
 
+// Jenis izin yang hanya berlaku satu hari — disamakan dengan RequestType.isSingleDay
+// di aplikasi mobile (request_form_screen.dart), sehingga form web cukup meminta
+// satu tanggal saja seperti di HP.
+const SINGLE_DAY_TYPES = ['late_permission', 'early_leave', 'sick', 'leave_office'];
+const isSingleDayType = (code) => SINGLE_DAY_TYPES.includes(code);
+
+// Judul kontekstual per jenis izin, mengikuti _headerTitle versi mobile
+const TYPE_HEADINGS = {
+  late_permission: 'Izin Terlambat',
+  early_leave:     'Pulang Cepat',
+  annual:          'Cuti Tahunan',
+  sick:            'Izin Sakit',
+  dinas:           'Dinas Luar',
+  leave_office:    'Keluar Kantor',
+};
+
+const todayStr = () => format(new Date(), 'yyyy-MM-dd');
+
 export default function LeavePage({ defaultTab = 0, defaultType = null }) {
   const [activeTab, setActiveTab] = useState(defaultTab);
   const [leaves, setLeaves] = useState([]);
@@ -42,7 +60,12 @@ export default function LeavePage({ defaultTab = 0, defaultType = null }) {
         const preselected = defaultType && data.leaveTypes.some(t => t.code === defaultType)
           ? defaultType
           : data.leaveTypes[0].code;
-        setForm(f => ({ ...f, type: preselected }));
+        // Seperti di mobile, izin satu hari langsung terisi tanggal hari ini
+        setForm(f => ({
+          ...f,
+          type: preselected,
+          ...(isSingleDayType(preselected) ? { start_date: todayStr(), end_date: todayStr() } : {}),
+        }));
       }
     } catch {}
   };
@@ -53,6 +76,28 @@ export default function LeavePage({ defaultTab = 0, defaultType = null }) {
       setLeaves(leavesRes.data.leaves);
       setQuota(quotaRes.data.quota);
     } catch {}
+  };
+
+  // Ganti jenis izin: sesuaikan tanggal & jam mengikuti perilaku form mobile.
+  // Izin satu hari otomatis memakai tanggal hari ini dan tidak punya tanggal selesai
+  // terpisah; jam rencana hanya relevan untuk izin terlambat/pulang cepat/keluar kantor.
+  const handleTypeChange = (code) => {
+    setForm(f => {
+      const next = { ...f, type: code };
+      if (isSingleDayType(code)) {
+        const d = f.start_date || todayStr();
+        next.start_date = d;
+        next.end_date = d;
+      } else if (isSingleDayType(f.type)) {
+        // Pindah dari izin satu hari ke rentang tanggal: minta tanggal selesai lagi
+        next.end_date = '';
+      }
+      if (!['late_permission', 'early_leave', 'leave_office'].includes(code)) {
+        next.time_start = '';
+        next.time_end = '';
+      }
+      return next;
+    });
   };
 
   const handleSubmit = async (e) => {
@@ -94,7 +139,9 @@ export default function LeavePage({ defaultTab = 0, defaultType = null }) {
       if (form.attachment) formData.append('attachment', form.attachment);
       const { data } = await api.post('/leave/submit', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
       toast.success(data.message);
-      setForm({ type: defaultType || leaveTypes[0]?.code || '', start_date: '', end_date: '', time_start: '', time_end: '', reason: '', attachment: null });
+      const resetType = defaultType || leaveTypes[0]?.code || '';
+      const resetDate = isSingleDayType(resetType) ? todayStr() : '';
+      setForm({ type: resetType, start_date: resetDate, end_date: resetDate, time_start: '', time_end: '', reason: '', attachment: null });
       setPreview(null);
       setActiveTab(0);
       fetchData();
@@ -208,7 +255,9 @@ export default function LeavePage({ defaultTab = 0, defaultType = null }) {
         {/* Ajukan Izin — unified form */}
         {activeTab === 1 && (
           <motion.div key="form" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="bg-white rounded-2xl border border-[#E7E5E4] shadow-[0_4px_16px_rgba(0,0,0,0.06)] p-5">
-            <h3 className="font-extrabold text-stone-900 mb-4">Pengajuan Izin / Cuti</h3>
+            <h3 className="font-extrabold text-stone-900 mb-4">
+              {TYPE_HEADINGS[form.type] ? `Pengajuan ${TYPE_HEADINGS[form.type]}` : 'Pengajuan Izin / Cuti'}
+            </h3>
             {quota && (
               <div className="bg-[#FFEBEE] border border-[#FFCDD2] rounded-xl p-3 mb-4 text-sm text-[#8B1F1F]">
                 📅 Sisa jatah cuti: <strong>{quota.remaining_days} hari</strong>
@@ -222,7 +271,7 @@ export default function LeavePage({ defaultTab = 0, defaultType = null }) {
                   {leaveTypes.map(t => {
                     const active = form.type === t.code;
                     return (
-                      <button key={t.code} type="button" onClick={() => setForm({ ...form, type: t.code })}
+                      <button key={t.code} type="button" onClick={() => handleTypeChange(t.code)}
                         className={`flex flex-col justify-center min-h-[62px] py-2.5 px-3 rounded-xl border-2 transition-all text-left ${
                           active
                             ? 'border-[#8B1F1F] bg-[#8B1F1F] text-white shadow-sm shadow-[#8B1F1F]/25'
@@ -237,25 +286,30 @@ export default function LeavePage({ defaultTab = 0, defaultType = null }) {
                   })}
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              {/* Tanggal — izin satu hari cukup satu field, sama seperti di mobile */}
+              {isSingleDayType(form.type) ? (
                 <div>
-                  <label className="block text-sm font-semibold text-stone-700 mb-1">Tanggal Mulai</label>
-                  <input type="date" value={form.start_date} onChange={e => setForm({ ...form, start_date: e.target.value })}
+                  <label className="block text-sm font-semibold text-stone-700 mb-1">Tanggal</label>
+                  <input type="date" value={form.start_date}
+                    onChange={e => setForm({ ...form, start_date: e.target.value, end_date: e.target.value })}
                     className="input-brand" required />
                 </div>
-                <div>
-                  <label className="block text-sm font-semibold text-stone-700 mb-1">Tanggal Selesai</label>
-                  <input type="date" value={form.end_date} onChange={e => setForm({ ...form, end_date: e.target.value })}
-                    className="input-brand" required min={form.start_date} />
+              ) : (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-semibold text-stone-700 mb-1">Tanggal Mulai</label>
+                    <input type="date" value={form.start_date} onChange={e => setForm({ ...form, start_date: e.target.value })}
+                      className="input-brand" required />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-stone-700 mb-1">Tanggal Selesai</label>
+                    <input type="date" value={form.end_date} onChange={e => setForm({ ...form, end_date: e.target.value })}
+                      className="input-brand" required min={form.start_date} />
+                  </div>
                 </div>
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-stone-700 mb-1">Alasan / Keterangan</label>
-                <textarea value={form.reason} onChange={e => setForm({ ...form, reason: e.target.value })}
-                  className="input-brand resize-none" rows={3} placeholder="Jelaskan alasan pengajuan..." required />
-              </div>
-              {/* Lampiran — tampil jika tipe butuh attachment */}
-              {/* Time inputs — tampil untuk late_permission, early_leave, leave_office */}
+              )}
+
+              {/* Jam rencana — tampil untuk late_permission, early_leave, leave_office */}
               {['late_permission', 'early_leave', 'leave_office'].includes(form.type) && (
                 <div className="grid grid-cols-2 gap-3">
                   {(form.type === 'late_permission' || form.type === 'leave_office') && (
@@ -288,10 +342,18 @@ export default function LeavePage({ defaultTab = 0, defaultType = null }) {
                 <p className="text-xs text-slate-500">Izin keluar kantor maksimal 2 jam. Pastikan jam kembali lebih dari jam keluar.</p>
               )}
 
-              {Number(selectedType?.requires_attachment) === 1 && (
-                <div>
+              <div>
+                <label className="block text-sm font-semibold text-stone-700 mb-1">Alasan / Keterangan</label>
+                <textarea value={form.reason} onChange={e => setForm({ ...form, reason: e.target.value })}
+                  className="input-brand resize-none" rows={3} placeholder="Jelaskan alasan pengajuan..." required />
+              </div>
+
+              {/* Lampiran — selalu tersedia seperti di mobile, wajib hanya untuk tipe tertentu */}
+              <div>
                   <label className="block text-sm font-semibold text-stone-700 mb-2">
-                    Bukti / Lampiran <span className="text-red-500">*</span>
+                    {Number(selectedType?.requires_attachment) === 1
+                      ? <>Bukti / Lampiran <span className="text-red-500">*</span></>
+                      : 'Bukti / Lampiran (Opsional)'}
                   </label>
                   {preview ? (
                     <div className="relative">
@@ -308,8 +370,7 @@ export default function LeavePage({ defaultTab = 0, defaultType = null }) {
                       <input type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
                     </label>
                   )}
-                </div>
-              )}
+              </div>
               <button type="submit" disabled={loading} className="btn-brand w-full">
                 {loading ? 'Mengajukan...' : 'Kirim Pengajuan'}
               </button>

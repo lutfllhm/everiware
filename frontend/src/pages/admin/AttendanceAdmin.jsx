@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Eye, X, Trash2, AlertTriangle, Edit, ChevronRight, ChevronDown, Building } from 'lucide-react';
+import { Search, Eye, X, Trash2, AlertTriangle, Edit, ChevronRight, ChevronDown, Building, RotateCcw } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../../api/axios';
 import { format } from 'date-fns';
@@ -16,7 +16,7 @@ export default function AttendanceAdmin() {
   const [filters, setFilters] = useState({ month: new Date().getMonth() + 1, year: new Date().getFullYear(), search: '' });
   const [selected, setSelected] = useState(null);
   const [editTarget, setEditTarget] = useState(null);
-  const [editForm, setEditForm] = useState({ check_in: '', check_out: '', status: '', notes: '' });
+  const [editForm, setEditForm] = useState({ check_in: '', check_out: '', status: '', notes: '', reset_check_in: false, reset_check_out: false });
   const [editSaving, setEditSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
@@ -73,6 +73,29 @@ export default function AttendanceAdmin() {
       check_out: att.check_out ? format(new Date(att.check_out), 'HH:mm') : '',
       status: att.status,
       notes: att.notes || '',
+      reset_check_in: false,
+      reset_check_out: false,
+    });
+  };
+
+  // Reset absen masuk/pulang secara terpisah. Menandai reset akan mengosongkan
+  // jam beserta foto selfie & lokasinya saat disimpan.
+  const toggleReset = (field) => {
+    setEditForm(prev => {
+      const key = field === 'in' ? 'reset_check_in' : 'reset_check_out';
+      const next = { ...prev, [key]: !prev[key] };
+      if (next.reset_check_in)  next.check_in = '';
+      if (next.reset_check_out) next.check_out = '';
+      // Jam masuk tidak boleh hilang sementara jam pulang masih ada
+      if (field === 'in' && next.reset_check_in && (editTarget?.check_out || prev.check_out)) {
+        next.reset_check_out = true;
+        next.check_out = '';
+      }
+      if (field === 'out' && !next.reset_check_out && prev.reset_check_in) {
+        next.reset_check_in = false;
+        next.check_in = editTarget?.check_in ? format(new Date(editTarget.check_in), 'HH:mm') : '';
+      }
+      return next;
     });
   };
 
@@ -462,19 +485,43 @@ export default function AttendanceAdmin() {
               </div>
               <form onSubmit={handleEdit} className="space-y-4">
                 <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-xs font-medium text-slate-600 mb-1 block">Jam Masuk</label>
-                    <input type="time" value={editForm.check_in}
-                      onChange={e => setEditForm({ ...editForm, check_in: e.target.value })}
-                      className="input-field py-2 text-sm" />
-                  </div>
-                  <div>
-                    <label className="text-xs font-medium text-slate-600 mb-1 block">Jam Pulang</label>
-                    <input type="time" value={editForm.check_out}
-                      onChange={e => setEditForm({ ...editForm, check_out: e.target.value })}
-                      className="input-field py-2 text-sm" />
-                  </div>
+                  {[
+                    { key: 'in',  field: 'check_in',  resetKey: 'reset_check_in',  label: 'Jam Masuk',  has: !!editTarget.check_in },
+                    { key: 'out', field: 'check_out', resetKey: 'reset_check_out', label: 'Jam Pulang', has: !!editTarget.check_out },
+                  ].map(({ key, field, resetKey, label, has }) => (
+                    <div key={key}>
+                      <div className="flex items-center justify-between mb-1 gap-1">
+                        <label className="text-xs font-medium text-slate-600">{label}</label>
+                        {has && (
+                          <button type="button" onClick={() => toggleReset(key)}
+                            className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md transition-colors ${
+                              editForm[resetKey]
+                                ? 'bg-red-100 text-red-600 hover:bg-red-200'
+                                : 'text-slate-400 hover:text-red-500 hover:bg-red-50'
+                            }`}>
+                            {editForm[resetKey] ? 'Batal reset' : 'Reset'}
+                          </button>
+                        )}
+                      </div>
+                      <input type="time" value={editForm[field]} disabled={editForm[resetKey]}
+                        onChange={e => setEditForm({ ...editForm, [field]: e.target.value })}
+                        className={`input-field py-2 text-sm ${editForm[resetKey] ? 'opacity-50 line-through' : ''}`} />
+                    </div>
+                  ))}
                 </div>
+
+                {(editForm.reset_check_in || editForm.reset_check_out) && (
+                  <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2 text-xs text-red-600 flex items-start gap-2">
+                    <RotateCcw size={13} className="mt-0.5 flex-shrink-0" />
+                    <span>
+                      Absen {editForm.reset_check_in && editForm.reset_check_out
+                        ? 'masuk & pulang'
+                        : editForm.reset_check_in ? 'masuk' : 'pulang'}{' '}
+                      akan dikosongkan beserta foto selfie dan lokasinya.
+                      {editForm.reset_check_in && ' Status otomatis menjadi Absen.'}
+                    </span>
+                  </div>
+                )}
                 <div>
                   <label className="text-xs font-medium text-slate-600 mb-1 block">Status</label>
                   <select value={editForm.status}

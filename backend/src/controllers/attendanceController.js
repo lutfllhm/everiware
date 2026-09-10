@@ -885,7 +885,7 @@ const deleteAttendance = async (req, res) => {
 const updateAttendance = async (req, res) => {
   try {
     const { id } = req.params;
-    const { check_in, check_out, status, notes } = req.body;
+    const { check_in, check_out, status, notes, reset_check_in, reset_check_out } = req.body;
 
     const [rows] = await pool.query('SELECT * FROM attendances WHERE id = ?', [id]);
     if (!rows.length) return res.status(404).json({ success: false, message: 'Data tidak ditemukan' });
@@ -895,9 +895,18 @@ const updateAttendance = async (req, res) => {
       ? att.date.toISOString().split('T')[0]
       : String(att.date).split('T')[0];
 
+    // Reset absen masuk/pulang secara terpisah (kosongkan jam beserta bukti selfie & lokasinya)
+    const resetIn  = reset_check_in  === true || reset_check_in  === 'true';
+    const resetOut = reset_check_out === true || reset_check_out === 'true';
+
+    // Reset masuk tanpa reset pulang akan menyisakan jam pulang tanpa jam masuk
+    if (resetIn && !resetOut && (check_out || att.check_out)) {
+      return res.status(400).json({ success: false, message: 'Reset absen masuk harus disertai reset absen pulang' });
+    }
+
     // Validasi format waktu jika diisi
-    const checkInVal  = check_in  ? `${dateStr} ${check_in}`  : att.check_in;
-    const checkOutVal = check_out ? `${dateStr} ${check_out}` : att.check_out;
+    const checkInVal  = resetIn  ? null : (check_in  ? `${dateStr} ${check_in}`  : att.check_in);
+    const checkOutVal = resetOut ? null : (check_out ? `${dateStr} ${check_out}` : att.check_out);
 
     // Validasi check_out > check_in
     if (checkInVal && checkOutVal && new Date(checkOutVal) <= new Date(checkInVal)) {
@@ -906,7 +915,10 @@ const updateAttendance = async (req, res) => {
 
     // Hitung ulang status jika check_in berubah
     let newStatus = status || att.status;
-    if (check_in && ['present', 'late'].includes(newStatus)) {
+    if (resetIn && ['present', 'late'].includes(newStatus)) {
+      // Tanpa jam masuk, status Hadir/Terlambat tidak lagi valid
+      newStatus = 'absent';
+    } else if (check_in && !resetIn && ['present', 'late'].includes(newStatus)) {
       const myShift = await resolveUserShift(att.user_id, dateStr);
       const [wh, wm] = myShift.start_time.split(':').map(Number);
       const tolerance = myShift.late_tolerance;
@@ -916,13 +928,18 @@ const updateAttendance = async (req, res) => {
       newStatus = isLateCheckIn(inMins, workMins, tolerance) ? 'late' : 'present';
     }
 
-    await pool.query(
-      'UPDATE attendances SET check_in = ?, check_out = ?, status = ?, notes = ? WHERE id = ?',
-      [checkInVal, checkOutVal, newStatus, notes ?? att.notes, id]
-    );
+    const fields = ['check_in = ?', 'check_out = ?', 'status = ?', 'notes = ?'];
+    const values = [checkInVal, checkOutVal, newStatus, notes ?? att.notes];
 
+    // Bersihkan bukti selfie & lokasi milik sesi yang direset
+    if (resetIn)  fields.push('check_in_photo = NULL',  'check_in_lat = NULL',  'check_in_lng = NULL');
+    if (resetOut) fields.push('check_out_photo = NULL', 'check_out_lat = NULL', 'check_out_lng = NULL');
+
+    await pool.query(`UPDATE attendances SET ${fields.join(', ')} WHERE id = ?`, [...values, id]);
+
+    const resetInfo = [resetIn && 'reset masuk', resetOut && 'reset pulang'].filter(Boolean).join(' + ');
     await auditLog(req, 'EDIT_ATTENDANCE', 'attendance', id,
-      `Edit absensi ${dateStr}: masuk=${check_in||'-'} pulang=${check_out||'-'} status=${newStatus}`);
+      `Edit absensi ${dateStr}: masuk=${resetIn ? 'RESET' : (check_in||'-')} pulang=${resetOut ? 'RESET' : (check_out||'-')} status=${newStatus}${resetInfo ? ` (${resetInfo})` : ''}`);
 
     const { broadcastEvent } = require('../utils/realtimeManager');
     broadcastEvent('attendance_update', { event: 'attendance_update', type: 'edit', id });
