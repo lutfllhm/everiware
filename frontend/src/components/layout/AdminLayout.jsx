@@ -156,7 +156,11 @@ function SidebarNav({ filteredGroups, location, user, onLinkClick, onLogout, dep
                           <div className="mt-1 ml-5 pl-3 border-l border-slate-700/70 space-y-0.5">
                             {departments.map((dept) => {
                               const to = `${item.path}/${encodeURIComponent(dept.name)}`;
-                              const subActive = decodeURIComponent(location.pathname) === decodeURIComponent(to);
+                              // Cocokkan longgar — nama divisi di URL bisa beda
+                              // spasi/kapitalisasi dengan yang ada di sidebar.
+                              const norm = (v) => v.trim().replace(/\s+/g, ' ').toLowerCase();
+                              const current = decodeURIComponent(location.pathname).split('/admin/employees/')[1];
+                              const subActive = current !== undefined && norm(current) === norm(dept.name);
                               return (
                                 <Link
                                   key={dept.id ?? dept.name}

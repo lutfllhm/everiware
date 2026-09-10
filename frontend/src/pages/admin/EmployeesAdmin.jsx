@@ -12,6 +12,10 @@ const CONTRACT_TYPES = [
   { key: 'DAILY_WORKER', label: 'Daily Worker' },
 ];
 
+// users.department & departments.name adalah dua salinan string yang bisa
+// berbeda spasi/kapitalisasi, jadi pencocokannya dilonggarkan.
+const normalizeDept = (v) => (v || '').trim().replace(/\s+/g, ' ').toLowerCase();
+
 const todayISO = () => new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
 // Role yang dihitung sebagai karyawan biasa. 'gm' & 'spv' hanya penanda jabatan
@@ -357,11 +361,12 @@ export default function EmployeesAdmin() {
       .map(([department, members]) => ({ department, members }))
       .sort((a, b) => a.department.localeCompare(b.department));
 
-    // Mode satu divisi: hanya tampilkan divisi dari URL. Divisi yang belum
-    // punya karyawan tetap dirender (grup kosong) supaya tidak terlihat
-    // seperti halaman rusak saat diklik dari sidebar.
+    // Mode satu divisi: hanya tampilkan divisi dari URL. Nama divisi di sidebar
+    // berasal dari tabel departments, sedangkan users.department menyimpan
+    // salinan namanya — keduanya bisa beda spasi/kapitalisasi. Cocokkan longgar
+    // supaya karyawan tidak "hilang" hanya karena selisih penulisan.
     if (activeDept) {
-      const found = groups.find(g => g.department === activeDept);
+      const found = groups.find(g => normalizeDept(g.department) === normalizeDept(activeDept));
       return [found || { department: activeDept, members: [] }];
     }
     return groups;
@@ -379,8 +384,11 @@ export default function EmployeesAdmin() {
 
   // Divisi yang dipilih dari sidebar langsung terbuka — itu inti dari submenu.
   useEffect(() => {
-    if (activeDept) setExpandedDept(prev => ({ ...prev, [activeDept]: true }));
-  }, [activeDept]);
+    if (!activeDept) return;
+    // pakai nama hasil grouping, bukan nama dari URL — bisa beda penulisan
+    const resolved = groupedByDept[0]?.department || activeDept;
+    setExpandedDept(prev => ({ ...prev, [resolved]: true }));
+  }, [activeDept, groupedByDept]);
 
   // Landing /admin/employees tidak lagi menampilkan kartu departemen — pilihan
   // divisi ada di sidebar. Pencarian tetap boleh menembus semua divisi supaya

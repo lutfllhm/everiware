@@ -60,11 +60,43 @@ const updateDepartment = async (req, res) => {
     const { name, description, is_active } = req.body;
     if (!name) return res.status(400).json({ success: false, message: 'Nama departemen wajib diisi' });
 
-    await pool.query(
-      'UPDATE departments SET name = ?, description = ?, is_active = ? WHERE id = ?',
-      [name, description || null, is_active !== undefined ? is_active : true, id]
-    );
-    res.json({ success: true, message: 'Departemen berhasil diperbarui' });
+    // users.department menyimpan NAMA departemen (denormalisasi), bukan FK.
+    // Kalau nama diubah tanpa ikut memperbarui users, karyawan lama masih
+    // memegang nama lama dan jadi "hilang" dari daftar per-departemen.
+    const conn = await pool.getConnection();
+    try {
+      await conn.beginTransaction();
+
+      const [[current]] = await conn.query('SELECT name FROM departments WHERE id = ?', [id]);
+      if (!current) {
+        await conn.rollback();
+        return res.status(404).json({ success: false, message: 'Departemen tidak ditemukan' });
+      }
+
+      await conn.query(
+        'UPDATE departments SET name = ?, description = ?, is_active = ? WHERE id = ?',
+        [name, description || null, is_active !== undefined ? is_active : true, id]
+      );
+
+      let migrated = 0;
+      if (current.name !== name) {
+        const [r] = await conn.query('UPDATE users SET department = ? WHERE department = ?', [name, current.name]);
+        migrated = r.affectedRows || 0;
+      }
+
+      await conn.commit();
+      res.json({
+        success: true,
+        message: migrated
+          ? `Departemen berhasil diperbarui (${migrated} karyawan ikut dipindahkan)`
+          : 'Departemen berhasil diperbarui'
+      });
+    } catch (err) {
+      await conn.rollback();
+      throw err;
+    } finally {
+      conn.release();
+    }
   } catch (err) {
     res.status(500).json({ success: false, message: 'Terjadi kesalahan server' });
   }
