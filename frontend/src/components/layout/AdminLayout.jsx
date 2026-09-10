@@ -309,6 +309,25 @@ export default function AdminLayout({ children }) {
   const currentItem = navGroups.flatMap(g => g.items).find(n => isActive(n));
   const currentLabel = currentItem?.label || 'Dashboard';
 
+  // Dua halaman di bawah menu Karyawan yang saling berpasangan. Tab-nya tampil
+  // di keduanya (termasuk halaman detail & per-departemen) sebagai jalan pintas.
+  const inEmployeeArea =
+    location.pathname.startsWith('/admin/employees') ||
+    location.pathname.startsWith('/admin/departments');
+
+  const employeeTabs = inEmployeeArea ? [
+    {
+      label: 'Daftar Karyawan',
+      to: '/admin/employees?all=1',
+      active: location.pathname.startsWith('/admin/employees'),
+    },
+    {
+      label: 'Departemen & Jabatan',
+      to: '/admin/departments',
+      active: location.pathname.startsWith('/admin/departments'),
+    },
+  ] : null;
+
   // Breadcrumb sebagai data supaya tiap potongan (kecuali yang terakhir)
   // bisa dirender jadi link ke halamannya sendiri.
   const crumbs = (() => {
@@ -469,9 +488,32 @@ export default function AdminLayout({ children }) {
         <main className="flex-1 overflow-y-auto">
           {/* Title bar — hanya tampil di halaman yang tidak punya hero banner sendiri */}
           {location.pathname !== '/admin' && (
-            <div className="bg-white border-b border-slate-100 px-4 sm:px-6 py-3.5 flex items-center gap-3">
-              <div className="w-1 h-5 bg-slate-800 rounded-full" />
-              <h1 className="text-base font-bold text-slate-900">{currentLabel}</h1>
+            <div className="bg-white border-b border-slate-100 px-4 sm:px-6 py-3.5 flex flex-wrap items-center gap-x-4 gap-y-2.5">
+              <div className="flex items-center gap-3">
+                <div className="w-1 h-5 bg-slate-800 rounded-full" />
+                <h1 className="text-base font-bold text-slate-900">{currentLabel}</h1>
+              </div>
+
+              {/* Tab tetap untuk area Karyawan — selalu tampil di kedua halaman
+                  supaya bisa pindah langsung tanpa membuka sidebar. */}
+              {employeeTabs && (
+                <div className="flex items-center gap-1 p-0.5 bg-slate-100 rounded-xl sm:ml-auto">
+                  {employeeTabs.map((tab) => (
+                    <Link
+                      key={tab.to}
+                      to={tab.to}
+                      aria-current={tab.active ? 'page' : undefined}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap ${
+                        tab.active
+                          ? 'bg-white text-slate-900 shadow-sm'
+                          : 'text-slate-500 hover:text-slate-900'
+                      }`}
+                    >
+                      {tab.label}
+                    </Link>
+                  ))}
+                </div>
+              )}
             </div>
           )}
           <AnimatePresence mode="wait">
