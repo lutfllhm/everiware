@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, Fragment } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Plus, Edit, Trash2, X, User, Mail, Phone, Building, Briefcase, Calendar, AlertTriangle, ChevronDown, ChevronRight, MailCheck, Copy, CheckCircle2, Send } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, X, User, Mail, Phone, Building, Briefcase, Calendar, AlertTriangle, ChevronDown, ChevronRight, MailCheck, Copy, CheckCircle2, Check, Send } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../../api/axios';
 import { FEATURES } from '../../constants/features';
@@ -51,6 +51,12 @@ export default function EmployeesAdmin() {
   // karyawan tidak punya cara masuk sama sekali.
   const [activationModal, setActivationModal] = useState(null);
   const [copied, setCopied] = useState(false);
+  // Tambah departemen/jabatan langsung dari form karyawan supaya HR tidak perlu
+  // keluar ke menu Departemen & Jabatan hanya untuk membuat satu entri baru.
+  // null = dropdown biasa, string = sedang mengetik nama baru.
+  const [newDept, setNewDept] = useState(null);
+  const [newPos, setNewPos] = useState(null);
+  const [savingMaster, setSavingMaster] = useState(false);
 
   useEffect(() => { fetchUsers(); fetchManagers(); fetchDepartments(); fetchLocations(); }, [locationFilter]);
   useEffect(() => { fetchMaster(); }, []);
@@ -116,7 +122,49 @@ export default function EmployeesAdmin() {
     : '-';
 
   // Posisi yang tersedia berdasarkan departemen yang dipilih
-  const availablePositions = departments.find(d => d.name === form.department)?.positions?.filter(p => p.is_active) || [];
+  const selectedDept = departments.find(d => d.name === form.department);
+  const availablePositions = selectedDept?.positions?.filter(p => p.is_active) || [];
+
+  // Form tambah cepat selalu bersih tiap modal karyawan dibuka/ditutup.
+  useEffect(() => { setNewDept(null); setNewPos(null); }, [showModal]);
+
+  // Simpan departemen baru lalu langsung pilih di form (jabatan direset karena
+  // departemen baru belum punya jabatan sama sekali).
+  const handleCreateDept = async () => {
+    const name = (newDept || '').trim();
+    if (!name) return;
+    setSavingMaster(true);
+    try {
+      await api.post('/departments', { name });
+      await fetchDepartments();
+      setForm(f => ({ ...f, department: name, position: '' }));
+      setNewDept(null);
+      setNewPos(null);
+      toast.success('Departemen berhasil ditambahkan');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Gagal menambah departemen');
+    } finally {
+      setSavingMaster(false);
+    }
+  };
+
+  // Jabatan baru selalu menempel ke departemen yang sedang dipilih.
+  const handleCreatePos = async () => {
+    const name = (newPos || '').trim();
+    if (!name || !selectedDept) return;
+    setSavingMaster(true);
+    try {
+      await api.post('/departments/positions', { department_id: selectedDept.id, name });
+      await fetchDepartments();
+      setForm(f => ({ ...f, position: name }));
+      setNewPos(null);
+      toast.success('Jabatan berhasil ditambahkan');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Gagal menambah jabatan');
+    } finally {
+      setSavingMaster(false);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -527,39 +575,97 @@ export default function EmployeesAdmin() {
                   </div>
                   <div>
                     <label className="text-xs font-medium text-slate-600 mb-1 block">Departemen</label>
-                    <select
-                      value={form.department}
-                      onChange={e => setForm({ ...form, department: e.target.value, position: '' })}
-                      className="input-field text-sm"
-                    >
-                      <option value="">-- Pilih Departemen --</option>
-                      {departments.filter(d => d.is_active).map(d => (
-                        <option key={d.id} value={d.name}>{d.name}</option>
-                      ))}
-                      {/* Tampilkan nilai lama jika tidak ada di list */}
-                      {form.department && !departments.find(d => d.name === form.department) && (
-                        <option value={form.department}>{form.department}</option>
-                      )}
-                    </select>
+                    {newDept === null ? (
+                      <select
+                        value={form.department}
+                        onChange={e => {
+                          if (e.target.value === '__new__') { setNewDept(''); return; }
+                          setForm({ ...form, department: e.target.value, position: '' });
+                        }}
+                        className="input-field text-sm"
+                      >
+                        <option value="">-- Pilih Departemen --</option>
+                        {departments.filter(d => d.is_active).map(d => (
+                          <option key={d.id} value={d.name}>{d.name}</option>
+                        ))}
+                        {/* Tampilkan nilai lama jika tidak ada di list */}
+                        {form.department && !departments.find(d => d.name === form.department) && (
+                          <option value={form.department}>{form.department}</option>
+                        )}
+                        <option value="__new__">+ Tambah departemen baru...</option>
+                      </select>
+                    ) : (
+                      <div className="flex gap-2">
+                        <input
+                          autoFocus
+                          value={newDept}
+                          onChange={e => setNewDept(e.target.value)}
+                          onKeyDown={e => {
+                            // Enter di sini tidak boleh men-submit form karyawan.
+                            if (e.key === 'Enter') { e.preventDefault(); handleCreateDept(); }
+                            if (e.key === 'Escape') setNewDept(null);
+                          }}
+                          className="input-field text-sm flex-1"
+                          placeholder="Nama departemen baru"
+                        />
+                        <button type="button" onClick={handleCreateDept} disabled={savingMaster || !newDept.trim()}
+                          className="btn-primary px-3 py-2 text-sm disabled:opacity-50" title="Simpan departemen">
+                          <Check size={16} />
+                        </button>
+                        <button type="button" onClick={() => setNewDept(null)}
+                          className="btn-secondary px-3 py-2 text-sm" title="Batal">
+                          <X size={16} />
+                        </button>
+                      </div>
+                    )}
                   </div>
                   <div>
                     <label className="text-xs font-medium text-slate-600 mb-1 block">Jabatan</label>
-                    <select
-                      value={form.position}
-                      onChange={e => setForm({ ...form, position: e.target.value })}
-                      className="input-field text-sm"
-                      disabled={!form.department}
-                    >
-                      <option value="">-- Pilih Jabatan --</option>
-                      {availablePositions.map(p => (
-                        <option key={p.id} value={p.name}>{p.name}</option>
-                      ))}
-                      {/* Tampilkan nilai lama jika tidak ada di list */}
-                      {form.position && !availablePositions.find(p => p.name === form.position) && (
-                        <option value={form.position}>{form.position}</option>
-                      )}
-                    </select>
-                    {!form.department && (
+                    {newPos === null ? (
+                      <select
+                        value={form.position}
+                        onChange={e => {
+                          if (e.target.value === '__new__') { setNewPos(''); return; }
+                          setForm({ ...form, position: e.target.value });
+                        }}
+                        className="input-field text-sm"
+                        disabled={!form.department}
+                      >
+                        <option value="">-- Pilih Jabatan --</option>
+                        {availablePositions.map(p => (
+                          <option key={p.id} value={p.name}>{p.name}</option>
+                        ))}
+                        {/* Tampilkan nilai lama jika tidak ada di list */}
+                        {form.position && !availablePositions.find(p => p.name === form.position) && (
+                          <option value={form.position}>{form.position}</option>
+                        )}
+                        {/* Hanya departemen terdaftar yang punya id untuk ditempeli jabatan */}
+                        {selectedDept && <option value="__new__">+ Tambah jabatan baru...</option>}
+                      </select>
+                    ) : (
+                      <div className="flex gap-2">
+                        <input
+                          autoFocus
+                          value={newPos}
+                          onChange={e => setNewPos(e.target.value)}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') { e.preventDefault(); handleCreatePos(); }
+                            if (e.key === 'Escape') setNewPos(null);
+                          }}
+                          className="input-field text-sm flex-1"
+                          placeholder={'Jabatan baru di ' + form.department}
+                        />
+                        <button type="button" onClick={handleCreatePos} disabled={savingMaster || !newPos.trim()}
+                          className="btn-primary px-3 py-2 text-sm disabled:opacity-50" title="Simpan jabatan">
+                          <Check size={16} />
+                        </button>
+                        <button type="button" onClick={() => setNewPos(null)}
+                          className="btn-secondary px-3 py-2 text-sm" title="Batal">
+                          <X size={16} />
+                        </button>
+                      </div>
+                    )}
+                    {!form.department && newPos === null && (
                       <p className="text-xs text-slate-400 mt-1">Pilih departemen terlebih dahulu</p>
                     )}
                   </div>
