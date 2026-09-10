@@ -43,7 +43,9 @@ export default function EmployeesAdmin() {
   // Kalau URL-nya /admin/employees/:department (dari submenu sidebar), halaman
   // langsung menampilkan daftar karyawan divisi itu tanpa accordion.
   const { department: deptParam } = useParams();
-  const activeDept = deptParam ? decodeURIComponent(deptParam) : null;
+  // useParams() sudah mengembalikan nilai ter-decode. Men-decode ulang bikin
+  // URIError untuk nama divisi yang mengandung '%' dan mematikan halaman.
+  const activeDept = deptParam || null;
 
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -348,7 +350,17 @@ export default function EmployeesAdmin() {
     }
   };
 
-  const filtered = users.filter(u => !search || u.name?.toLowerCase().includes(search.toLowerCase()) || u.email?.toLowerCase().includes(search.toLowerCase()) || u.employee_id?.toLowerCase().includes(search.toLowerCase()));
+  // Harus useMemo: `filtered` jadi dependency `groupedByDept`, dan array baru
+  // di tiap render bikin memo + effect di bawahnya ikut jalan terus-menerus.
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return users;
+    return users.filter(u =>
+      u.name?.toLowerCase().includes(q) ||
+      u.email?.toLowerCase().includes(q) ||
+      u.employee_id?.toLowerCase().includes(q)
+    );
+  }, [users, search]);
 
   const groupedByDept = useMemo(() => {
     const byDept = filtered.reduce((acc, u) => {
@@ -372,23 +384,30 @@ export default function EmployeesAdmin() {
     return groups;
   }, [filtered, activeDept]);
 
-  // Saat mencari, otomatis buka departemen yang punya hasil match
+  // Saat mencari, otomatis buka departemen yang punya hasil match.
+  // Dependency berupa string gabungan nama divisi supaya effect hanya jalan
+  // saat isi grupnya benar-benar berubah, bukan tiap render.
+  const matchedDeptKeys = groupedByDept.map(d => d.department).join('|');
   useEffect(() => {
-    if (!search) return;
+    if (!search.trim() || !matchedDeptKeys) return;
     setExpandedDept(prev => {
       const next = { ...prev };
-      groupedByDept.forEach(d => { next[d.department] = true; });
-      return next;
+      let changed = false;
+      for (const name of matchedDeptKeys.split('|')) {
+        if (!next[name]) { next[name] = true; changed = true; }
+      }
+      return changed ? next : prev;
     });
-  }, [search, groupedByDept]);
+  }, [search, matchedDeptKeys]);
 
   // Divisi yang dipilih dari sidebar langsung terbuka — itu inti dari submenu.
+  // Dependency-nya nama hasil resolve (string), bukan objek memo: kalau memo
+  // yang dipakai, tiap setState bikin referensi baru → render loop tak berhenti.
+  const resolvedDept = activeDept ? (groupedByDept[0]?.department || activeDept) : null;
   useEffect(() => {
-    if (!activeDept) return;
-    // pakai nama hasil grouping, bukan nama dari URL — bisa beda penulisan
-    const resolved = groupedByDept[0]?.department || activeDept;
-    setExpandedDept(prev => ({ ...prev, [resolved]: true }));
-  }, [activeDept, groupedByDept]);
+    if (!resolvedDept) return;
+    setExpandedDept(prev => (prev[resolvedDept] ? prev : { ...prev, [resolvedDept]: true }));
+  }, [resolvedDept]);
 
   // Landing /admin/employees tidak lagi menampilkan kartu departemen — pilihan
   // divisi ada di sidebar. Pencarian tetap boleh menembus semua divisi supaya

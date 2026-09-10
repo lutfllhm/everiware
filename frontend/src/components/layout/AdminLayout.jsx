@@ -10,6 +10,10 @@ import useAuthStore from '../../store/authStore';
 import toast from 'react-hot-toast';
 import api from '../../api/axios';
 
+// decodeURIComponent melempar URIError kalau string punya '%' yang bukan escape
+// valid. Sidebar tidak boleh ikut mati hanya karena nama divisi aneh.
+const safeDecode = (v) => { try { return decodeURIComponent(v); } catch { return v; } };
+
 const navGroups = [
   {
     label: 'Utama',
@@ -159,8 +163,8 @@ function SidebarNav({ filteredGroups, location, user, onLinkClick, onLogout, dep
                               // Cocokkan longgar — nama divisi di URL bisa beda
                               // spasi/kapitalisasi dengan yang ada di sidebar.
                               const norm = (v) => v.trim().replace(/\s+/g, ' ').toLowerCase();
-                              const current = decodeURIComponent(location.pathname).split('/admin/employees/')[1];
-                              const subActive = current !== undefined && norm(current) === norm(dept.name);
+                              const current = location.pathname.split('/admin/employees/')[1];
+                              const subActive = current !== undefined && norm(safeDecode(current)) === norm(dept.name);
                               return (
                                 <Link
                                   key={dept.id ?? dept.name}
@@ -357,7 +361,7 @@ export default function AdminLayout({ children }) {
                 <>
                   <span className="text-slate-300">/</span>
                   <span className="font-semibold text-slate-900 text-sm truncate max-w-[40vw]">
-                    {decodeURIComponent(location.pathname.split('/admin/employees/')[1] || '')}
+                    {safeDecode(location.pathname.split('/admin/employees/')[1] || '')}
                   </span>
                 </>
               )}
