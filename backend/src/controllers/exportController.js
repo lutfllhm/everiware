@@ -1,4 +1,5 @@
 const { pool } = require('../config/database');
+const { EMPLOYEE_ROLE_SQL } = require('../constants/roles');
 const ExcelJS = require('exceljs');
 const PDFDocument = require('pdfkit');
 
@@ -204,7 +205,7 @@ const exportAttendanceExcel = async (req, res) => {
         COUNT(a.id) as total_hari
        FROM users u
        LEFT JOIN attendances a ON u.id = a.user_id ${filter}
-       WHERE u.role='employee' AND u.is_active=TRUE
+       WHERE ${EMPLOYEE_ROLE_SQL('u')} AND u.is_active=TRUE
        GROUP BY u.id ORDER BY u.name`,
       params
     );
@@ -427,7 +428,7 @@ const exportAttendancePDF = async (req, res) => {
         COUNT(CASE WHEN a.status='sick'    THEN 1 END) as sakit
        FROM users u
        LEFT JOIN attendances a ON u.id = a.user_id ${filter}
-       WHERE u.role='employee' AND u.is_active=TRUE
+       WHERE ${EMPLOYEE_ROLE_SQL('u')} AND u.is_active=TRUE
        GROUP BY u.id ORDER BY u.name`,
       params
     );
@@ -504,7 +505,7 @@ const exportAttendanceDetailPDF = async (req, res) => {
        FROM users u
        LEFT JOIN attendances a ON u.id = a.user_id ${filter}
        LEFT JOIN attendance_locations l ON a.location_id = l.id
-       WHERE u.role='employee' AND u.is_active=TRUE
+       WHERE ${EMPLOYEE_ROLE_SQL('u')} AND u.is_active=TRUE
        ORDER BY u.name, a.date`,
       params
     );
@@ -683,7 +684,7 @@ const exportMonthlyRecapExcel = async (req, res) => {
        LEFT JOIN user_shifts us ON u.id = us.user_id
          AND us.effective_date = (SELECT MAX(us2.effective_date) FROM user_shifts us2 WHERE us2.user_id = u.id AND us2.effective_date <= CURDATE())
        LEFT JOIN work_shifts ws ON us.shift_id = ws.id
-       WHERE u.role='employee' AND u.is_active=TRUE ${userFilter}
+       WHERE ${EMPLOYEE_ROLE_SQL('u')} AND u.is_active=TRUE ${userFilter}
        ORDER BY u.name, a.date`,
       params
     );
@@ -810,7 +811,7 @@ const exportAttendanceTimesheetExcel = async (req, res) => {
 
     const [users] = await pool.query(
       `SELECT id, employee_id, name FROM users u
-       WHERE u.role='employee' AND u.is_active=TRUE ${userFilter}
+       WHERE ${EMPLOYEE_ROLE_SQL('u')} AND u.is_active=TRUE ${userFilter}
        ORDER BY u.name`,
       userParams
     );

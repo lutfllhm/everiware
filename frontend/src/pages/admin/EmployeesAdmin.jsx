@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, Fragment } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Plus, Edit, Trash2, X, User, Mail, Phone, Building, Briefcase, Calendar, AlertTriangle, ChevronDown, ChevronRight, MailCheck, Copy, CheckCircle2, Check, Send } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, X, User, Mail, Phone, Building, Briefcase, Calendar, AlertTriangle, ChevronDown, ChevronRight, ChevronLeft, MailCheck, Copy, CheckCircle2, Check, Send } from 'lucide-react';
+import { useParams, Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import api from '../../api/axios';
 import { FEATURES } from '../../constants/features';
@@ -12,6 +13,15 @@ const CONTRACT_TYPES = [
 ];
 
 const todayISO = () => new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+// Role yang dihitung sebagai karyawan biasa. 'gm' & 'spv' hanya penanda jabatan
+// struktural untuk approval — aksesnya sama dengan 'employee', bukan admin.
+// Harus sinkron dengan EMPLOYEE_ROLES di backend/src/constants/roles.js
+const EMPLOYEE_ROLES = ['employee', 'gm', 'spv'];
+const ROLE_LABELS = {
+  employee: 'Karyawan', gm: 'General Manager', spv: 'SPV/PIC',
+  hrd: 'HRD', admin: 'Admin', superadmin: 'Superadmin',
+};
 
 // Satu sumber nilai awal form supaya reset di tombol tambah, setelah simpan,
 // dan saat batal edit tidak pernah berbeda isinya.
@@ -26,6 +36,11 @@ const emptyForm = () => ({
 });
 
 export default function EmployeesAdmin() {
+  // Kalau URL-nya /admin/employees/:department (dari submenu sidebar), halaman
+  // langsung menampilkan daftar karyawan divisi itu tanpa accordion.
+  const { department: deptParam } = useParams();
+  const activeDept = deptParam ? decodeURIComponent(deptParam) : null;
+
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
@@ -64,7 +79,7 @@ export default function EmployeesAdmin() {
   const fetchUsers = async () => {
     setLoading(true);
     try {
-      const url = `/users?role=employee&limit=1000${locationFilter ? `&location_id=${locationFilter}` : ''}`;
+      const url = `/users?role=${EMPLOYEE_ROLES.join(',')}&limit=1000${locationFilter ? `&location_id=${locationFilter}` : ''}`;
       const { data } = await api.get(url);
       setUsers(data.users);
     } catch {} finally { setLoading(false); }
@@ -73,8 +88,10 @@ export default function EmployeesAdmin() {
   const fetchManagers = async () => {
     try {
       const { data } = await api.get('/users?limit=1000');
+      // GM & SPV/PIC ikut jadi kandidat atasan — itu memang alasan role-nya ada,
+      // walaupun aksesnya setara karyawan biasa.
       setManagers(data.users.filter(u =>
-        ['superadmin','admin','hrd'].includes(u.role) ||
+        ['superadmin','admin','hrd','gm','spv'].includes(u.role) ||
         (Array.isArray(u.permissions) && u.permissions.length > 0)
       ));
     } catch {}
@@ -148,7 +165,7 @@ export default function EmployeesAdmin() {
     }
   };
 
-  // Jabatan baru selalu menempel ke departemen yang sedang dipilih.
+  // Posisi baru selalu menempel ke departemen yang sedang dipilih.
   const handleCreatePos = async () => {
     const name = (newPos || '').trim();
     if (!name || !selectedDept) return;
@@ -158,9 +175,9 @@ export default function EmployeesAdmin() {
       await fetchDepartments();
       setForm(f => ({ ...f, position: name }));
       setNewPos(null);
-      toast.success('Jabatan berhasil ditambahkan');
+      toast.success('Posisi berhasil ditambahkan');
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Gagal menambah jabatan');
+      toast.error(err.response?.data?.message || 'Gagal menambah posisi');
     } finally {
       setSavingMaster(false);
     }
@@ -172,7 +189,7 @@ export default function EmployeesAdmin() {
     try {
       if (editUser) {
         await api.put(`/users/${editUser.id}`, form);
-        if (form.role === 'employee') {
+        if (EMPLOYEE_ROLES.includes(form.role)) {
           await api.put(`/users/${editUser.id}/permissions`, { feature_keys: permissions });
         }
         toast.success('Data karyawan berhasil diperbarui');
@@ -336,10 +353,19 @@ export default function EmployeesAdmin() {
       acc[dept].push(u);
       return acc;
     }, {});
-    return Object.entries(byDept)
+    const groups = Object.entries(byDept)
       .map(([department, members]) => ({ department, members }))
       .sort((a, b) => a.department.localeCompare(b.department));
-  }, [filtered]);
+
+    // Mode satu divisi: hanya tampilkan divisi dari URL. Divisi yang belum
+    // punya karyawan tetap dirender (grup kosong) supaya tidak terlihat
+    // seperti halaman rusak saat diklik dari sidebar.
+    if (activeDept) {
+      const found = groups.find(g => g.department === activeDept);
+      return [found || { department: activeDept, members: [] }];
+    }
+    return groups;
+  }, [filtered, activeDept]);
 
   // Saat mencari, otomatis buka departemen yang punya hasil match
   useEffect(() => {
@@ -351,17 +377,30 @@ export default function EmployeesAdmin() {
     });
   }, [search, groupedByDept]);
 
+  // Divisi yang dipilih dari sidebar langsung terbuka — itu inti dari submenu.
+  useEffect(() => {
+    if (activeDept) setExpandedDept(prev => ({ ...prev, [activeDept]: true }));
+  }, [activeDept]);
+
   const toggleDept = (dept) => setExpandedDept(prev => ({ ...prev, [dept]: !prev[dept] }));
   const setDeptSearchValue = (dept, value) => setDeptSearch(prev => ({ ...prev, [dept]: value }));
 
   return (
     <div className="space-y-4">
+      {/* Breadcrumb kembali — hanya saat sedang melihat satu divisi */}
+      {activeDept && (
+        <Link to="/admin/employees"
+          className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-900 transition-colors">
+          <ChevronLeft size={15} /> Semua Departemen
+        </Link>
+      )}
+
       {/* Header Actions */}
       <div className="flex flex-wrap gap-3 items-center justify-between">
         <div className="flex flex-1 flex-wrap gap-3 items-center min-w-48">
           <div className="relative flex-1 min-w-48">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input placeholder="Cari karyawan..." value={search} onChange={(e) => setSearch(e.target.value)} className="input-field pl-9 py-2.5 text-sm" />
+            <input placeholder={activeDept ? `Cari karyawan di ${activeDept}...` : 'Cari karyawan...'} value={search} onChange={(e) => setSearch(e.target.value)} className="input-field pl-9 py-2.5 text-sm" />
           </div>
           <select
             value={locationFilter}
@@ -374,7 +413,7 @@ export default function EmployeesAdmin() {
             ))}
           </select>
         </div>
-        <button onClick={() => { setEditUser(null); setForm(emptyForm()); setAvatarFile(null); setAvatarPreview(null); setPermissions([]); setShowModal(true); }}
+        <button onClick={() => { setEditUser(null); setForm({ ...emptyForm(), department: activeDept || '' }); setAvatarFile(null); setAvatarPreview(null); setPermissions([]); setShowModal(true); }}
           className="btn-primary py-2.5 flex items-center gap-2 text-sm">
           <Plus size={16} /> Tambah Karyawan
         </button>
@@ -388,7 +427,9 @@ export default function EmployeesAdmin() {
           <div className="card text-center py-8 text-slate-400">Tidak ada karyawan</div>
         ) : (
           groupedByDept.map(({ department, members }) => {
-            const isOpen = !!expandedDept[department];
+            // Di mode satu divisi header tidak bisa ditutup — tidak ada gunanya
+            // menyembunyikan satu-satunya tabel di halaman.
+            const isOpen = activeDept ? true : !!expandedDept[department];
             const activeCount = members.filter(m => m.is_active).length;
             const deptQuery = (deptSearch[department] || '').toLowerCase();
             const visibleMembers = deptQuery
@@ -396,11 +437,12 @@ export default function EmployeesAdmin() {
               : members;
             return (
               <div key={department} className="card overflow-hidden">
-                <button onClick={() => toggleDept(department)}
-                  className="w-full flex items-center gap-3 p-4 hover:bg-slate-50 transition-colors text-left">
-                  {isOpen
+                <button onClick={() => { if (!activeDept) toggleDept(department); }}
+                  disabled={!!activeDept}
+                  className={`w-full flex items-center gap-3 p-4 transition-colors text-left ${activeDept ? 'cursor-default' : 'hover:bg-slate-50'}`}>
+                  {!activeDept && (isOpen
                     ? <ChevronDown size={16} className="text-slate-500 flex-shrink-0" />
-                    : <ChevronRight size={16} className="text-slate-500 flex-shrink-0" />}
+                    : <ChevronRight size={16} className="text-slate-500 flex-shrink-0" />)}
                   <div className="w-9 h-9 bg-slate-100 rounded-xl flex items-center justify-center flex-shrink-0">
                     <Building size={18} className="text-slate-600" />
                   </div>
@@ -431,7 +473,7 @@ export default function EmployeesAdmin() {
                         <table className="w-full">
                           <thead className="bg-slate-50 border-b border-slate-200">
                             <tr>
-                              {['Karyawan', 'ID', 'Jabatan', 'Penempatan', 'Jatah Cuti', 'Status', 'Aksi'].map(h => (
+                              {['Karyawan', 'ID', 'Posisi', 'Penempatan', 'Jatah Cuti', 'Status', 'Aksi'].map(h => (
                                 <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">{h}</th>
                               ))}
                             </tr>
@@ -620,7 +662,7 @@ export default function EmployeesAdmin() {
                     )}
                   </div>
                   <div>
-                    <label className="text-xs font-medium text-slate-600 mb-1 block">Jabatan</label>
+                    <label className="text-xs font-medium text-slate-600 mb-1 block">Posisi</label>
                     {newPos === null ? (
                       <select
                         value={form.position}
@@ -631,7 +673,7 @@ export default function EmployeesAdmin() {
                         className="input-field text-sm"
                         disabled={!form.department}
                       >
-                        <option value="">-- Pilih Jabatan --</option>
+                        <option value="">-- Pilih Posisi --</option>
                         {availablePositions.map(p => (
                           <option key={p.id} value={p.name}>{p.name}</option>
                         ))}
@@ -640,7 +682,7 @@ export default function EmployeesAdmin() {
                           <option value={form.position}>{form.position}</option>
                         )}
                         {/* Hanya departemen terdaftar yang punya id untuk ditempeli jabatan */}
-                        {selectedDept && <option value="__new__">+ Tambah jabatan baru...</option>}
+                        {selectedDept && <option value="__new__">+ Tambah posisi baru...</option>}
                       </select>
                     ) : (
                       <div className="flex gap-2">
@@ -653,10 +695,10 @@ export default function EmployeesAdmin() {
                             if (e.key === 'Escape') setNewPos(null);
                           }}
                           className="input-field text-sm flex-1"
-                          placeholder={'Jabatan baru di ' + form.department}
+                          placeholder={'Posisi baru di ' + form.department}
                         />
                         <button type="button" onClick={handleCreatePos} disabled={savingMaster || !newPos.trim()}
-                          className="btn-primary px-3 py-2 text-sm disabled:opacity-50" title="Simpan jabatan">
+                          className="btn-primary px-3 py-2 text-sm disabled:opacity-50" title="Simpan posisi">
                           <Check size={16} />
                         </button>
                         <button type="button" onClick={() => setNewPos(null)}
@@ -676,9 +718,17 @@ export default function EmployeesAdmin() {
                   <div>
                     <label className="text-xs font-medium text-slate-600 mb-1 block">Role</label>
                     <select value={form.role} onChange={e => setForm({ ...form, role: e.target.value })} className="input-field text-sm">
-                      <option value="employee">Karyawan</option>
-                      <option value="hrd">HRD</option>
-                      <option value="admin">Admin</option>
+                      {/* GM & SPV/PIC adalah penanda jabatan struktural: aksesnya
+                          tetap setara karyawan, dipakai untuk alur approval. */}
+                      <optgroup label="Karyawan">
+                        <option value="employee">Karyawan</option>
+                        <option value="gm">General Manager</option>
+                        <option value="spv">SPV/PIC</option>
+                      </optgroup>
+                      <optgroup label="Akses Panel Admin">
+                        <option value="hrd">HRD</option>
+                        <option value="admin">Admin</option>
+                      </optgroup>
                     </select>
                   </div>
                   <div className="col-span-2">
@@ -704,12 +754,12 @@ export default function EmployeesAdmin() {
                       .filter(m => m.id !== editUser?.id)
                       .filter(m => !form.department || m.department === form.department)
                       .map(m => (
-                        <option key={m.id} value={m.id}>{m.name} ({m.role})</option>
+                        <option key={m.id} value={m.id}>{m.name} ({ROLE_LABELS[m.role] || m.role})</option>
                       ))}
                   </select>
-                  <p className="text-xs text-slate-400 mt-1">Menampilkan akun HRD/Admin serta karyawan yang sudah diberi akses, di divisi yang sama{!form.department && ' (pilih divisi karyawan dulu untuk menyaring)'}</p>
+                  <p className="text-xs text-slate-400 mt-1">Menampilkan akun HRD/Admin, General Manager, SPV/PIC, serta karyawan yang sudah diberi akses, di divisi yang sama{!form.department && ' (pilih divisi karyawan dulu untuk menyaring)'}</p>
                 </div>
-                {editUser && form.role === 'employee' && (
+                {editUser && EMPLOYEE_ROLES.includes(form.role) && (
                   <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
                     <label className="text-xs font-medium text-slate-600 mb-2 block">Kelola Akses (fitur admin yang diberikan)</label>
                     <div className="space-y-2">

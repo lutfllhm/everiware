@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   LayoutDashboard, Users, Clock, FileText, BarChart3, Settings,
   Bell, LogOut, Menu, X, MapPin, Database, Shield, ChevronRight,
-  CalendarClock, ListChecks, CalendarDays, Building, FileSignature
+  CalendarClock, ListChecks, CalendarDays, Building, FileSignature, ChevronDown
 } from 'lucide-react';
 import useAuthStore from '../../store/authStore';
 import toast from 'react-hot-toast';
@@ -16,7 +16,7 @@ const navGroups = [
     items: [
       { path: '/admin', icon: LayoutDashboard, label: 'Dashboard', exact: true, roles: ['superadmin', 'admin', 'hrd'] },
       { path: '/admin/attendance', icon: Clock, label: 'Absensi', roles: ['superadmin', 'admin', 'hrd'] },
-      { path: '/admin/employees', icon: Users, label: 'Karyawan', roles: ['superadmin', 'admin', 'hrd'] },
+      { path: '/admin/employees', icon: Users, label: 'Karyawan', roles: ['superadmin', 'admin', 'hrd'], submenu: 'departments' },
       { path: '/admin/leaves', icon: FileText, label: 'Perizinan', roles: ['superadmin', 'admin', 'hrd'] },
       { path: '/admin/overtime', icon: Clock, label: 'Lembur', roles: ['superadmin', 'admin', 'hrd'] },
     ]
@@ -53,8 +53,16 @@ const navGroups = [
 // ── SidebarNav — komponen terpisah di luar AdminLayout ────────────────────────
 // Didefinisikan di luar agar tidak di-recreate setiap render AdminLayout,
 // sehingga scroll position nav tetap terjaga saat navigasi antar halaman.
-function SidebarNav({ filteredGroups, location, user, onLinkClick, onLogout }) {
+function SidebarNav({ filteredGroups, location, user, onLinkClick, onLogout, departments }) {
   const navRef = useRef(null);
+  // Submenu departemen di bawah "Karyawan" dibuka otomatis saat berada di
+  // halaman karyawan, tapi tetap bisa ditutup/buka manual oleh user.
+  const onEmployeesPage = location.pathname.startsWith('/admin/employees');
+  const [openSubmenu, setOpenSubmenu] = useState(onEmployeesPage ? '/admin/employees' : null);
+
+  useEffect(() => {
+    if (onEmployeesPage) setOpenSubmenu('/admin/employees');
+  }, [onEmployeesPage]);
 
   const isActive = (item) =>
     item.exact
@@ -95,22 +103,81 @@ function SidebarNav({ filteredGroups, location, user, onLinkClick, onLogout }) {
             <div className="space-y-0.5">
               {group.items.map((item) => {
                 const active = isActive(item);
+                const hasSubmenu = item.submenu === 'departments' && departments.length > 0;
+                const submenuOpen = hasSubmenu && openSubmenu === item.path;
                 return (
-                  <Link
-                    key={item.path}
-                    to={item.path}
-                    data-active={active}
-                    onClick={onLinkClick}
-                    className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-300 ease-out active:scale-[0.98] ${
-                      active
-                        ? 'bg-white text-slate-900 shadow-sm'
-                        : 'text-slate-400 hover:bg-slate-800 hover:text-white hover:translate-x-1'
-                    }`}
-                  >
-                    <item.icon size={17} />
-                    <span>{item.label}</span>
-                    {active && <ChevronRight size={13} className="ml-auto text-slate-400" />}
-                  </Link>
+                  <div key={item.path}>
+                    <div
+                      data-active={active}
+                      className={`flex items-center rounded-xl text-sm font-medium transition-all duration-300 ease-out ${
+                        active
+                          ? 'bg-white text-slate-900 shadow-sm'
+                          : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                      }`}
+                    >
+                      <Link
+                        to={item.path}
+                        onClick={onLinkClick}
+                        className="flex items-center gap-3 flex-1 min-w-0 px-3 py-2.5 active:scale-[0.98]"
+                      >
+                        <item.icon size={17} />
+                        <span className="truncate">{item.label}</span>
+                      </Link>
+                      {hasSubmenu ? (
+                        <button
+                          type="button"
+                          onClick={() => setOpenSubmenu(submenuOpen ? null : item.path)}
+                          aria-label={submenuOpen ? `Tutup daftar ${item.label}` : `Buka daftar ${item.label}`}
+                          aria-expanded={submenuOpen}
+                          className={`px-2.5 py-2.5 flex-shrink-0 transition-colors ${
+                            active ? 'text-slate-500 hover:text-slate-900' : 'text-slate-500 hover:text-white'
+                          }`}
+                        >
+                          <ChevronDown
+                            size={14}
+                            className={`transition-transform duration-200 ${submenuOpen ? 'rotate-180' : ''}`}
+                          />
+                        </button>
+                      ) : (
+                        active && <ChevronRight size={13} className="mr-3 text-slate-400" />
+                      )}
+                    </div>
+
+                    {/* Daftar departemen — klik langsung membuka karyawan divisi itu */}
+                    <AnimatePresence initial={false}>
+                      {submenuOpen && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: 'auto', opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={{ duration: 0.18 }}
+                          className="overflow-hidden"
+                        >
+                          <div className="mt-1 ml-5 pl-3 border-l border-slate-700/70 space-y-0.5">
+                            {departments.map((dept) => {
+                              const to = `${item.path}/${encodeURIComponent(dept.name)}`;
+                              const subActive = decodeURIComponent(location.pathname) === decodeURIComponent(to);
+                              return (
+                                <Link
+                                  key={dept.id ?? dept.name}
+                                  to={to}
+                                  onClick={onLinkClick}
+                                  className={`block px-3 py-2 rounded-lg text-[13px] transition-colors truncate ${
+                                    subActive
+                                      ? 'bg-slate-700 text-white font-medium'
+                                      : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                                  }`}
+                                  title={dept.name}
+                                >
+                                  {dept.name}
+                                </Link>
+                              );
+                            })}
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
                 );
               })}
             </div>
@@ -146,6 +213,9 @@ function SidebarNav({ filteredGroups, location, user, onLinkClick, onLogout }) {
 export default function AdminLayout({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  // Dipakai submenu "Karyawan" di sidebar supaya HR bisa langsung loncat ke
+  // satu divisi tanpa membuka accordion di halaman karyawan dulu.
+  const [departments, setDepartments] = useState([]);
   const { user, logout } = useAuthStore();
   const location = useLocation();
   const navigate = useNavigate();
@@ -165,6 +235,28 @@ export default function AdminLayout({ children }) {
     const interval = setInterval(fetchUnread, 120_000); // 2 menit
     return () => clearInterval(interval);
   }, []);
+
+  // Endpoint /departments/all hanya untuk role admin-tier; user dengan grant
+  // granular (mis. shifts.manage) tidak perlu memanggilnya sama sekali.
+  const canReadDepartments = ['superadmin', 'admin', 'hrd'].includes(user?.role);
+
+  useEffect(() => {
+    if (!canReadDepartments) { setDepartments([]); return; }
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await api.get('/departments/all');
+        if (!cancelled) {
+          setDepartments(
+            (data.departments || [])
+              .filter(d => d.is_active !== false)
+              .sort((a, b) => a.name.localeCompare(b.name))
+          );
+        }
+      } catch {}
+    })();
+    return () => { cancelled = true; };
+  }, [canReadDepartments]);
 
   const handleLogout = () => {
     logout();
@@ -201,6 +293,7 @@ export default function AdminLayout({ children }) {
           user={user}
           onLinkClick={() => {}}
           onLogout={handleLogout}
+          departments={departments}
         />
       </aside>
 
@@ -232,6 +325,7 @@ export default function AdminLayout({ children }) {
                 user={user}
                 onLinkClick={() => setSidebarOpen(false)}
                 onLogout={handleLogout}
+                departments={departments}
               />
             </motion.aside>
           </>
@@ -254,6 +348,15 @@ export default function AdminLayout({ children }) {
               <span className="text-slate-400 text-sm hidden sm:block">Everiware</span>
               <span className="text-slate-300 hidden sm:block">/</span>
               <span className="font-semibold text-slate-900 text-sm">{currentLabel}</span>
+              {/* Nama divisi ikut muncul saat membuka karyawan per departemen */}
+              {location.pathname.startsWith('/admin/employees/') && (
+                <>
+                  <span className="text-slate-300">/</span>
+                  <span className="font-semibold text-slate-900 text-sm truncate max-w-[40vw]">
+                    {decodeURIComponent(location.pathname.split('/admin/employees/')[1] || '')}
+                  </span>
+                </>
+              )}
             </div>
           </div>
           <div className="flex items-center gap-2">

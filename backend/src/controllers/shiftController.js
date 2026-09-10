@@ -1,4 +1,5 @@
 const { pool } = require('../config/database');
+const { EMPLOYEE_ROLE_SQL } = require('../constants/roles');
 const { generateId } = require('../utils/helpers');
 const { resolveScope } = require('../utils/permissionScope');
 
@@ -161,7 +162,7 @@ const getAllUserShifts = async (req, res) => {
            WHERE us2.user_id = u.id AND us2.effective_date <= CURDATE()
          )
        LEFT JOIN work_shifts ws ON us.shift_id = ws.id
-       WHERE u.role = 'employee' AND u.is_active = TRUE`;
+       WHERE ${EMPLOYEE_ROLE_SQL('u')} AND u.is_active = TRUE`;
     const params = [];
     if (scope.scoped) {
       query += ' AND u.department = ?';

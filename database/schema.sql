@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS users (
   face_photo VARCHAR(255),
   face_photo_left VARCHAR(255),
   face_photo_right VARCHAR(255),
-  role ENUM('superadmin','admin','hrd','employee') DEFAULT 'employee',
+  role ENUM('superadmin','admin','hrd','gm','spv','employee') DEFAULT 'employee',
   department VARCHAR(100),
   position VARCHAR(100),
   department_id VARCHAR(36) DEFAULT NULL,

@@ -1,5 +1,6 @@
 const cron = require('node-cron');
 const { pool } = require('../config/database');
+const { EMPLOYEE_ROLE_SQL } = require('../constants/roles');
 const { generateId, nowWIBParts } = require('../utils/helpers');
 const { sendPushNotification } = require('../utils/fcm');
 const { resolveUserShift } = require('../controllers/attendanceController');
@@ -46,7 +47,7 @@ const runReminderCheck = async () => {
   const nowMinutes = nowParts.getUTCHours() * 60 + nowParts.getUTCMinutes();
 
   const [users] = await pool.query(
-    "SELECT id FROM users WHERE is_active = TRUE AND role = 'employee'"
+    `SELECT id FROM users WHERE is_active = TRUE AND ${EMPLOYEE_ROLE_SQL()}`
   );
   if (!users.length) return;
 

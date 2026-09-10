@@ -1,4 +1,5 @@
 const { pool } = require('../config/database');
+const { EMPLOYEE_ROLE_SQL } = require('../constants/roles');
 const { generateId, getWorkingDays, nowWIBParts } = require('../utils/helpers');
 const { sendLeaveNotification } = require('../utils/email');
 const { sendPushNotification } = require('../utils/fcm');
@@ -502,7 +503,7 @@ const getTeamCalendar = async (req, res) => {
     let notYetCheckedIn = [];
     if (dayOfWeek !== 0 && dayOfWeek !== 6) {
       const [allEmp] = await pool.query(
-        "SELECT id, name, employee_id, department, avatar FROM users WHERE role = 'employee' AND is_active = TRUE"
+        `SELECT id, name, employee_id, department, avatar FROM users WHERE ${EMPLOYEE_ROLE_SQL()} AND is_active = TRUE`
       );
       const checkedInIds = new Set(todayAtt.map(a => a.user_id));
       notYetCheckedIn = allEmp.filter(e => !checkedInIds.has(e.id));
@@ -527,7 +528,7 @@ const triggerCarryOver = async (req, res) => {
     const fromYear = parseInt(from_year) || new Date().getFullYear() - 1;
     const toYear = parseInt(to_year) || new Date().getFullYear();
 
-    const [employees] = await pool.query("SELECT id FROM users WHERE role = 'employee' AND is_active = TRUE");
+    const [employees] = await pool.query(`SELECT id FROM users WHERE ${EMPLOYEE_ROLE_SQL()} AND is_active = TRUE`);
     let processed = 0;
     for (const emp of employees) {
       const carried = await carryOverQuota(emp.id, fromYear, toYear);

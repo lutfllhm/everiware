@@ -1,5 +1,6 @@
 const bcrypt = require('bcryptjs');
 const { pool } = require('../config/database');
+const { EMPLOYEE_ROLE_SQL } = require('../constants/roles');
 const { generateId } = require('../utils/helpers');
 const { auditLog } = require('../utils/auditLog');
 const { validateRegistrationFace } = require('../utils/faceVerification');
@@ -31,7 +32,13 @@ const getAllUsers = async (req, res) => {
     const params = [];
 
     if (scope.scoped) { query += ' AND u.department = ?'; params.push(scope.department); }
-    if (role) { query += ' AND u.role = ?'; params.push(role); }
+    // role bisa berisi beberapa nilai dipisah koma (mis. 'employee,gm,spv')
+    // supaya halaman Karyawan bisa menarik seluruh tier karyawan sekaligus.
+    if (role) {
+      const roles = String(role).split(',').map(r => r.trim()).filter(Boolean);
+      query += ` AND u.role IN (${roles.map(() => '?').join(',')})`;
+      params.push(...roles);
+    }
     if (department) { query += ' AND u.department = ?'; params.push(department); }
     if (location_id) { query += ' AND u.location_id = ?'; params.push(location_id); }
     if (search) { query += ' AND (u.name LIKE ? OR u.email LIKE ? OR u.employee_id LIKE ?)'; params.push(`%${search}%`, `%${search}%`, `%${search}%`); }
@@ -56,7 +63,11 @@ const getAllUsers = async (req, res) => {
     let countQuery = 'SELECT COUNT(*) as total FROM users WHERE 1=1';
     const countParams = [];
     if (scope.scoped) { countQuery += ' AND department = ?'; countParams.push(scope.department); }
-    if (role) { countQuery += ' AND role = ?'; countParams.push(role); }
+    if (role) {
+      const roles = String(role).split(',').map(r => r.trim()).filter(Boolean);
+      countQuery += ` AND role IN (${roles.map(() => '?').join(',')})`;
+      countParams.push(...roles);
+    }
     if (location_id) { countQuery += ' AND location_id = ?'; countParams.push(location_id); }
     const [countResult] = await pool.query(countQuery, countParams);
 
@@ -484,7 +495,7 @@ const broadcastNotification = async (req, res) => {
     const { title, message, type, department, location_id } = req.body;
     if (!title || !message) return res.status(400).json({ success: false, message: 'Judul dan pesan wajib diisi' });
 
-    let sql = "SELECT id FROM users WHERE role = 'employee' AND is_active = TRUE";
+    let sql = `SELECT id FROM users WHERE ${EMPLOYEE_ROLE_SQL()} AND is_active = TRUE`;
     const params = [];
 
     if (department && department !== 'all') {
@@ -524,7 +535,7 @@ const getDashboardStats = async (req, res) => {
     const month = new Date().getMonth() + 1;
     const year = new Date().getFullYear();
 
-    const [totalUsers] = await pool.query("SELECT COUNT(*) as count FROM users WHERE role = 'employee' AND is_active = TRUE");
+    const [totalUsers] = await pool.query(`SELECT COUNT(*) as count FROM users WHERE ${EMPLOYEE_ROLE_SQL()} AND is_active = TRUE`);
     const [presentToday] = await pool.query("SELECT COUNT(*) as count FROM attendances WHERE date = ? AND status IN ('present','late')", [today]);
     const [pendingLeaves] = await pool.query("SELECT COUNT(*) as count FROM leave_requests WHERE status = 'pending'");
     const [monthlyAttendance] = await pool.query("SELECT COUNT(*) as count FROM attendances WHERE MONTH(date) = ? AND YEAR(date) = ? AND status IN ('present','late')", [month, year]);

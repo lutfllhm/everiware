@@ -1,4 +1,5 @@
 const { pool } = require('../config/database');
+const { EMPLOYEE_ROLE_SQL } = require('../constants/roles');
 
 // ── Tren kehadiran N bulan terakhir ──────────────────────────────────────────
 const getAttendanceTrend = async (req, res) => {
@@ -90,7 +91,7 @@ const getDepartmentStats = async (req, res) => {
         ) as attendance_rate
        FROM users u
        LEFT JOIN attendances a ON u.id = a.user_id AND MONTH(a.date)=? AND YEAR(a.date)=?
-       WHERE u.role='employee' AND u.is_active=TRUE AND u.department IS NOT NULL AND u.department != ''
+       WHERE ${EMPLOYEE_ROLE_SQL('u')} AND u.is_active=TRUE AND u.department IS NOT NULL AND u.department != ''
        GROUP BY u.department
        ORDER BY attendance_rate DESC`,
       [m, y]
@@ -148,7 +149,7 @@ const getFullDashboard = async (req, res) => {
       [monthlyAtt], [monthlyLate], [monthlyAbsent],
       [totalLeaveThisMonth], [newEmployees]
     ] = await Promise.all([
-      pool.query("SELECT COUNT(*) as c FROM users WHERE role='employee' AND is_active=TRUE"),
+      pool.query(`SELECT COUNT(*) as c FROM users WHERE ${EMPLOYEE_ROLE_SQL()} AND is_active=TRUE`),
       pool.query("SELECT COUNT(*) as c FROM attendances WHERE date=? AND status='present'", [today]),
       pool.query("SELECT COUNT(*) as c FROM attendances WHERE date=? AND status='late'", [today]),
       pool.query("SELECT COUNT(*) as c FROM leave_requests WHERE status='pending'"),
@@ -156,7 +157,7 @@ const getFullDashboard = async (req, res) => {
       pool.query("SELECT COUNT(*) as c FROM attendances WHERE MONTH(date)=? AND YEAR(date)=? AND status='late'", [month, year]),
       pool.query("SELECT COUNT(*) as c FROM attendances WHERE MONTH(date)=? AND YEAR(date)=? AND status='absent'", [month, year]),
       pool.query("SELECT COUNT(*) as c FROM leave_requests WHERE MONTH(start_date)=? AND YEAR(start_date)=? AND status='approved'", [month, year]),
-      pool.query("SELECT COUNT(*) as c FROM users WHERE role='employee' AND MONTH(created_at)=? AND YEAR(created_at)=?", [month, year]),
+      pool.query(`SELECT COUNT(*) as c FROM users WHERE ${EMPLOYEE_ROLE_SQL()} AND MONTH(created_at)=? AND YEAR(created_at)=?`, [month, year]),
     ]);
 
     // Attendance rate bulan ini

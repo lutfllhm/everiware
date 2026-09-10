@@ -9,6 +9,8 @@ const roleConfig = {
   superadmin: { label: 'Super Admin', cls: 'bg-red-50 text-red-700 border border-red-200', iconCls: 'bg-red-100 text-red-600', desc: 'Akses penuh ke semua fitur' },
   admin:      { label: 'Admin',       cls: 'bg-slate-100 text-slate-700 border border-slate-200', iconCls: 'bg-slate-200 text-slate-600', desc: 'Kelola karyawan & pengaturan' },
   hrd:        { label: 'HRD',         cls: 'bg-purple-50 text-purple-700 border border-purple-200', iconCls: 'bg-purple-100 text-purple-600', desc: 'Approve cuti & lihat laporan' },
+  gm:         { label: 'General Manager', cls: 'bg-amber-50 text-amber-700 border border-amber-200', iconCls: 'bg-amber-100 text-amber-600', desc: 'Penanda jabatan — akses setara karyawan' },
+  spv:        { label: 'SPV/PIC',     cls: 'bg-teal-50 text-teal-700 border border-teal-200', iconCls: 'bg-teal-100 text-teal-600', desc: 'Penanda jabatan — akses setara karyawan' },
   employee:   { label: 'Karyawan',    cls: 'bg-sky-50 text-sky-700 border border-sky-200', iconCls: 'bg-sky-100 text-sky-600', desc: 'Absensi & pengajuan izin' },
 };
 

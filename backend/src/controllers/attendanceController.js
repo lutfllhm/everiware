@@ -1,4 +1,5 @@
 const { pool } = require('../config/database');
+const { EMPLOYEE_ROLE_SQL } = require('../constants/roles');
 const { generateId, calculateDistance, nowWIBParts, detectImpossibleTravel } = require('../utils/helpers');
 const { auditLog } = require('../utils/auditLog');
 const { verifyFace } = require('../utils/faceVerification');
@@ -799,7 +800,7 @@ const getAttendanceReport = async (req, res) => {
         COUNT(a.id) as total_days
        FROM users u
        LEFT JOIN attendances a ON u.id = a.user_id ${dateFilter}
-       WHERE u.role = 'employee' AND u.is_active = TRUE ${userFilter}
+       WHERE ${EMPLOYEE_ROLE_SQL('u')} AND u.is_active = TRUE ${userFilter}
        GROUP BY u.id ORDER BY u.name`,
       params
     );
