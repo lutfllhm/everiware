@@ -382,6 +382,11 @@ export default function EmployeesAdmin() {
     if (activeDept) setExpandedDept(prev => ({ ...prev, [activeDept]: true }));
   }, [activeDept]);
 
+  // Landing /admin/employees tidak lagi menampilkan kartu departemen — pilihan
+  // divisi ada di sidebar. Pencarian tetap boleh menembus semua divisi supaya
+  // HR masih bisa mencari nama tanpa tahu divisinya.
+  const showDeptPicker = !activeDept && !search.trim();
+
   const toggleDept = (dept) => setExpandedDept(prev => ({ ...prev, [dept]: !prev[dept] }));
   const setDeptSearchValue = (dept, value) => setDeptSearch(prev => ({ ...prev, [dept]: value }));
 
@@ -423,6 +428,21 @@ export default function EmployeesAdmin() {
       <div className="space-y-3">
         {loading ? (
           <div className="card text-center py-8 text-slate-400">Memuat data...</div>
+        ) : showDeptPicker ? (
+          /* Tanpa divisi terpilih & tanpa pencarian: daftar karyawan sengaja
+             tidak ditampilkan — pemilihan divisi dilakukan lewat submenu
+             "Karyawan" di sidebar. */
+          <div className="card text-center py-16 px-6">
+            <div className="w-14 h-14 mx-auto bg-slate-100 rounded-2xl flex items-center justify-center mb-4">
+              <Building size={24} className="text-slate-400" />
+            </div>
+            <div className="font-semibold text-slate-900 text-sm">Pilih departemen dulu</div>
+            <p className="text-sm text-slate-400 mt-1.5 max-w-sm mx-auto">
+              Buka submenu <span className="font-medium text-slate-500">Karyawan</span> di sidebar,
+              lalu pilih departemen untuk melihat daftar karyawannya. Bisa juga langsung ketik nama
+              di kolom pencarian di atas.
+            </p>
+          </div>
         ) : groupedByDept.length === 0 ? (
           <div className="card text-center py-8 text-slate-400">Tidak ada karyawan</div>
         ) : (
