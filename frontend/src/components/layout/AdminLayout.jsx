@@ -20,7 +20,7 @@ const navGroups = [
     items: [
       { path: '/admin', icon: LayoutDashboard, label: 'Dashboard', exact: true, roles: ['superadmin', 'admin', 'hrd'] },
       { path: '/admin/attendance', icon: Clock, label: 'Absensi', roles: ['superadmin', 'admin', 'hrd'] },
-      { path: '/admin/employees', icon: Users, label: 'Karyawan', roles: ['superadmin', 'admin', 'hrd'], submenu: 'departments' },
+      { path: '/admin/employees', icon: Users, label: 'Karyawan', roles: ['superadmin', 'admin', 'hrd'], submenu: 'departments', ownedPaths: ['/admin/departments'] },
       { path: '/admin/leaves', icon: FileText, label: 'Perizinan', roles: ['superadmin', 'admin', 'hrd'] },
       { path: '/admin/overtime', icon: Clock, label: 'Lembur', roles: ['superadmin', 'admin', 'hrd'] },
     ]
@@ -30,7 +30,6 @@ const navGroups = [
     items: [
       { path: '/admin/shifts',      icon: CalendarClock, label: 'Shift Kerja',          roles: ['superadmin', 'admin', 'hrd'], feature: 'shifts.manage' },
       { path: '/admin/leave-types', icon: ListChecks,    label: 'Jenis Izin',           roles: ['superadmin', 'admin', 'hrd'] },
-      { path: '/admin/departments', icon: Building,      label: 'Departemen & Jabatan', roles: ['superadmin', 'admin', 'hrd'] },
       { path: '/admin/contracts',   icon: FileSignature, label: 'Status Hubungan Kerja', roles: ['superadmin', 'admin', 'hrd'] },
       { path: '/admin/holidays',    icon: CalendarDays,  label: 'Hari Libur Nasional',  roles: ['superadmin', 'admin', 'hrd'] },
       { path: '/admin/locations',   icon: MapPin,        label: 'Lokasi Absensi', roles: ['superadmin', 'admin', 'hrd'] },
@@ -112,7 +111,9 @@ function SidebarNav({ filteredGroups, location, user, onLinkClick, onLogout, dep
   const isActive = (item) =>
     item.exact
       ? location.pathname === item.path
-      : location.pathname.startsWith(item.path);
+      : location.pathname.startsWith(item.path) ||
+        // Rute yang pindah ke dalam flyout tetap menyalakan item induknya.
+        (item.ownedPaths || []).some(p => location.pathname.startsWith(p));
 
   // Scroll ke item aktif saat pertama kali mount
   useEffect(() => {
@@ -239,13 +240,26 @@ function SidebarNav({ filteredGroups, location, user, onLinkClick, onLogout, dep
               <Link
                 to="/admin/employees?all=1"
                 onClick={() => { closeFlyout(); onLinkClick(); }}
-                className={`block px-3 py-2 mx-1.5 rounded-lg text-[13px] transition-colors ${
+                className={`flex items-center gap-2.5 px-3 py-2 mx-1.5 rounded-lg text-[13px] transition-colors ${
                   location.pathname === '/admin/employees' && location.search.includes('all=1')
                     ? 'bg-slate-700 text-white font-medium'
                     : 'text-slate-400 hover:bg-slate-700/70 hover:text-white'
                 }`}
               >
-                Semua Karyawan
+                <Users size={14} className="flex-shrink-0" /> Daftar Karyawan
+              </Link>
+              {/* Pindahan dari grup Konfigurasi — rute & halamannya sama persis
+                  dengan menu "Departemen & Jabatan" yang lama. */}
+              <Link
+                to="/admin/departments"
+                onClick={() => { closeFlyout(); onLinkClick(); }}
+                className={`flex items-center gap-2.5 px-3 py-2 mx-1.5 rounded-lg text-[13px] transition-colors ${
+                  location.pathname.startsWith('/admin/departments')
+                    ? 'bg-slate-700 text-white font-medium'
+                    : 'text-slate-400 hover:bg-slate-700/70 hover:text-white'
+                }`}
+              >
+                <Building size={14} className="flex-shrink-0" /> Departemen
               </Link>
             </div>
           </motion.div>
@@ -334,7 +348,9 @@ export default function AdminLayout({ children }) {
   const isActive = (item) =>
     item.exact
       ? location.pathname === item.path
-      : location.pathname.startsWith(item.path);
+      : location.pathname.startsWith(item.path) ||
+        // Rute yang pindah ke dalam flyout tetap menyalakan item induknya.
+        (item.ownedPaths || []).some(p => location.pathname.startsWith(p));
 
   const currentLabel =
     navGroups.flatMap(g => g.items).find(n => isActive(n))?.label || 'Dashboard';
@@ -422,6 +438,13 @@ export default function AdminLayout({ children }) {
                   <span className="font-semibold text-slate-900 text-sm truncate max-w-[40vw]">
                     {safeDecode(location.pathname.split('/admin/employees/')[1] || '')}
                   </span>
+                </>
+              )}
+              {/* Departemen & Jabatan kini anak dari Karyawan */}
+              {location.pathname.startsWith('/admin/departments') && (
+                <>
+                  <span className="text-slate-300">/</span>
+                  <span className="font-semibold text-slate-900 text-sm">Departemen &amp; Jabatan</span>
                 </>
               )}
             </div>
