@@ -488,31 +488,31 @@ export default function AdminLayout({ children }) {
         <main className="flex-1 overflow-y-auto">
           {/* Title bar — hanya tampil di halaman yang tidak punya hero banner sendiri */}
           {location.pathname !== '/admin' && (
-            <div className="bg-white border-b border-slate-100 px-4 sm:px-6 py-3.5 flex flex-wrap items-center gap-x-4 gap-y-2.5">
-              <div className="flex items-center gap-3">
-                <div className="w-1 h-5 bg-slate-800 rounded-full" />
-                <h1 className="text-base font-bold text-slate-900">{currentLabel}</h1>
-              </div>
-
-              {/* Tab tetap untuk area Karyawan — selalu tampil di kedua halaman
-                  supaya bisa pindah langsung tanpa membuka sidebar. */}
-              {employeeTabs && (
-                <div className="flex items-center gap-1 p-0.5 bg-slate-100 rounded-xl sm:ml-auto">
-                  {employeeTabs.map((tab) => (
-                    <Link
-                      key={tab.to}
-                      to={tab.to}
-                      aria-current={tab.active ? 'page' : undefined}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap ${
-                        tab.active
-                          ? 'bg-white text-slate-900 shadow-sm'
-                          : 'text-slate-500 hover:text-slate-900'
-                      }`}
-                    >
-                      {tab.label}
-                    </Link>
+            <div className="bg-white border-b border-slate-100 px-4 sm:px-6 py-3.5 flex items-center gap-3">
+              <div className="w-1 h-5 bg-slate-800 rounded-full flex-shrink-0" />
+              {employeeTabs ? (
+                /* Area Karyawan: judulnya jadi dua, keduanya bisa diklik.
+                   Yang sedang dibuka hitam tebal, satunya abu-abu. */
+                <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                  {employeeTabs.map((tab, i) => (
+                    <Fragment key={tab.to}>
+                      {i > 0 && <span className="text-slate-300 font-light">|</span>}
+                      <Link
+                        to={tab.to}
+                        aria-current={tab.active ? 'page' : undefined}
+                        className={`text-base font-bold transition-colors ${
+                          tab.active
+                            ? 'text-slate-900'
+                            : 'text-slate-400 hover:text-slate-700'
+                        }`}
+                      >
+                        {tab.label}
+                      </Link>
+                    </Fragment>
                   ))}
                 </div>
+              ) : (
+                <h1 className="text-base font-bold text-slate-900">{currentLabel}</h1>
               )}
             </div>
           )}
