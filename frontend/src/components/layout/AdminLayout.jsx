@@ -20,7 +20,7 @@ const navGroups = [
     items: [
       { path: '/admin', icon: LayoutDashboard, label: 'Dashboard', exact: true, roles: ['superadmin', 'admin', 'hrd'] },
       { path: '/admin/attendance', icon: Clock, label: 'Absensi', roles: ['superadmin', 'admin', 'hrd'] },
-      { path: '/admin/employees', icon: Users, label: 'Karyawan', roles: ['superadmin', 'admin', 'hrd'], submenu: 'departments', ownedPaths: ['/admin/departments'] },
+      { path: '/admin/employees', icon: Users, label: 'Karyawan', roles: ['superadmin', 'admin', 'hrd'], submenu: true, ownedPaths: ['/admin/departments'] },
       { path: '/admin/leaves', icon: FileText, label: 'Perizinan', roles: ['superadmin', 'admin', 'hrd'] },
       { path: '/admin/overtime', icon: Clock, label: 'Lembur', roles: ['superadmin', 'admin', 'hrd'] },
     ]
@@ -56,7 +56,7 @@ const navGroups = [
 // ── SidebarNav — komponen terpisah di luar AdminLayout ────────────────────────
 // Didefinisikan di luar agar tidak di-recreate setiap render AdminLayout,
 // sehingga scroll position nav tetap terjaga saat navigasi antar halaman.
-function SidebarNav({ filteredGroups, location, user, onLinkClick, onLogout, departments }) {
+function SidebarNav({ filteredGroups, location, user, onLinkClick, onLogout }) {
   const navRef = useRef(null);
   // Submenu departemen tampil sebagai flyout di samping — muncul saat hover
   // atau klik item "Karyawan", dan hilang begitu kursor pergi.
@@ -149,7 +149,7 @@ function SidebarNav({ filteredGroups, location, user, onLinkClick, onLogout, dep
             <div className="space-y-0.5">
               {group.items.map((item) => {
                 const active = isActive(item);
-                const hasSubmenu = item.submenu === 'departments' && departments.length > 0;
+                const hasSubmenu = !!item.submenu;
                 const isOpen = hasSubmenu && flyout?.path === item.path;
                 return (
                   <div
@@ -213,30 +213,9 @@ function SidebarNav({ filteredGroups, location, user, onLinkClick, onLogout, dep
             className="fixed z-50 w-52 max-h-[70vh] overflow-y-auto bg-slate-800 border border-slate-700 rounded-xl shadow-2xl py-1.5"
           >
             <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest px-3 py-1.5">
-              Departemen
+              Karyawan
             </p>
-            {departments.map((dept) => {
-              const to = `/admin/employees/${encodeURIComponent(dept.name)}`;
-              const norm = (v) => v.trim().replace(/\s+/g, ' ').toLowerCase();
-              const current = location.pathname.split('/admin/employees/')[1];
-              const subActive = current !== undefined && norm(safeDecode(current)) === norm(dept.name);
-              return (
-                <Link
-                  key={dept.id ?? dept.name}
-                  to={to}
-                  onClick={() => { closeFlyout(); onLinkClick(); }}
-                  title={dept.name}
-                  className={`block px-3 py-2 mx-1.5 rounded-lg text-[13px] transition-colors truncate ${
-                    subActive
-                      ? 'bg-slate-700 text-white font-medium'
-                      : 'text-slate-300 hover:bg-slate-700/70 hover:text-white'
-                  }`}
-                >
-                  {dept.name}
-                </Link>
-              );
-            })}
-            <div className="mt-1 pt-1 border-t border-slate-700">
+            <div>
               <Link
                 to="/admin/employees?all=1"
                 onClick={() => { closeFlyout(); onLinkClick(); }}
@@ -259,7 +238,7 @@ function SidebarNav({ filteredGroups, location, user, onLinkClick, onLogout, dep
                     : 'text-slate-400 hover:bg-slate-700/70 hover:text-white'
                 }`}
               >
-                <Building size={14} className="flex-shrink-0" /> Departemen
+                <Building size={14} className="flex-shrink-0" /> Departemen &amp; Jabatan
               </Link>
             </div>
           </motion.div>
@@ -294,9 +273,6 @@ function SidebarNav({ filteredGroups, location, user, onLinkClick, onLogout, dep
 export default function AdminLayout({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
-  // Dipakai submenu "Karyawan" di sidebar supaya HR bisa langsung loncat ke
-  // satu divisi tanpa membuka accordion di halaman karyawan dulu.
-  const [departments, setDepartments] = useState([]);
   const { user, logout } = useAuthStore();
   const location = useLocation();
   const navigate = useNavigate();
@@ -316,28 +292,6 @@ export default function AdminLayout({ children }) {
     const interval = setInterval(fetchUnread, 120_000); // 2 menit
     return () => clearInterval(interval);
   }, []);
-
-  // Endpoint /departments/all hanya untuk role admin-tier; user dengan grant
-  // granular (mis. shifts.manage) tidak perlu memanggilnya sama sekali.
-  const canReadDepartments = ['superadmin', 'admin', 'hrd'].includes(user?.role);
-
-  useEffect(() => {
-    if (!canReadDepartments) { setDepartments([]); return; }
-    let cancelled = false;
-    (async () => {
-      try {
-        const { data } = await api.get('/departments/all');
-        if (!cancelled) {
-          setDepartments(
-            (data.departments || [])
-              .filter(d => d.is_active !== false)
-              .sort((a, b) => a.name.localeCompare(b.name))
-          );
-        }
-      } catch {}
-    })();
-    return () => { cancelled = true; };
-  }, [canReadDepartments]);
 
   const handleLogout = () => {
     logout();
@@ -376,7 +330,6 @@ export default function AdminLayout({ children }) {
           user={user}
           onLinkClick={() => {}}
           onLogout={handleLogout}
-          departments={departments}
         />
       </aside>
 
@@ -408,7 +361,6 @@ export default function AdminLayout({ children }) {
                 user={user}
                 onLinkClick={() => setSidebarOpen(false)}
                 onLogout={handleLogout}
-                departments={departments}
               />
             </motion.aside>
           </>
