@@ -318,10 +318,14 @@ export default function AdminLayout({ children }) {
       ? '/admin/employees?all=1'
       : (currentItem?.path || '/admin');
     const list = [{ label: currentLabel, to: rootTo }];
-    const deptSlug = location.pathname.startsWith('/admin/employees/')
+    const isDetail = location.pathname.startsWith('/admin/employees/detail/');
+    const deptSlug = !isDetail && location.pathname.startsWith('/admin/employees/')
       ? location.pathname.split('/admin/employees/')[1]
       : null;
-    if (deptSlug) {
+    if (isDetail) {
+      // Nama karyawannya sendiri tidak tersedia di layout, jadi cukup penanda.
+      list.push({ label: 'Detail Karyawan', to: location.pathname });
+    } else if (deptSlug) {
       list.push({ label: safeDecode(deptSlug), to: location.pathname });
     } else if (location.pathname.startsWith('/admin/departments')) {
       list.push({ label: 'Departemen & Jabatan', to: '/admin/departments' });

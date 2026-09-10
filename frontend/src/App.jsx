@@ -28,6 +28,7 @@ import AdminLayout from './components/layout/AdminLayout';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AttendanceAdmin from './pages/admin/AttendanceAdmin';
 import EmployeesAdmin from './pages/admin/EmployeesAdmin';
+import EmployeeDetail from './pages/admin/EmployeeDetail';
 import LeavesAdmin from './pages/admin/LeavesAdmin';
 import ReportsAdmin from './pages/admin/ReportsAdmin';
 import LocationsAdmin from './pages/admin/LocationsAdmin';
@@ -196,6 +197,7 @@ export default function App() {
           <Route path="/admin" element={<AdminRoute><FeatureRoute><AdminDashboard /></FeatureRoute></AdminRoute>} />
           <Route path="/admin/attendance" element={<AdminRoute><FeatureRoute><AttendanceAdmin /></FeatureRoute></AdminRoute>} />
           <Route path="/admin/employees" element={<AdminRoute><FeatureRoute><EmployeesAdmin /></FeatureRoute></AdminRoute>} />
+          <Route path="/admin/employees/detail/:id" element={<AdminRoute><FeatureRoute><EmployeeDetail /></FeatureRoute></AdminRoute>} />
           <Route path="/admin/employees/:department" element={<AdminRoute><FeatureRoute><EmployeesAdmin /></FeatureRoute></AdminRoute>} />
           <Route path="/admin/leaves" element={<AdminRoute><FeatureRoute><LeavesAdmin /></FeatureRoute></AdminRoute>} />
           <Route path="/admin/reports" element={<AdminRoute><FeatureRoute><ReportsAdmin /></FeatureRoute></AdminRoute>} />

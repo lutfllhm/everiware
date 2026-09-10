@@ -548,8 +548,16 @@ export default function EmployeesAdmin() {
                                         : user.name?.[0]
                                       }
                                     </div>
-                                    <div>
-                                      <div className="font-medium text-slate-900 text-sm">{user.name}</div>
+                                    <div className="min-w-0">
+                                      {/* Nama = link ke detail. Sengaja hanya nama,
+                                          bukan seluruh baris, supaya tidak bentrok
+                                          dengan tombol aksi & jatah cuti di kanan. */}
+                                      <Link
+                                        to={`/admin/employees/detail/${user.id}`}
+                                        className="font-medium text-slate-900 text-sm hover:text-slate-950 hover:underline"
+                                      >
+                                        {user.name}
+                                      </Link>
                                       <div className="text-xs text-slate-500">{user.email}</div>
                                       {user.position && (
                                         <div className="text-xs text-slate-400 mt-0.5">{user.position}</div>
