@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   LayoutDashboard, Users, Clock, FileText, BarChart3, Settings,
   Bell, LogOut, Menu, X, MapPin, Database, Shield, ChevronRight,
-  CalendarClock, ListChecks, CalendarDays, Building, FileSignature, ChevronDown
+  CalendarClock, ListChecks, CalendarDays, Building, FileSignature
 } from 'lucide-react';
 import useAuthStore from '../../store/authStore';
 import toast from 'react-hot-toast';
@@ -59,14 +59,55 @@ const navGroups = [
 // sehingga scroll position nav tetap terjaga saat navigasi antar halaman.
 function SidebarNav({ filteredGroups, location, user, onLinkClick, onLogout, departments }) {
   const navRef = useRef(null);
-  // Submenu departemen di bawah "Karyawan" dibuka otomatis saat berada di
-  // halaman karyawan, tapi tetap bisa ditutup/buka manual oleh user.
-  const onEmployeesPage = location.pathname.startsWith('/admin/employees');
-  const [openSubmenu, setOpenSubmenu] = useState(onEmployeesPage ? '/admin/employees' : null);
+  // Submenu departemen tampil sebagai flyout di samping — muncul saat hover
+  // atau klik item "Karyawan", dan hilang begitu kursor pergi.
+  // `anchor` menyimpan koordinat item supaya flyout bisa pakai position:fixed;
+  // nav punya overflow-y-auto, jadi panel absolute akan terpotong.
+  const [flyout, setFlyout] = useState(null); // { path, top, left } | null
+  const [pinned, setPinned] = useState(false); // true = dibuka lewat klik
+  const closeTimer = useRef(null);
 
+  const openFlyout = (path, el) => {
+    if (closeTimer.current) { clearTimeout(closeTimer.current); closeTimer.current = null; }
+    const r = el.getBoundingClientRect();
+    setFlyout({ path, top: r.top, left: r.right + 8 });
+  };
+
+  // Jeda singkat supaya kursor sempat menyeberang dari item ke panel flyout.
+  const scheduleClose = () => {
+    if (pinned) return;
+    if (closeTimer.current) clearTimeout(closeTimer.current);
+    closeTimer.current = setTimeout(() => setFlyout(null), 160);
+  };
+
+  const cancelClose = () => {
+    if (closeTimer.current) { clearTimeout(closeTimer.current); closeTimer.current = null; }
+  };
+
+  const closeFlyout = () => {
+    cancelClose();
+    setPinned(false);
+    setFlyout(null);
+  };
+
+  useEffect(() => () => { if (closeTimer.current) clearTimeout(closeTimer.current); }, []);
+
+  // Saat di-pin lewat klik: tutup kalau klik di luar atau tekan Escape.
   useEffect(() => {
-    if (onEmployeesPage) setOpenSubmenu('/admin/employees');
-  }, [onEmployeesPage]);
+    if (!pinned) return;
+    const onDown = (e) => { if (!e.target.closest('[data-flyout]')) closeFlyout(); };
+    const onKey = (e) => { if (e.key === 'Escape') closeFlyout(); };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [pinned]);
+
+  // Flyout ikut hilang saat pindah halaman atau saat nav di-scroll,
+  // supaya panelnya tidak menggantung di koordinat lama.
+  useEffect(() => { closeFlyout(); }, [location.pathname]);
 
   const isActive = (item) =>
     item.exact
@@ -98,7 +139,7 @@ function SidebarNav({ filteredGroups, location, user, onLinkClick, onLogout, dep
       </div>
 
       {/* Nav — overflow-y-auto agar bisa scroll, scroll position dipertahankan */}
-      <nav ref={navRef} className="flex-1 px-3 py-4 space-y-5 overflow-y-auto">
+      <nav ref={navRef} onScroll={closeFlyout} className="flex-1 px-3 py-4 space-y-5 overflow-y-auto">
         {filteredGroups.map((group) => (
           <div key={group.label}>
             <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest px-3 mb-2">
@@ -108,83 +149,45 @@ function SidebarNav({ filteredGroups, location, user, onLinkClick, onLogout, dep
               {group.items.map((item) => {
                 const active = isActive(item);
                 const hasSubmenu = item.submenu === 'departments' && departments.length > 0;
-                const submenuOpen = hasSubmenu && openSubmenu === item.path;
+                const isOpen = hasSubmenu && flyout?.path === item.path;
                 return (
-                  <div key={item.path}>
-                    <div
+                  <div
+                    key={item.path}
+                    data-flyout={hasSubmenu ? '' : undefined}
+                    onMouseEnter={hasSubmenu ? (e) => openFlyout(item.path, e.currentTarget) : undefined}
+                    onMouseLeave={hasSubmenu ? scheduleClose : undefined}
+                  >
+                    <Link
+                      to={item.path}
                       data-active={active}
-                      className={`flex items-center rounded-xl text-sm font-medium transition-all duration-300 ease-out ${
+                      onClick={(e) => {
+                        if (hasSubmenu) {
+                          // Klik "Karyawan" mengunci flyout supaya tetap terbuka
+                          // (berguna di layar sentuh yang tidak punya hover).
+                          e.preventDefault();
+                          openFlyout(item.path, e.currentTarget.parentElement);
+                          setPinned(true);
+                          return;
+                        }
+                        onLinkClick();
+                      }}
+                      className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-300 ease-out active:scale-[0.98] ${
                         active
                           ? 'bg-white text-slate-900 shadow-sm'
-                          : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                          : 'text-slate-400 hover:bg-slate-800 hover:text-white hover:translate-x-1'
                       }`}
                     >
-                      <Link
-                        to={item.path}
-                        onClick={onLinkClick}
-                        className="flex items-center gap-3 flex-1 min-w-0 px-3 py-2.5 active:scale-[0.98]"
-                      >
-                        <item.icon size={17} />
-                        <span className="truncate">{item.label}</span>
-                      </Link>
-                      {hasSubmenu ? (
-                        <button
-                          type="button"
-                          onClick={() => setOpenSubmenu(submenuOpen ? null : item.path)}
-                          aria-label={submenuOpen ? `Tutup daftar ${item.label}` : `Buka daftar ${item.label}`}
-                          aria-expanded={submenuOpen}
-                          className={`px-2.5 py-2.5 flex-shrink-0 transition-colors ${
-                            active ? 'text-slate-500 hover:text-slate-900' : 'text-slate-500 hover:text-white'
-                          }`}
-                        >
-                          <ChevronDown
-                            size={14}
-                            className={`transition-transform duration-200 ${submenuOpen ? 'rotate-180' : ''}`}
+                      <item.icon size={17} />
+                      <span className="truncate">{item.label}</span>
+                      {hasSubmenu
+                        ? <ChevronRight
+                            size={13}
+                            className={`ml-auto flex-shrink-0 transition-transform duration-200 ${
+                              isOpen ? 'translate-x-0.5' : ''
+                            } ${active ? 'text-slate-400' : 'text-slate-500'}`}
                           />
-                        </button>
-                      ) : (
-                        active && <ChevronRight size={13} className="mr-3 text-slate-400" />
-                      )}
-                    </div>
-
-                    {/* Daftar departemen — klik langsung membuka karyawan divisi itu */}
-                    <AnimatePresence initial={false}>
-                      {submenuOpen && (
-                        <motion.div
-                          initial={{ height: 0, opacity: 0 }}
-                          animate={{ height: 'auto', opacity: 1 }}
-                          exit={{ height: 0, opacity: 0 }}
-                          transition={{ duration: 0.18 }}
-                          className="overflow-hidden"
-                        >
-                          <div className="mt-1 ml-5 pl-3 border-l border-slate-700/70 space-y-0.5">
-                            {departments.map((dept) => {
-                              const to = `${item.path}/${encodeURIComponent(dept.name)}`;
-                              // Cocokkan longgar — nama divisi di URL bisa beda
-                              // spasi/kapitalisasi dengan yang ada di sidebar.
-                              const norm = (v) => v.trim().replace(/\s+/g, ' ').toLowerCase();
-                              const current = location.pathname.split('/admin/employees/')[1];
-                              const subActive = current !== undefined && norm(safeDecode(current)) === norm(dept.name);
-                              return (
-                                <Link
-                                  key={dept.id ?? dept.name}
-                                  to={to}
-                                  onClick={onLinkClick}
-                                  className={`block px-3 py-2 rounded-lg text-[13px] transition-colors truncate ${
-                                    subActive
-                                      ? 'bg-slate-700 text-white font-medium'
-                                      : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-                                  }`}
-                                  title={dept.name}
-                                >
-                                  {dept.name}
-                                </Link>
-                              );
-                            })}
-                          </div>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
+                        : active && <ChevronRight size={13} className="ml-auto text-slate-400" />}
+                    </Link>
                   </div>
                 );
               })}
@@ -192,6 +195,58 @@ function SidebarNav({ filteredGroups, location, user, onLinkClick, onLogout, dep
           </div>
         ))}
       </nav>
+
+      {/* Flyout departemen — position:fixed supaya tidak terpotong oleh
+          nav yang punya overflow-y-auto. */}
+      <AnimatePresence>
+        {flyout && (
+          <motion.div
+            data-flyout=""
+            initial={{ opacity: 0, x: -6 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -6 }}
+            transition={{ duration: 0.14 }}
+            style={{ top: flyout.top, left: flyout.left }}
+            onMouseEnter={cancelClose}
+            onMouseLeave={scheduleClose}
+            className="fixed z-50 w-52 max-h-[70vh] overflow-y-auto bg-slate-800 border border-slate-700 rounded-xl shadow-2xl py-1.5"
+          >
+            <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest px-3 py-1.5">
+              Departemen
+            </p>
+            {departments.map((dept) => {
+              const to = `/admin/employees/${encodeURIComponent(dept.name)}`;
+              const norm = (v) => v.trim().replace(/\s+/g, ' ').toLowerCase();
+              const current = location.pathname.split('/admin/employees/')[1];
+              const subActive = current !== undefined && norm(safeDecode(current)) === norm(dept.name);
+              return (
+                <Link
+                  key={dept.id ?? dept.name}
+                  to={to}
+                  onClick={() => { closeFlyout(); onLinkClick(); }}
+                  title={dept.name}
+                  className={`block px-3 py-2 mx-1.5 rounded-lg text-[13px] transition-colors truncate ${
+                    subActive
+                      ? 'bg-slate-700 text-white font-medium'
+                      : 'text-slate-300 hover:bg-slate-700/70 hover:text-white'
+                  }`}
+                >
+                  {dept.name}
+                </Link>
+              );
+            })}
+            <div className="mt-1 pt-1 border-t border-slate-700">
+              <Link
+                to="/admin/employees"
+                onClick={() => { closeFlyout(); onLinkClick(); }}
+                className="block px-3 py-2 mx-1.5 rounded-lg text-[13px] text-slate-400 hover:bg-slate-700/70 hover:text-white transition-colors"
+              >
+                Semua Departemen
+              </Link>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* User + Logout */}
       <div className="px-3 py-4 border-t border-slate-800 space-y-2 flex-shrink-0">
