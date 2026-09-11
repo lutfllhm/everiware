@@ -4,6 +4,7 @@ import { BarChart3, Download, Calendar, FileSpreadsheet, FileText, CalendarRange
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 import api from '../../api/axios';
 import UserAvatar from '../../components/ui/UserAvatar';
+import SearchableSelect from '../../components/ui/SearchableSelect';
 
 const monthNames = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
 const COLORS = { present: '#14b8a6', late: '#f59e0b', absent: '#ef4444', leave: '#38bdf8', sick: '#a855f7' };
@@ -202,17 +203,21 @@ export default function ReportsAdmin() {
             <>
               <div>
                 <label className="text-xs text-slate-500 mb-1 block">Bulan</label>
-                <select value={filters.month} onChange={e => setFilters({ ...filters, month: +e.target.value })}
-                  className="input-field py-2 text-sm w-auto">
-                  {monthNames.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
-                </select>
+                <div className="w-36">
+                  <SearchableSelect value={filters.month}
+                    onChange={v => setFilters({ ...filters, month: v })}
+                    options={monthNames.map((m, i) => ({ value: i + 1, label: m }))}
+                    searchPlaceholder="Cari bulan..." className="py-2" />
+                </div>
               </div>
               <div>
                 <label className="text-xs text-slate-500 mb-1 block">Tahun</label>
-                <select value={filters.year} onChange={e => setFilters({ ...filters, year: +e.target.value })}
-                  className="input-field py-2 text-sm w-auto">
-                  {[2024, 2025, 2026].map(y => <option key={y} value={y}>{y}</option>)}
-                </select>
+                <div className="w-28">
+                  <SearchableSelect value={filters.year}
+                    onChange={v => setFilters({ ...filters, year: v })}
+                    options={[2024, 2025, 2026].map(y => ({ value: y, label: String(y) }))}
+                    className="py-2" />
+                </div>
               </div>
             </>
           ) : (
@@ -239,22 +244,29 @@ export default function ReportsAdmin() {
           {/* Filter Departemen & Karyawan */}
           <div>
             <label className="text-xs text-slate-500 mb-1 block">Departemen</label>
-            <select value={filters.department} onChange={e => setFilters({ ...filters, department: e.target.value, employee_id: '' })}
-              className="input-field py-2 text-sm w-auto">
-              <option value="">Semua Departemen</option>
-              {departments.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
-            </select>
+            <div className="w-48">
+              <SearchableSelect value={filters.department}
+                onChange={v => setFilters({ ...filters, department: v, employee_id: '' })}
+                options={[{ value: '', label: 'Semua Departemen' }, ...departments.map(d => ({ value: d.name, label: d.name }))]}
+                placeholder="Semua Departemen" searchPlaceholder="Cari departemen..."
+                emptyLabel="Departemen tidak ditemukan" className="py-2" />
+            </div>
           </div>
           <div>
             <label className="text-xs text-slate-500 mb-1 block">Karyawan</label>
-            <select value={filters.employee_id} onChange={e => setFilters({ ...filters, employee_id: e.target.value })}
-              className="input-field py-2 text-sm w-auto">
-              <option value="">Semua Karyawan</option>
-              {(filters.department
-                ? employees.filter(e => e.department === filters.department)
-                : employees
-              ).map(e => <option key={e.id} value={e.employee_id || e.id}>{e.name}</option>)}
-            </select>
+            <div className="w-52">
+              <SearchableSelect value={filters.employee_id}
+                onChange={v => setFilters({ ...filters, employee_id: v })}
+                options={[
+                  { value: '', label: 'Semua Karyawan' },
+                  ...(filters.department
+                    ? employees.filter(e => e.department === filters.department)
+                    : employees
+                  ).map(e => ({ value: e.employee_id || e.id, label: e.name })),
+                ]}
+                placeholder="Semua Karyawan" searchPlaceholder="Cari karyawan..."
+                emptyLabel="Karyawan tidak ditemukan" className="py-2" />
+            </div>
           </div>
 
           {/* Export buttons */}

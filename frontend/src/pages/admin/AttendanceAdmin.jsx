@@ -9,6 +9,7 @@ import UserAvatar from '../../components/ui/UserAvatar';
 import { usePagination } from '../../hooks/usePagination';
 import Pagination from '../../components/ui/Pagination';
 import { ZoomableImage } from '../../components/ui/ImageLightbox';
+import SearchableSelect from '../../components/ui/SearchableSelect';
 
 export default function AttendanceAdmin() {
   const [attendances, setAttendances] = useState([]);
@@ -184,14 +185,18 @@ export default function AttendanceAdmin() {
               onChange={(e) => setFilters({ ...filters, search: e.target.value })}
               className="input-field pl-9 py-2.5 text-sm" />
           </div>
-          <select value={filters.month} onChange={(e) => setFilters({ ...filters, month: e.target.value })}
-            className="input-field py-2.5 text-sm w-auto">
-            {months.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
-          </select>
-          <select value={filters.year} onChange={(e) => setFilters({ ...filters, year: e.target.value })}
-            className="input-field py-2.5 text-sm w-auto">
-            {[2024, 2025, 2026].map(y => <option key={y} value={y}>{y}</option>)}
-          </select>
+          <div className="w-36">
+            <SearchableSelect value={Number(filters.month)}
+              onChange={v => setFilters({ ...filters, month: v })}
+              options={months.map((m, i) => ({ value: i + 1, label: m }))}
+              searchPlaceholder="Cari bulan..." className="py-2.5" />
+          </div>
+          <div className="w-28">
+            <SearchableSelect value={Number(filters.year)}
+              onChange={v => setFilters({ ...filters, year: v })}
+              options={[2024, 2025, 2026].map(y => ({ value: y, label: String(y) }))}
+              className="py-2.5" />
+          </div>
           <label className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-600 cursor-pointer select-none hover:bg-slate-50">
             <input type="checkbox" checked={onlyMissingCheckout}
               onChange={(e) => setOnlyMissingCheckout(e.target.checked)}
@@ -524,15 +529,16 @@ export default function AttendanceAdmin() {
                 )}
                 <div>
                   <label className="text-xs font-medium text-slate-600 mb-1 block">Status</label>
-                  <select value={editForm.status}
-                    onChange={e => setEditForm({ ...editForm, status: e.target.value })}
-                    className="input-field py-2 text-sm">
-                    <option value="present">Hadir</option>
-                    <option value="late">Terlambat</option>
-                    <option value="absent">Absen</option>
-                    <option value="leave">Cuti</option>
-                    <option value="sick">Sakit</option>
-                  </select>
+                  <SearchableSelect value={editForm.status}
+                    onChange={v => setEditForm({ ...editForm, status: v })}
+                    options={[
+                      { value: 'present', label: 'Hadir' },
+                      { value: 'late', label: 'Terlambat' },
+                      { value: 'absent', label: 'Absen' },
+                      { value: 'leave', label: 'Cuti' },
+                      { value: 'sick', label: 'Sakit' },
+                    ]}
+                    className="py-2" />
                 </div>
                 <div>
                   <label className="text-xs font-medium text-slate-600 mb-1 block">Catatan (opsional)</label>

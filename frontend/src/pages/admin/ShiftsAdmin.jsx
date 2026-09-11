@@ -4,6 +4,7 @@ import { Clock, Plus, Edit, Trash2, X, Users, CheckSquare, Square, Save } from '
 import toast from 'react-hot-toast';
 import api from '../../api/axios';
 import UserAvatar from '../../components/ui/UserAvatar';
+import SearchableSelect from '../../components/ui/SearchableSelect';
 
 const emptyShift = { name: '', start_time: '08:00', end_time: '17:00', late_tolerance: 10, is_active: true };
 
@@ -147,12 +148,13 @@ export default function ShiftsAdmin() {
           <div className="card p-4 flex flex-wrap gap-3 items-end">
             <div className="flex-1 min-w-40">
               <label className="text-xs font-medium text-slate-600 mb-1 block">Shift</label>
-              <select value={bulkShiftId} onChange={e => setBulkShiftId(e.target.value)} className="input-field py-2 text-sm">
-                <option value="">Pilih shift...</option>
-                {shifts.filter(s => s.is_active).map(s => (
-                  <option key={s.id} value={s.id}>{s.name} ({s.start_time?.substring(0,5)}-{s.end_time?.substring(0,5)})</option>
-                ))}
-              </select>
+              <SearchableSelect value={bulkShiftId} onChange={setBulkShiftId}
+                options={shifts.filter(s => s.is_active).map(s => ({
+                  value: s.id,
+                  label: `${s.name} (${s.start_time?.substring(0,5)}-${s.end_time?.substring(0,5)})`,
+                }))}
+                placeholder="Pilih shift..." searchPlaceholder="Cari shift..."
+                emptyLabel="Shift tidak ditemukan" className="py-2" />
             </div>
             <div>
               <label className="text-xs font-medium text-slate-600 mb-1 block">Berlaku Mulai</label>

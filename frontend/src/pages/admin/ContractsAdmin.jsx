@@ -8,6 +8,7 @@ import {
 import toast from 'react-hot-toast';
 import api from '../../api/axios';
 import ContractRecap from './ContractRecap';
+import SearchableSelect from '../../components/ui/SearchableSelect';
 
 // ── Konstanta tampilan ────────────────────────────────────────────────────────
 const TYPE_LABELS = { PKWT: 'PKWT', PKWTT: 'PKWTT', DAILY_WORKER: 'Daily Worker' };
@@ -391,23 +392,28 @@ export default function ContractsAdmin() {
                 className="w-full pl-9 pr-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900/10"
               />
             </div>
-            <select value={filterType} onChange={e => setFilterType(e.target.value)}
-              className="px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none">
-              <option value="">Semua Status</option>
-              <option value="PKWT">PKWT</option>
-              <option value="PKWTT">PKWTT</option>
-              <option value="DAILY_WORKER">Daily Worker</option>
-            </select>
-            <select value={filterPlacement} onChange={e => setFilterPlacement(e.target.value)}
-              className="px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none max-w-[170px]">
-              <option value="">Semua Penempatan</option>
-              {master.placements.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
-            </select>
-            <select value={filterInstansi} onChange={e => setFilterInstansi(e.target.value)}
-              className="px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none max-w-[170px]">
-              <option value="">Semua Instansi</option>
-              {master.institutions.map(i => <option key={i.id} value={i.name}>{i.name}</option>)}
-            </select>
+            <div className="w-40">
+              <SearchableSelect value={filterType} onChange={setFilterType}
+                options={[
+                  { value: '', label: 'Semua Status' },
+                  { value: 'PKWT', label: 'PKWT' },
+                  { value: 'PKWTT', label: 'PKWTT' },
+                  { value: 'DAILY_WORKER', label: 'Daily Worker' },
+                ]}
+                placeholder="Semua Status" className="px-3 py-2 rounded-xl" />
+            </div>
+            <div className="w-[170px]">
+              <SearchableSelect value={filterPlacement} onChange={setFilterPlacement}
+                options={[{ value: '', label: 'Semua Penempatan' }, ...master.placements.map(p => ({ value: p.name, label: p.name }))]}
+                placeholder="Semua Penempatan" searchPlaceholder="Cari penempatan..."
+                emptyLabel="Penempatan tidak ditemukan" className="px-3 py-2 rounded-xl" />
+            </div>
+            <div className="w-[170px]">
+              <SearchableSelect value={filterInstansi} onChange={setFilterInstansi}
+                options={[{ value: '', label: 'Semua Instansi' }, ...master.institutions.map(i => ({ value: i.name, label: i.name }))]}
+                placeholder="Semua Instansi" searchPlaceholder="Cari instansi..."
+                emptyLabel="Instansi tidak ditemukan" className="px-3 py-2 rounded-xl" />
+            </div>
             <button
               onClick={() => setOnlyExpiring(v => !v)}
               className={`flex items-center gap-1.5 px-3 py-2 text-sm rounded-xl border transition-colors ${
@@ -708,25 +714,23 @@ export default function ContractsAdmin() {
               </Field>
 
               <Field label="Penempatan">
-                <select value={empForm.penempatan}
-                  onChange={e => {
-                    const name = e.target.value;
+                <SearchableSelect value={empForm.penempatan}
+                  onChange={name => {
                     // Instansi ikut terisi otomatis dari master penempatan
                     const match = master.placements.find(p => p.name === name);
                     setEmpForm(f => ({ ...f, penempatan: name, instansi: match?.instansi || f.instansi }));
                   }}
-                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none">
-                  <option value="">— Pilih Penempatan —</option>
-                  {master.placements.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
-                </select>
+                  options={master.placements.map(p => ({ value: p.name, label: p.name }))}
+                  placeholder="— Pilih Penempatan —" searchPlaceholder="Cari penempatan..."
+                  emptyLabel="Penempatan tidak ditemukan" clearable className="px-3 py-2 rounded-xl" />
               </Field>
 
               <Field label="Instansi">
-                <select value={empForm.instansi} onChange={e => setEmpForm(f => ({ ...f, instansi: e.target.value }))}
-                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none">
-                  <option value="">— Pilih Instansi —</option>
-                  {master.institutions.map(i => <option key={i.id} value={i.name}>{i.name}</option>)}
-                </select>
+                <SearchableSelect value={empForm.instansi}
+                  onChange={v => setEmpForm(f => ({ ...f, instansi: v }))}
+                  options={master.institutions.map(i => ({ value: i.name, label: i.name }))}
+                  placeholder="— Pilih Instansi —" searchPlaceholder="Cari instansi..."
+                  emptyLabel="Instansi tidak ditemukan" clearable className="px-3 py-2 rounded-xl" />
               </Field>
 
               <Field label="Tanggal Masuk">
@@ -877,11 +881,10 @@ export default function ContractsAdmin() {
               </Field>
 
               <Field label="Alasan Keluar">
-                <select value={termForm.resign_reason}
-                  onChange={e => setTermForm(f => ({ ...f, resign_reason: e.target.value }))}
-                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none">
-                  {RESIGN_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                </select>
+                <SearchableSelect value={termForm.resign_reason}
+                  onChange={v => setTermForm(f => ({ ...f, resign_reason: v }))}
+                  options={RESIGN_OPTIONS.map(o => ({ value: o.value, label: o.label }))}
+                  className="px-3 py-2 rounded-xl" />
               </Field>
 
               <Field label="Catatan (opsional)">

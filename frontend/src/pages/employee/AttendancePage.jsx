@@ -7,6 +7,7 @@ import api from '../../api/axios';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
 import PageHeader from '../../components/ui/PageHeader';
+import SearchableSelect from '../../components/ui/SearchableSelect';
 
 export default function AttendancePage() {
   const [todayAtt, setTodayAtt] = useState(null);
@@ -207,14 +208,16 @@ export default function AttendancePage() {
         <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
           <h3 className="font-bold text-slate-900">Riwayat Absensi</h3>
           <div className="flex gap-2">
-            <select value={selectedMonth} onChange={(e) => setSelectedMonth(Number(e.target.value))}
-              className="input-brand py-2 text-sm w-auto">
-              {months.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
-            </select>
-            <select value={selectedYear} onChange={(e) => setSelectedYear(Number(e.target.value))}
-              className="input-brand py-2 text-sm w-auto">
-              {years.map(y => <option key={y} value={y}>{y}</option>)}
-            </select>
+            <div className="w-32">
+              <SearchableSelect variant="brand" value={selectedMonth} onChange={setSelectedMonth}
+                options={months.map((m, i) => ({ value: i + 1, label: m }))}
+                searchPlaceholder="Cari bulan..." className="py-2" />
+            </div>
+            <div className="w-24">
+              <SearchableSelect variant="brand" value={selectedYear} onChange={setSelectedYear}
+                options={years.map(y => ({ value: y, label: String(y) }))}
+                className="py-2" />
+            </div>
           </div>
         </div>
 

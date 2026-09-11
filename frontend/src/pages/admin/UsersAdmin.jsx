@@ -4,6 +4,7 @@ import { Search, Plus, Edit, Trash2, X, Shield, Key, ToggleLeft, ToggleRight, Us
 import toast from 'react-hot-toast';
 import api from '../../api/axios';
 import useAuthStore from '../../store/authStore';
+import SearchableSelect from '../../components/ui/SearchableSelect';
 
 const roleConfig = {
   superadmin: { label: 'Super Admin', cls: 'bg-red-50 text-red-700 border border-red-200', iconCls: 'bg-red-100 text-red-600', desc: 'Akses penuh ke semua fitur' },
@@ -168,10 +169,12 @@ export default function UsersAdmin() {
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input placeholder="Cari nama, email, ID..." value={search} onChange={e => setSearch(e.target.value)} className="input-field pl-9 py-2.5 text-sm" />
           </div>
-          <select value={roleFilter} onChange={e => setRoleFilter(e.target.value)} className="input-field py-2.5 text-sm w-auto">
-            <option value="">Semua Role</option>
-            {Object.entries(roleConfig).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-          </select>
+          <div className="w-44">
+            <SearchableSelect value={roleFilter} onChange={setRoleFilter}
+              options={[{ value: '', label: 'Semua Role' },
+                ...Object.entries(roleConfig).map(([k, v]) => ({ value: k, label: v.label }))]}
+              placeholder="Semua Role" className="py-2.5" />
+          </div>
         </div>
         {currentUser?.role === 'superadmin' && (
           <button onClick={() => { closeModal(); setShowModal(true); }} className="btn-primary py-2.5 flex items-center gap-2 text-sm">
@@ -338,13 +341,11 @@ export default function UsersAdmin() {
                   </div>
                   <div>
                     <label className="text-xs font-medium text-slate-600 mb-1 block">Role *</label>
-                    <select value={form.role} onChange={e => setForm({ ...form, role: e.target.value })} className="input-field text-sm">
-                      {Object.entries(roleConfig).map(([k, v]) => (
-                        k !== 'superadmin' || currentUser?.role === 'superadmin'
-                          ? <option key={k} value={k}>{v.label}</option>
-                          : null
-                      ))}
-                    </select>
+                    <SearchableSelect value={form.role}
+                      onChange={v => setForm({ ...form, role: v })}
+                      options={Object.entries(roleConfig)
+                        .filter(([k]) => k !== 'superadmin' || currentUser?.role === 'superadmin')
+                        .map(([k, v]) => ({ value: k, label: v.label }))} />
                   </div>
                   <div>
                     <label className="text-xs font-medium text-slate-600 mb-1 block">ID Karyawan</label>

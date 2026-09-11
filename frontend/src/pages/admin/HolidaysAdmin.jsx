@@ -6,6 +6,7 @@ import api from '../../api/axios';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
 import useAuthStore from '../../store/authStore';
+import SearchableSelect from '../../components/ui/SearchableSelect';
 
 const MONTHS = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
 
@@ -121,10 +122,11 @@ export default function HolidaysAdmin() {
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <select value={yearFilter} onChange={e => setYearFilter(+e.target.value)}
-            className="input-field py-2 text-sm w-auto">
-            {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
-          </select>
+          <div className="w-28">
+            <SearchableSelect value={yearFilter} onChange={setYearFilter}
+              options={[2024, 2025, 2026, 2027].map(y => ({ value: y, label: String(y) }))}
+              className="py-2" />
+          </div>
           <span className="text-slate-500 text-sm">{holidays.length} hari libur</span>
         </div>
         <div className="flex gap-2">

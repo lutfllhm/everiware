@@ -9,6 +9,7 @@ import { id as localeId } from 'date-fns/locale';
 import api from '../../api/axios';
 import useAuthStore from '../../store/authStore';
 import PageHeader from '../../components/ui/PageHeader';
+import SearchableSelect from '../../components/ui/SearchableSelect';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
 
@@ -228,14 +229,17 @@ export default function MyStatsPage() {
           <div className="space-y-4">
             {/* ── Filter bulan & tahun ── */}
             <div className="flex items-center gap-2.5">
-              <select value={month} onChange={(e) => setMonth(Number(e.target.value))}
-                className="flex-1 px-3.5 py-2.5 rounded-xl border border-[#E7E5E4] bg-white text-sm font-semibold text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#8B1F1F]/15">
-                {MONTHS.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
-              </select>
-              <select value={year} onChange={(e) => setYear(Number(e.target.value))}
-                className="flex-1 px-3.5 py-2.5 rounded-xl border border-[#E7E5E4] bg-white text-sm font-semibold text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#8B1F1F]/15">
-                {years.map((y) => <option key={y} value={y}>{y}</option>)}
-              </select>
+              <div className="flex-1 min-w-0">
+                <SearchableSelect variant="brand" value={month} onChange={setMonth}
+                  options={MONTHS.map((m, i) => ({ value: i + 1, label: m }))}
+                  searchPlaceholder="Cari bulan..."
+                  className="px-3.5 py-2.5 rounded-xl font-semibold" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <SearchableSelect variant="brand" value={year} onChange={setYear}
+                  options={years.map((y) => ({ value: y, label: String(y) }))}
+                  className="px-3.5 py-2.5 rounded-xl font-semibold" />
+              </div>
               <button onClick={loadData} aria-label="Muat ulang"
                 className="w-11 h-11 rounded-xl bg-white border border-[#E7E5E4] flex items-center justify-center hover:bg-stone-50 active:scale-95 transition-all">
                 <RefreshCw size={16} className="text-stone-500" />

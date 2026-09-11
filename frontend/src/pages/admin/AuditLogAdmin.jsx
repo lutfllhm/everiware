@@ -5,6 +5,7 @@ import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
 import { usePagination } from '../../hooks/usePagination';
 import Pagination from '../../components/ui/Pagination';
+import SearchableSelect from '../../components/ui/SearchableSelect';
 
 const ACTION_LABELS = {
   APPROVE_LEAVE:    { label: 'Setujui Izin',      color: 'bg-emerald-100 text-emerald-700' },
@@ -55,13 +56,13 @@ export default function AuditLogAdmin() {
             onChange={e => setSearch(e.target.value)}
             className="input-field pl-9 py-2.5 text-sm" />
         </div>
-        <select value={actionFilter} onChange={e => setActionFilter(e.target.value)}
-          className="input-field py-2.5 text-sm w-auto">
-          <option value="">Semua Aksi</option>
-          {Object.entries(ACTION_LABELS).map(([k, v]) => (
-            <option key={k} value={k}>{v.label}</option>
-          ))}
-        </select>
+        <div className="w-52">
+          <SearchableSelect value={actionFilter} onChange={setActionFilter}
+            options={[{ value: '', label: 'Semua Aksi' },
+              ...Object.entries(ACTION_LABELS).map(([k, v]) => ({ value: k, label: v.label }))]}
+            placeholder="Semua Aksi" searchPlaceholder="Cari aksi..."
+            emptyLabel="Aksi tidak ditemukan" className="py-2.5" />
+        </div>
         <button onClick={fetchLogs} className="p-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 transition-colors">
           <RefreshCw size={15} className={`text-slate-500 ${loading ? 'animate-spin' : ''}`} />
         </button>

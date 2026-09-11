@@ -12,12 +12,15 @@ import { Search, ChevronDown, Check, X } from 'lucide-react';
  *
  * Props:
  *   value, onChange(value)  — terkendali, sama seperti <select>
- *   options                 — array string, atau { value, label }
+ *   options                 — array string, atau { value, label, group? }
+ *                             (group = pengganti <optgroup>)
  *   placeholder             — teks saat belum ada pilihan
  *   searchPlaceholder       — teks di kolom cari
  *   disabled, className, id
  *   emptyLabel              — teks saat hasil pencarian kosong
  *   clearable               — tampilkan tombol hapus pilihan
+ *   variant                 — 'admin' (slate, default) | 'brand' (warm/crimson,
+ *                             dipakai halaman karyawan yang bergaya mobile)
  *   footer({ close, query }) — aksi pinned di bawah daftar, mis. "+ Tambah baru"
  *   searchThreshold         — kolom cari baru muncul kalau opsi >= ini (default 7)
  */
@@ -34,7 +37,42 @@ export default function SearchableSelect({
   clearable = false,
   footer,
   searchThreshold = 7,
+  variant = 'admin',
 }) {
+  const brand = variant === 'brand';
+  // Dua palet: panel admin memakai slate, halaman karyawan memakai warna hangat
+  // yang sama dengan .input-brand supaya tidak terasa seperti komponen asing.
+  const T = brand
+    ? {
+        trigger: 'input-brand',
+        pop: 'border-[#E7E5E4]',
+        sel: 'text-stone-900',
+        ph: 'text-stone-400',
+        chev: 'text-stone-400',
+        item: 'text-stone-600',
+        itemSel: 'font-semibold text-stone-900',
+        hl: 'bg-stone-100',
+        clearHover: 'hover:bg-stone-100 hover:text-stone-600',
+        check: 'text-[#8B1F1F]',
+        muted: 'text-stone-400',
+        ring: 'focus:ring-[#8B1F1F]/15 focus:border-[#8B1F1F]/40 border-[#E7E5E4]',
+        divide: 'border-stone-100',
+      }
+    : {
+        trigger: 'input-field',
+        pop: 'border-slate-200',
+        sel: 'text-slate-900',
+        ph: 'text-slate-400',
+        chev: 'text-slate-400',
+        item: 'text-slate-600',
+        itemSel: 'font-medium text-slate-900',
+        hl: 'bg-slate-100',
+        clearHover: 'hover:bg-slate-100 hover:text-slate-600',
+        check: 'text-slate-900',
+        muted: 'text-slate-400',
+        ring: 'focus:ring-slate-800/10 focus:border-slate-400 border-slate-200',
+        divide: 'border-slate-100',
+      };
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [highlight, setHighlight] = useState(0);
@@ -147,9 +185,9 @@ export default function SearchableSelect({
         onKeyDown={onKeyDown}
         aria-haspopup="listbox"
         aria-expanded={open}
-        className={`input-field text-sm flex items-center gap-2 text-left disabled:bg-slate-50 disabled:text-slate-400 disabled:cursor-not-allowed ${className}`}
+        className={`${T.trigger} text-sm flex items-center gap-2 text-left disabled:opacity-60 disabled:cursor-not-allowed ${className}`}
       >
-        <span className={`flex-1 min-w-0 truncate ${selected ? 'text-slate-900' : 'text-slate-400'}`}>
+        <span className={`flex-1 min-w-0 truncate ${selected ? T.sel : T.ph}`}>
           {selected ? selected.label : placeholder}
         </span>
         {clearable && selected && !disabled && (
@@ -158,14 +196,14 @@ export default function SearchableSelect({
             tabIndex={-1}
             title="Hapus pilihan"
             onClick={(e) => { e.stopPropagation(); onChange(''); }}
-            className="p-0.5 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-600 flex-shrink-0"
+            className={`p-0.5 rounded ${T.clearHover} ${T.muted} flex-shrink-0`}
           >
             <X size={13} />
           </span>
         )}
         <ChevronDown
           size={15}
-          className={`flex-shrink-0 text-slate-400 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
+          className={`flex-shrink-0 ${T.chev} transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
         />
       </button>
 
@@ -173,19 +211,19 @@ export default function SearchableSelect({
         <div
           ref={popRef}
           style={{ left: rect.left, width: rect.width, top: rect.top, bottom: rect.bottom }}
-          className="fixed z-[60] bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden"
+          className={`fixed z-[60] bg-white border ${T.pop} rounded-xl shadow-xl overflow-hidden`}
         >
           {showSearch && (
-            <div className="p-2 border-b border-slate-100">
+            <div className={`p-2 border-b ${T.divide}`}>
               <div className="relative">
-                <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <Search size={13} className={`absolute left-2.5 top-1/2 -translate-y-1/2 ${T.muted}`} />
                 <input
                   ref={searchRef}
                   value={query}
                   onChange={e => setQuery(e.target.value)}
                   onKeyDown={onKeyDown}
                   placeholder={searchPlaceholder}
-                  className="w-full pl-7 pr-2 py-1.5 text-xs rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-800/10 focus:border-slate-400"
+                  className={`w-full pl-7 pr-2 py-1.5 text-xs rounded-lg border focus:outline-none focus:ring-2 ${T.ring}`}
                 />
               </div>
             </div>
@@ -193,29 +231,38 @@ export default function SearchableSelect({
 
           <div className="overflow-y-auto py-1" style={{ maxHeight: rect.maxH }}>
             {shown.length === 0 ? (
-              <div className="px-3 py-4 text-center text-xs text-slate-400">{emptyLabel}</div>
+              <div className={`px-3 py-4 text-center text-xs ${T.muted}`}>{emptyLabel}</div>
             ) : shown.map((opt, i) => {
               const isSel = opt.value === value;
+              // Judul grup tampil sekali, saat nama grupnya berganti — pengganti
+              // <optgroup> yang tidak punya padanan di popup buatan sendiri.
+              const head = opt.group && opt.group !== shown[i - 1]?.group;
               return (
-                <button
-                  key={opt.value}
-                  type="button"
-                  data-hl={i === highlight ? '1' : undefined}
-                  onMouseEnter={() => setHighlight(i)}
-                  onClick={() => pick(opt)}
-                  className={`w-full flex items-center gap-2 px-3 py-2 text-left text-sm transition-colors ${
-                    i === highlight ? 'bg-slate-100' : ''
-                  } ${isSel ? 'font-medium text-slate-900' : 'text-slate-600'}`}
-                >
-                  <span className="flex-1 min-w-0 truncate">{opt.label}</span>
-                  {isSel && <Check size={14} className="text-slate-900 flex-shrink-0" />}
-                </button>
+                <div key={opt.value}>
+                  {head && (
+                    <div className={`px-3 pt-2 pb-1 text-[10px] font-semibold ${T.muted} uppercase tracking-wider`}>
+                      {opt.group}
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    data-hl={i === highlight ? '1' : undefined}
+                    onMouseEnter={() => setHighlight(i)}
+                    onClick={() => pick(opt)}
+                    className={`w-full flex items-center gap-2 px-3 py-2 text-left text-sm transition-colors ${
+                      i === highlight ? T.hl : ''
+                    } ${isSel ? T.itemSel : T.item}`}
+                  >
+                    <span className="flex-1 min-w-0 truncate">{opt.label}</span>
+                    {isSel && <Check size={14} className={`${T.check} flex-shrink-0`} />}
+                  </button>
+                </div>
               );
             })}
           </div>
 
           {footer && (
-            <div className="border-t border-slate-100 p-1">
+            <div className={`border-t ${T.divide} p-1`}>
               {footer({ close, query })}
             </div>
           )}

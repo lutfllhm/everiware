@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../../api/axios';
+import SearchableSelect from '../../components/ui/SearchableSelect';
 
 // Palet selaras dashboard: hijau untuk masuk, merah untuk keluar, netral untuk sisanya.
 const C = {
@@ -86,13 +87,11 @@ export default function ContractRecap() {
             Karyawan baru dihitung dari tanggal masuk, turn over dari tanggal keluar.
           </p>
         </div>
-        <select
-          value={year}
-          onChange={e => setYear(Number(e.target.value))}
-          className="px-4 py-2 text-sm font-medium border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-slate-900/10"
-        >
-          {(data.available_years || [year]).map(y => <option key={y} value={y}>Tahun {y}</option>)}
-        </select>
+        <div className="w-40">
+          <SearchableSelect value={year} onChange={setYear}
+            options={(data.available_years || [year]).map(y => ({ value: y, label: `Tahun ${y}` }))}
+            className="px-4 py-2 rounded-xl font-medium" />
+        </div>
       </div>
 
       {/* Kartu ringkasan */}

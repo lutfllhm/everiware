@@ -9,6 +9,7 @@ import UserAvatar from '../../components/ui/UserAvatar';
 import { usePagination } from '../../hooks/usePagination';
 import Pagination from '../../components/ui/Pagination';
 import { ZoomableImage } from '../../components/ui/ImageLightbox';
+import SearchableSelect from '../../components/ui/SearchableSelect';
 
 const statusConfig = {
   pending:  { label: 'Menunggu',  cls: 'badge-warning' },
@@ -168,34 +169,38 @@ export default function OvertimeAdmin() {
             </div>
           )}
           {activeView === 'list' && (
-            <select value={filters.status} onChange={e => setFilters({ ...filters, status: e.target.value })}
-              className="input-field py-2.5 text-sm w-auto">
-              <option value="">Semua Status</option>
-              <option value="pending">Menunggu</option>
-              <option value="approved">Disetujui</option>
-              <option value="rejected">Ditolak</option>
-            </select>
+            <div className="w-40">
+              <SearchableSelect value={filters.status}
+                onChange={v => setFilters({ ...filters, status: v })}
+                options={[
+                  { value: '', label: 'Semua Status' },
+                  { value: 'pending', label: 'Menunggu' },
+                  { value: 'approved', label: 'Disetujui' },
+                  { value: 'rejected', label: 'Ditolak' },
+                ]}
+                placeholder="Semua Status" className="py-2.5" />
+            </div>
           )}
 
           {filterMode === 'month' ? (
             <>
               <div>
                 <label className="text-xs text-slate-500 mb-1 block">Bulan</label>
-                <select value={filters.month} onChange={e => setFilters({ ...filters, month: +e.target.value })}
-                  className="input-field py-2 text-sm w-auto">
-                  {monthNames.map((m, i) => (
-                    <option key={i + 1} value={i + 1}>{m}</option>
-                  ))}
-                </select>
+                <div className="w-36">
+                  <SearchableSelect value={filters.month}
+                    onChange={v => setFilters({ ...filters, month: v })}
+                    options={monthNames.map((m, i) => ({ value: i + 1, label: m }))}
+                    searchPlaceholder="Cari bulan..." className="py-2" />
+                </div>
               </div>
               <div>
                 <label className="text-xs text-slate-500 mb-1 block">Tahun</label>
-                <select value={filters.year} onChange={e => setFilters({ ...filters, year: +e.target.value })}
-                  className="input-field py-2 text-sm w-auto">
-                  {[new Date().getFullYear(), new Date().getFullYear() - 1].map(y => (
-                    <option key={y} value={y}>{y}</option>
-                  ))}
-                </select>
+                <div className="w-28">
+                  <SearchableSelect value={filters.year}
+                    onChange={v => setFilters({ ...filters, year: v })}
+                    options={[new Date().getFullYear(), new Date().getFullYear() - 1].map(y => ({ value: y, label: String(y) }))}
+                    className="py-2" />
+                </div>
               </div>
             </>
           ) : (

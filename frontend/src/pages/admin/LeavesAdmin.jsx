@@ -9,6 +9,7 @@ import UserAvatar from '../../components/ui/UserAvatar';
 import { usePagination } from '../../hooks/usePagination';
 import Pagination from '../../components/ui/Pagination';
 import { ZoomableImage } from '../../components/ui/ImageLightbox';
+import SearchableSelect from '../../components/ui/SearchableSelect';
 
 const statusConfig = {
   pending:  { label: 'Menunggu', cls: 'badge-warning' },
@@ -126,19 +127,27 @@ export default function LeavesAdmin() {
               onChange={(e) => setFilters({ ...filters, search: e.target.value })}
               className="input-field pl-9 py-2.5 text-sm" />
           </div>
-          <select value={filters.status} onChange={(e) => setFilters({ ...filters, status: e.target.value })}
-            className="input-field py-2.5 text-sm w-auto">
-            <option value="">Semua Status</option>
-            <option value="pending">Menunggu</option>
-            <option value="approved">Disetujui</option>
-            <option value="rejected">Ditolak</option>
-          </select>
-          <select value={filters.type} onChange={(e) => setFilters({ ...filters, type: e.target.value })}
-            className="input-field py-2.5 text-sm w-auto">
-            <option value="">Semua Jenis</option>
-            <option value="annual">Cuti Tahunan</option>
-            <option value="sick">Izin Sakit</option>
-          </select>
+          <div className="w-40">
+            <SearchableSelect value={filters.status}
+              onChange={v => setFilters({ ...filters, status: v })}
+              options={[
+                { value: '', label: 'Semua Status' },
+                { value: 'pending', label: 'Menunggu' },
+                { value: 'approved', label: 'Disetujui' },
+                { value: 'rejected', label: 'Ditolak' },
+              ]}
+              placeholder="Semua Status" className="py-2.5" />
+          </div>
+          <div className="w-40">
+            <SearchableSelect value={filters.type}
+              onChange={v => setFilters({ ...filters, type: v })}
+              options={[
+                { value: '', label: 'Semua Jenis' },
+                { value: 'annual', label: 'Cuti Tahunan' },
+                { value: 'sick', label: 'Izin Sakit' },
+              ]}
+              placeholder="Semua Jenis" className="py-2.5" />
+          </div>
         </div>
       </div>
 

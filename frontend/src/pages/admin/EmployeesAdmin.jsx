@@ -429,16 +429,16 @@ export default function EmployeesAdmin() {
               className="py-2.5"
             />
           </div>
-          <select
-            value={locationFilter}
-            onChange={(e) => setLocationFilter(e.target.value)}
-            className="input-field py-2.5 px-3 text-sm max-w-xs"
-          >
-            <option value="">Semua Lokasi Penempatan</option>
-            {locations.map(loc => (
-              <option key={loc.id} value={loc.id}>{loc.name}</option>
-            ))}
-          </select>
+          <div className="w-52 flex-shrink-0">
+            <SearchableSelect
+              value={locationFilter}
+              onChange={setLocationFilter}
+              options={[{ value: '', label: 'Semua Lokasi Penempatan' }, ...locations.map(l => ({ value: l.id, label: l.name }))]}
+              placeholder="Semua Lokasi Penempatan"
+              searchPlaceholder="Cari lokasi..."
+              className="py-2.5"
+            />
+          </div>
         </div>
         {/* Divisi yang sedang difilter jadi nilai awal form — menghemat satu
             langkah saat HR menambah beberapa karyawan di divisi yang sama. */}
@@ -737,46 +737,50 @@ export default function EmployeesAdmin() {
                   </div>
                   <div>
                     <label className="text-xs font-medium text-slate-600 mb-1 block">Role</label>
-                    <select value={form.role} onChange={e => setForm({ ...form, role: e.target.value })} className="input-field text-sm">
-                      {/* GM & SPV/PIC adalah penanda jabatan struktural: aksesnya
-                          tetap setara karyawan, dipakai untuk alur approval. */}
-                      <optgroup label="Karyawan">
-                        <option value="employee">Karyawan</option>
-                        <option value="gm">General Manager</option>
-                        <option value="spv">SPV/PIC</option>
-                      </optgroup>
-                      <optgroup label="Akses Panel Admin">
-                        <option value="hrd">HRD</option>
-                        <option value="admin">Admin</option>
-                      </optgroup>
-                    </select>
+                    {/* GM & SPV/PIC adalah penanda jabatan struktural: aksesnya
+                        tetap setara karyawan, dipakai untuk alur approval. */}
+                    <SearchableSelect
+                      value={form.role}
+                      onChange={v => setForm({ ...form, role: v })}
+                      options={[
+                        { value: 'employee', label: 'Karyawan', group: 'Karyawan' },
+                        { value: 'gm', label: 'General Manager', group: 'Karyawan' },
+                        { value: 'spv', label: 'SPV/PIC', group: 'Karyawan' },
+                        { value: 'hrd', label: 'HRD', group: 'Akses Panel Admin' },
+                        { value: 'admin', label: 'Admin', group: 'Akses Panel Admin' },
+                      ]}
+                    />
                   </div>
                   <div className="col-span-2">
                     <label className="text-xs font-medium text-slate-600 mb-1 block">Lokasi Penempatan Kerja</label>
-                    <select
+                    <SearchableSelect
                       value={form.location_id}
-                      onChange={e => setForm({ ...form, location_id: e.target.value })}
-                      className="input-field text-sm"
-                    >
-                      <option value="">-- Pilih Lokasi Penempatan --</option>
-                      {locations.map(loc => (
-                        <option key={loc.id} value={loc.id}>{loc.name}</option>
-                      ))}
-                    </select>
+                      onChange={v => setForm({ ...form, location_id: v })}
+                      options={locations.map(loc => ({ value: loc.id, label: loc.name }))}
+                      placeholder="-- Pilih Lokasi Penempatan --"
+                      searchPlaceholder="Cari lokasi..."
+                      emptyLabel="Lokasi tidak ditemukan"
+                      clearable
+                    />
                     <p className="text-xs text-slate-400 mt-1">Karyawan harus ter-assign ke lokasi agar dapat melakukan absensi mobile</p>
                   </div>
                 </div>
                 <div>
                   <label className="text-xs font-medium text-slate-600 mb-1 block">Atasan / Manager (untuk multi-level approval)</label>
-                  <select value={form.manager_id} onChange={e => setForm({ ...form, manager_id: e.target.value })} className="input-field text-sm">
-                    <option value="">Tidak ada atasan</option>
-                    {managers
-                      .filter(m => m.id !== editUser?.id)
-                      .filter(m => !form.department || m.department === form.department)
-                      .map(m => (
-                        <option key={m.id} value={m.id}>{m.name} ({ROLE_LABELS[m.role] || m.role})</option>
-                      ))}
-                  </select>
+                  <SearchableSelect
+                    value={form.manager_id}
+                    onChange={v => setForm({ ...form, manager_id: v })}
+                    options={[
+                      { value: '', label: 'Tidak ada atasan' },
+                      ...managers
+                        .filter(m => m.id !== editUser?.id)
+                        .filter(m => !form.department || m.department === form.department)
+                        .map(m => ({ value: m.id, label: `${m.name} (${ROLE_LABELS[m.role] || m.role})` })),
+                    ]}
+                    placeholder="Tidak ada atasan"
+                    searchPlaceholder="Cari atasan..."
+                    emptyLabel="Atasan tidak ditemukan"
+                  />
                   <p className="text-xs text-slate-400 mt-1">Menampilkan akun HRD/Admin, General Manager, SPV/PIC, serta karyawan yang sudah diberi akses, di divisi yang sama{!form.department && ' (pilih divisi karyawan dulu untuk menyaring)'}</p>
                 </div>
                 {editUser && EMPLOYEE_ROLES.includes(form.role) && (
@@ -814,31 +818,32 @@ export default function EmployeesAdmin() {
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label className="text-xs font-medium text-slate-600 mb-1 block">Penempatan</label>
-                        <select
+                        <SearchableSelect
                           value={form.penempatan}
-                          onChange={e => {
-                            const name = e.target.value;
+                          onChange={name => {
                             const match = master.placements.find(pl => pl.name === name);
                             // Instansi ikut terisi otomatis karena satu penempatan
                             // selalu bernaung di bawah instansi yang sama.
                             setForm(f => ({ ...f, penempatan: name, instansi: match?.instansi || f.instansi }));
                           }}
-                          className="input-field text-sm"
-                        >
-                          <option value="">-- Pilih Penempatan --</option>
-                          {master.placements.map(pl => <option key={pl.id} value={pl.name}>{pl.name}</option>)}
-                        </select>
+                          options={master.placements.map(pl => ({ value: pl.name, label: pl.name }))}
+                          placeholder="-- Pilih Penempatan --"
+                          searchPlaceholder="Cari penempatan..."
+                          emptyLabel="Penempatan tidak ditemukan"
+                          clearable
+                        />
                       </div>
                       <div>
                         <label className="text-xs font-medium text-slate-600 mb-1 block">Instansi</label>
-                        <select
+                        <SearchableSelect
                           value={form.instansi}
-                          onChange={e => setForm({ ...form, instansi: e.target.value })}
-                          className="input-field text-sm"
-                        >
-                          <option value="">-- Pilih Instansi --</option>
-                          {master.institutions.map(i => <option key={i.id} value={i.name}>{i.name}</option>)}
-                        </select>
+                          onChange={v => setForm({ ...form, instansi: v })}
+                          options={master.institutions.map(i => ({ value: i.name, label: i.name }))}
+                          placeholder="-- Pilih Instansi --"
+                          searchPlaceholder="Cari instansi..."
+                          emptyLabel="Instansi tidak ditemukan"
+                          clearable
+                        />
                       </div>
                     </div>
 

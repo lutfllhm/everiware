@@ -3,6 +3,7 @@ import { Save, Clock, Calendar, Building, Database, GitMerge, RotateCcw, Refresh
 import toast from 'react-hot-toast';
 import api from '../../api/axios';
 import useAuthStore from '../../store/authStore';
+import SearchableSelect from '../../components/ui/SearchableSelect';
 
 export default function SettingsAdmin() {
   const [settings, setSettings] = useState({});
@@ -128,12 +129,12 @@ export default function SettingsAdmin() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="text-sm font-medium text-slate-700 mb-1 block">Status Hari Sabtu</label>
-                <select value={settings.saturday_work_enabled ?? 'true'}
-                  onChange={e => setSettings({ ...settings, saturday_work_enabled: e.target.value })}
-                  className="input-field">
-                  <option value="true">Masuk kerja (setengah hari)</option>
-                  <option value="false">Libur</option>
-                </select>
+                <SearchableSelect value={settings.saturday_work_enabled ?? 'true'}
+                  onChange={v => setSettings({ ...settings, saturday_work_enabled: v })}
+                  options={[
+                    { value: 'true', label: 'Masuk kerja (setengah hari)' },
+                    { value: 'false', label: 'Libur' },
+                  ]} />
               </div>
               <div>
                 <label className="text-sm font-medium text-slate-700 mb-1 block">Jam Pulang Sabtu</label>
@@ -218,10 +219,12 @@ export default function SettingsAdmin() {
           <div className="grid grid-cols-2 gap-4 mb-4">
             <div>
               <label className="text-sm font-medium text-slate-700 mb-1 block">Aktifkan Carry-over</label>
-              <select value={settings.leave_carryover_enabled || 'false'} onChange={e => setSettings({ ...settings, leave_carryover_enabled: e.target.value })} className="input-field">
-                <option value="true">Ya, aktifkan</option>
-                <option value="false">Tidak</option>
-              </select>
+              <SearchableSelect value={settings.leave_carryover_enabled || 'false'}
+                onChange={v => setSettings({ ...settings, leave_carryover_enabled: v })}
+                options={[
+                  { value: 'true', label: 'Ya, aktifkan' },
+                  { value: 'false', label: 'Tidak' },
+                ]} />
             </div>
             <div>
               <label className="text-sm font-medium text-slate-700 mb-1 block">Maks. Hari Carry-over</label>
