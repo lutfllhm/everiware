@@ -5,6 +5,7 @@ import { useParams, Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import api from '../../api/axios';
 import { FEATURES } from '../../constants/features';
+import SearchableSelect from '../../components/ui/SearchableSelect';
 
 const CONTRACT_TYPES = [
   { key: 'PKWT', label: 'PKWT' },
@@ -418,16 +419,16 @@ export default function EmployeesAdmin() {
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input placeholder={deptFilter ? `Cari karyawan di ${deptFilter}...` : 'Cari semua karyawan...'} value={search} onChange={(e) => setSearch(e.target.value)} className="input-field pl-9 py-2.5 text-sm" />
           </div>
-          <select
-            value={deptFilter}
-            onChange={(e) => setDeptFilter(e.target.value)}
-            className="input-field py-2.5 px-3 text-sm max-w-xs"
-          >
-            <option value="">Semua Departemen</option>
-            {deptOptions.map(name => (
-              <option key={name} value={name}>{name}</option>
-            ))}
-          </select>
+          <div className="w-52 flex-shrink-0">
+            <SearchableSelect
+              value={deptFilter}
+              onChange={setDeptFilter}
+              options={[{ value: '', label: 'Semua Departemen' }, ...deptOptions.map(n => ({ value: n, label: n }))]}
+              placeholder="Semua Departemen"
+              searchPlaceholder="Cari departemen..."
+              className="py-2.5"
+            />
+          </div>
           <select
             value={locationFilter}
             onChange={(e) => setLocationFilter(e.target.value)}
@@ -633,24 +634,26 @@ export default function EmployeesAdmin() {
                   <div>
                     <label className="text-xs font-medium text-slate-600 mb-1 block">Departemen</label>
                     {newDept === null ? (
-                      <select
+                      <SearchableSelect
                         value={form.department}
-                        onChange={e => {
-                          if (e.target.value === '__new__') { setNewDept(''); return; }
-                          setForm({ ...form, department: e.target.value, position: '' });
-                        }}
-                        className="input-field text-sm"
-                      >
-                        <option value="">-- Pilih Departemen --</option>
-                        {departments.filter(d => d.is_active).map(d => (
-                          <option key={d.id} value={d.name}>{d.name}</option>
-                        ))}
-                        {/* Tampilkan nilai lama jika tidak ada di list */}
-                        {form.department && !departments.find(d => d.name === form.department) && (
-                          <option value={form.department}>{form.department}</option>
+                        onChange={v => setForm({ ...form, department: v, position: '' })}
+                        options={[
+                          ...departments.filter(d => d.is_active).map(d => ({ value: d.name, label: d.name })),
+                          // Tampilkan nilai lama jika tidak ada di list
+                          ...(form.department && !departments.find(d => d.name === form.department)
+                            ? [{ value: form.department, label: form.department }] : []),
+                        ]}
+                        placeholder="-- Pilih Departemen --"
+                        searchPlaceholder="Cari departemen..."
+                        emptyLabel="Departemen tidak ditemukan"
+                        footer={({ close, query }) => (
+                          <button type="button"
+                            onClick={() => { close(); setNewDept(query.trim()); }}
+                            className="w-full text-left px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 rounded-lg transition-colors">
+                            + Tambah departemen baru{query.trim() ? ` "${query.trim()}"` : '...'}
+                          </button>
                         )}
-                        <option value="__new__">+ Tambah departemen baru...</option>
-                      </select>
+                      />
                     ) : (
                       <div className="flex gap-2">
                         <input
@@ -679,26 +682,28 @@ export default function EmployeesAdmin() {
                   <div>
                     <label className="text-xs font-medium text-slate-600 mb-1 block">Posisi</label>
                     {newPos === null ? (
-                      <select
+                      <SearchableSelect
                         value={form.position}
-                        onChange={e => {
-                          if (e.target.value === '__new__') { setNewPos(''); return; }
-                          setForm({ ...form, position: e.target.value });
-                        }}
-                        className="input-field text-sm"
+                        onChange={v => setForm({ ...form, position: v })}
                         disabled={!form.department}
-                      >
-                        <option value="">-- Pilih Posisi --</option>
-                        {availablePositions.map(p => (
-                          <option key={p.id} value={p.name}>{p.name}</option>
-                        ))}
-                        {/* Tampilkan nilai lama jika tidak ada di list */}
-                        {form.position && !availablePositions.find(p => p.name === form.position) && (
-                          <option value={form.position}>{form.position}</option>
-                        )}
-                        {/* Hanya departemen terdaftar yang punya id untuk ditempeli jabatan */}
-                        {selectedDept && <option value="__new__">+ Tambah posisi baru...</option>}
-                      </select>
+                        options={[
+                          ...availablePositions.map(p => ({ value: p.name, label: p.name })),
+                          // Tampilkan nilai lama jika tidak ada di list
+                          ...(form.position && !availablePositions.find(p => p.name === form.position)
+                            ? [{ value: form.position, label: form.position }] : []),
+                        ]}
+                        placeholder={form.department ? '-- Pilih Posisi --' : 'Pilih departemen dulu'}
+                        searchPlaceholder="Cari posisi..."
+                        emptyLabel="Posisi tidak ditemukan"
+                        /* Hanya departemen terdaftar yang punya id untuk ditempeli jabatan */
+                        footer={selectedDept ? (({ close, query }) => (
+                          <button type="button"
+                            onClick={() => { close(); setNewPos(query.trim()); }}
+                            className="w-full text-left px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 rounded-lg transition-colors">
+                            + Tambah posisi baru{query.trim() ? ` "${query.trim()}"` : '...'}
+                          </button>
+                        )) : undefined}
+                      />
                     ) : (
                       <div className="flex gap-2">
                         <input
