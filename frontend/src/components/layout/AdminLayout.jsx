@@ -20,7 +20,7 @@ const navGroups = [
     items: [
       { path: '/admin', icon: LayoutDashboard, label: 'Dashboard', exact: true, roles: ['superadmin', 'admin', 'hrd'] },
       { path: '/admin/attendance', icon: Clock, label: 'Absensi', roles: ['superadmin', 'admin', 'hrd'] },
-      { path: '/admin/employees', icon: Users, label: 'Karyawan', roles: ['superadmin', 'admin', 'hrd'], submenu: true, ownedPaths: ['/admin/departments'] },
+      { path: '/admin/employees', icon: Users, label: 'Karyawan dan Departemen', roles: ['superadmin', 'admin', 'hrd'], submenu: true, ownedPaths: ['/admin/departments'] },
       { path: '/admin/leaves', icon: FileText, label: 'Perizinan', roles: ['superadmin', 'admin', 'hrd'] },
       { path: '/admin/overtime', icon: Clock, label: 'Lembur', roles: ['superadmin', 'admin', 'hrd'] },
     ]
@@ -178,8 +178,8 @@ function SidebarNav({ filteredGroups, location, user, onLinkClick, onLogout }) {
                           : 'text-slate-400 hover:bg-slate-800 hover:text-white hover:translate-x-1'
                       }`}
                     >
-                      <item.icon size={17} />
-                      <span className="truncate">{item.label}</span>
+                      <item.icon size={17} className="flex-shrink-0" />
+                      <span className="min-w-0 leading-snug">{item.label}</span>
                       {hasSubmenu
                         ? <ChevronRight
                             size={13}
@@ -213,7 +213,7 @@ function SidebarNav({ filteredGroups, location, user, onLinkClick, onLogout }) {
             className="fixed z-50 w-52 max-h-[70vh] overflow-y-auto bg-slate-800 border border-slate-700 rounded-xl shadow-2xl py-1.5"
           >
             <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest px-3 py-1.5">
-              Karyawan
+              Karyawan dan Departemen
             </p>
             <div>
               <Link

@@ -1,7 +1,7 @@
-import { useState, useEffect, useMemo, Fragment } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Plus, Edit, Trash2, X, User, Mail, Phone, Building, Briefcase, Calendar, AlertTriangle, ChevronDown, ChevronRight, ChevronLeft, MailCheck, Copy, CheckCircle2, Check, Send } from 'lucide-react';
-import { useParams, useSearchParams, Link } from 'react-router-dom';
+import { Search, Plus, Edit, Trash2, X, User, Mail, Phone, Briefcase, Calendar, AlertTriangle, ChevronLeft, MailCheck, Copy, CheckCircle2, Check, Send } from 'lucide-react';
+import { useParams, Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import api from '../../api/axios';
 import { FEATURES } from '../../constants/features';
@@ -15,6 +15,9 @@ const CONTRACT_TYPES = [
 // users.department & departments.name adalah dua salinan string yang bisa
 // berbeda spasi/kapitalisasi, jadi pencocokannya dilonggarkan.
 const normalizeDept = (v) => (v || '').trim().replace(/\s+/g, ' ').toLowerCase();
+
+// Nilai semu untuk menyaring karyawan yang users.department-nya masih kosong.
+const NO_DEPT = 'Tanpa Departemen';
 
 const todayISO = () => new Date(Date.now() + 7 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
@@ -40,17 +43,12 @@ const emptyForm = () => ({
 });
 
 export default function EmployeesAdmin() {
-  // Kalau URL-nya /admin/employees/:department (dari submenu sidebar), halaman
-  // langsung menampilkan daftar karyawan divisi itu tanpa accordion.
+  // Kalau URL-nya /admin/employees/:department (dari submenu sidebar atau
+  // tautan lama), divisi itu dipakai sebagai nilai awal dropdown filter.
   const { department: deptParam } = useParams();
   // useParams() sudah mengembalikan nilai ter-decode. Men-decode ulang bikin
   // URIError untuk nama divisi yang mengandung '%' dan mematikan halaman.
   const activeDept = deptParam || null;
-  // ?all=1 (dari menu "Semua Karyawan") menampilkan seluruh karyawan sekaligus,
-  // dikelompokkan per departemen. Tanpa itu, /admin/employees tetap menampilkan
-  // placeholder supaya daftar nama tidak muncul sebelum divisi dipilih.
-  const [searchParams] = useSearchParams();
-  const showAll = searchParams.get('all') === '1';
 
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -68,8 +66,11 @@ export default function EmployeesAdmin() {
   const [locations, setLocations] = useState([]);
   const [locationFilter, setLocationFilter] = useState('');
   const [permissions, setPermissions] = useState([]);
-  const [expandedDept, setExpandedDept] = useState({});
-  const [deptSearch, setDeptSearch] = useState({});
+  // Daftar karyawan sekarang satu tabel datar; penyaringan divisi lewat dropdown
+  // ini, bukan lagi accordion per departemen. Nilainya string nama departemen
+  // ('' = semua), diseed dari /admin/employees/:department supaya tautan lama
+  // dan submenu sidebar tetap mendarat di divisi yang benar.
+  const [deptFilter, setDeptFilter] = useState(activeDept || '');
   const [saving, setSaving] = useState(false);
   // Master penempatan & instansi dipakai bagian status hubungan kerja di form.
   const [master, setMaster] = useState({ placements: [], institutions: [], durations: [3, 6, 12] });
@@ -355,8 +356,8 @@ export default function EmployeesAdmin() {
     }
   };
 
-  // Harus useMemo: `filtered` jadi dependency `groupedByDept`, dan array baru
-  // di tiap render bikin memo + effect di bawahnya ikut jalan terus-menerus.
+  // Harus useMemo: `filtered` jadi dependency `visibleUsers`, dan array baru
+  // di tiap render bikin memo di bawahnya ikut jalan terus-menerus.
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return users;
@@ -367,64 +368,42 @@ export default function EmployeesAdmin() {
     );
   }, [users, search]);
 
-  const groupedByDept = useMemo(() => {
-    const byDept = filtered.reduce((acc, u) => {
-      const dept = u.department || 'Tanpa Departemen';
-      if (!acc[dept]) acc[dept] = [];
-      acc[dept].push(u);
-      return acc;
-    }, {});
-    const groups = Object.entries(byDept)
-      .map(([department, members]) => ({ department, members }))
-      .sort((a, b) => a.department.localeCompare(b.department));
+  // Pilihan dropdown: gabungan nama dari master departemen & nilai yang benar-
+  // benar terpakai di users.department, supaya divisi yang datanya belum rapi
+  // (atau kosong → "Tanpa Departemen") tetap bisa disaring.
+  const deptOptions = useMemo(() => {
+    const seen = new Map();
+    const add = (name) => {
+      const key = normalizeDept(name);
+      if (key && !seen.has(key)) seen.set(key, name);
+    };
+    departments.forEach(d => add(d.name));
+    users.forEach(u => add(u.department));
+    const list = [...seen.values()].sort((a, b) => a.localeCompare(b));
+    if (users.some(u => !u.department)) list.push(NO_DEPT);
+    return list;
+  }, [departments, users]);
 
-    // Mode satu divisi: hanya tampilkan divisi dari URL. Nama divisi di sidebar
-    // berasal dari tabel departments, sedangkan users.department menyimpan
-    // salinan namanya — keduanya bisa beda spasi/kapitalisasi. Cocokkan longgar
-    // supaya karyawan tidak "hilang" hanya karena selisih penulisan.
-    if (activeDept) {
-      const found = groups.find(g => normalizeDept(g.department) === normalizeDept(activeDept));
-      return [found || { department: activeDept, members: [] }];
-    }
-    return groups;
-  }, [filtered, activeDept]);
-
-  // Saat mencari, otomatis buka departemen yang punya hasil match.
-  // Dependency berupa string gabungan nama divisi supaya effect hanya jalan
-  // saat isi grupnya benar-benar berubah, bukan tiap render.
-  const matchedDeptKeys = groupedByDept.map(d => d.department).join('|');
+  // URL /admin/employees/:department masih dipakai submenu sidebar & tautan
+  // lama. Perlakukan sebagai nilai awal dropdown, bukan mode tampilan terpisah.
   useEffect(() => {
-    if (!search.trim() || !matchedDeptKeys) return;
-    setExpandedDept(prev => {
-      const next = { ...prev };
-      let changed = false;
-      for (const name of matchedDeptKeys.split('|')) {
-        if (!next[name]) { next[name] = true; changed = true; }
-      }
-      return changed ? next : prev;
-    });
-  }, [search, matchedDeptKeys]);
+    if (activeDept) setDeptFilter(activeDept);
+  }, [activeDept]);
 
-  // Divisi yang dipilih dari sidebar langsung terbuka — itu inti dari submenu.
-  // Dependency-nya nama hasil resolve (string), bukan objek memo: kalau memo
-  // yang dipakai, tiap setState bikin referensi baru → render loop tak berhenti.
-  const resolvedDept = activeDept ? (groupedByDept[0]?.department || activeDept) : null;
-  useEffect(() => {
-    if (!resolvedDept) return;
-    setExpandedDept(prev => (prev[resolvedDept] ? prev : { ...prev, [resolvedDept]: true }));
-  }, [resolvedDept]);
+  // Satu daftar datar: pencarian + filter divisi + filter lokasi digabung di
+  // sini. Pencocokan divisi dilonggarkan karena users.department dan
+  // departments.name adalah dua salinan string yang bisa beda spasi/kapital.
+  const visibleUsers = useMemo(() => {
+    if (!deptFilter) return filtered;
+    if (deptFilter === NO_DEPT) return filtered.filter(u => !u.department);
+    return filtered.filter(u => normalizeDept(u.department) === normalizeDept(deptFilter));
+  }, [filtered, deptFilter]);
 
-  // Landing /admin/employees tidak lagi menampilkan kartu departemen — pilihan
-  // divisi ada di sidebar. Pencarian tetap boleh menembus semua divisi supaya
-  // HR masih bisa mencari nama tanpa tahu divisinya.
-  const showDeptPicker = !activeDept && !showAll && !search.trim();
-
-  const toggleDept = (dept) => setExpandedDept(prev => ({ ...prev, [dept]: !prev[dept] }));
-  const setDeptSearchValue = (dept, value) => setDeptSearch(prev => ({ ...prev, [dept]: value }));
+  const activeCount = visibleUsers.filter(u => u.is_active).length;
 
   return (
     <div className="space-y-4">
-      {/* Breadcrumb kembali — hanya saat sedang melihat satu divisi */}
+      {/* Breadcrumb kembali — hanya saat halaman dibuka lewat URL satu divisi */}
       {activeDept && (
         <Link to="/admin/employees?all=1"
           className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-900 transition-colors">
@@ -437,8 +416,18 @@ export default function EmployeesAdmin() {
         <div className="flex flex-1 flex-wrap gap-3 items-center min-w-48">
           <div className="relative flex-1 min-w-48">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input placeholder={activeDept ? `Cari karyawan di ${activeDept}...` : 'Cari semua karyawan...'} value={search} onChange={(e) => setSearch(e.target.value)} className="input-field pl-9 py-2.5 text-sm" />
+            <input placeholder={deptFilter ? `Cari karyawan di ${deptFilter}...` : 'Cari semua karyawan...'} value={search} onChange={(e) => setSearch(e.target.value)} className="input-field pl-9 py-2.5 text-sm" />
           </div>
+          <select
+            value={deptFilter}
+            onChange={(e) => setDeptFilter(e.target.value)}
+            className="input-field py-2.5 px-3 text-sm max-w-xs"
+          >
+            <option value="">Semua Departemen</option>
+            {deptOptions.map(name => (
+              <option key={name} value={name}>{name}</option>
+            ))}
+          </select>
           <select
             value={locationFilter}
             onChange={(e) => setLocationFilter(e.target.value)}
@@ -450,168 +439,134 @@ export default function EmployeesAdmin() {
             ))}
           </select>
         </div>
-        <button onClick={() => { setEditUser(null); setForm({ ...emptyForm(), department: activeDept || '' }); setAvatarFile(null); setAvatarPreview(null); setPermissions([]); setShowModal(true); }}
+        {/* Divisi yang sedang difilter jadi nilai awal form — menghemat satu
+            langkah saat HR menambah beberapa karyawan di divisi yang sama. */}
+        <button onClick={() => { setEditUser(null); setForm({ ...emptyForm(), department: deptFilter === NO_DEPT ? '' : deptFilter }); setAvatarFile(null); setAvatarPreview(null); setPermissions([]); setShowModal(true); }}
           className="btn-primary py-2.5 flex items-center gap-2 text-sm">
           <Plus size={16} /> Tambah Karyawan
         </button>
       </div>
 
-      {/* Grouped per departemen (accordion) */}
-      <div className="space-y-3">
+      {/* Satu daftar datar untuk semua karyawan. Pengelompokan per departemen
+          (accordion) diganti dropdown filter di toolbar supaya HR tidak perlu
+          membuka-tutup divisi satu per satu. */}
+      <div className="card overflow-hidden">
         {loading ? (
-          <div className="card text-center py-8 text-slate-400">Memuat data...</div>
-        ) : showDeptPicker ? (
-          /* Tanpa divisi terpilih & tanpa pencarian: daftar karyawan sengaja
-             tidak ditampilkan — pemilihan divisi dilakukan lewat submenu
-             "Karyawan" di sidebar. */
-          <div className="card text-center py-16 px-6">
-            <div className="w-14 h-14 mx-auto bg-slate-100 rounded-2xl flex items-center justify-center mb-4">
-              <Building size={24} className="text-slate-400" />
-            </div>
-            <div className="font-semibold text-slate-900 text-sm">Pilih departemen dulu</div>
-            <p className="text-sm text-slate-400 mt-1.5 max-w-sm mx-auto">
-              Buka submenu <span className="font-medium text-slate-500">Karyawan</span> di sidebar,
-              lalu pilih departemen untuk melihat daftar karyawannya. Bisa juga langsung ketik nama
-              di kolom pencarian di atas.
-            </p>
+          <div className="text-center py-8 text-slate-400">Memuat data...</div>
+        ) : visibleUsers.length === 0 ? (
+          <div className="text-center py-8 text-slate-400 text-sm">
+            {search.trim() || deptFilter || locationFilter
+              ? 'Tidak ada karyawan yang cocok dengan filter ini'
+              : 'Belum ada karyawan'}
           </div>
-        ) : groupedByDept.length === 0 ? (
-          <div className="card text-center py-8 text-slate-400">Tidak ada karyawan</div>
         ) : (
-          groupedByDept.map(({ department, members }) => {
-            // Di mode satu divisi header tidak bisa ditutup — tidak ada gunanya
-            // menyembunyikan satu-satunya tabel di halaman.
-            const isOpen = (activeDept || showAll) ? true : !!expandedDept[department];
-            const activeCount = members.filter(m => m.is_active).length;
-            const deptQuery = (deptSearch[department] || '').toLowerCase();
-            const visibleMembers = deptQuery
-              ? members.filter(m => m.name?.toLowerCase().includes(deptQuery) || m.email?.toLowerCase().includes(deptQuery) || m.employee_id?.toLowerCase().includes(deptQuery) || m.position?.toLowerCase().includes(deptQuery))
-              : members;
-            return (
-              <div key={department} className="card overflow-hidden">
-                <button onClick={() => { if (!activeDept) toggleDept(department); }}
-                  disabled={!!activeDept}
-                  className={`w-full flex items-center gap-3 p-4 transition-colors text-left ${activeDept ? 'cursor-default' : 'hover:bg-slate-50'}`}>
-                  {!activeDept && (isOpen
-                    ? <ChevronDown size={16} className="text-slate-500 flex-shrink-0" />
-                    : <ChevronRight size={16} className="text-slate-500 flex-shrink-0" />)}
-                  <div className="w-9 h-9 bg-slate-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                    <Building size={18} className="text-slate-600" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="font-semibold text-slate-900 text-sm">{department}</div>
-                    <div className="text-xs text-slate-400 mt-0.5">{members.length} karyawan</div>
-                  </div>
-                  <div className="hidden sm:flex items-center gap-2 text-xs flex-shrink-0">
-                    <span className="badge-success">{activeCount} Aktif</span>
-                    {activeCount < members.length && <span className="badge-danger">{members.length - activeCount} Nonaktif</span>}
-                  </div>
-                </button>
-
-                <AnimatePresence>
-                  {isOpen && (
-                    <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
-                      className="overflow-hidden border-t border-slate-100">
-                      <div className="p-3 border-b border-slate-100 bg-slate-50/50">
-                        <div className="relative max-w-xs">
-                          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                          <input placeholder={`Cari di ${department}...`} value={deptSearch[department] || ''}
-                            onClick={e => e.stopPropagation()}
-                            onChange={e => setDeptSearchValue(department, e.target.value)}
-                            className="input-field pl-8 py-1.5 text-xs" />
-                        </div>
-                      </div>
-                      <div className="overflow-x-auto">
-                        <table className="w-full">
-                          <thead className="bg-slate-50 border-b border-slate-200">
-                            <tr>
-                              {['Karyawan', 'ID', 'Posisi', 'Penempatan', 'Jatah Cuti', 'Status', 'Aksi'].map(h => (
-                                <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">{h}</th>
-                              ))}
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-50">
-                            {visibleMembers.length === 0 ? (
-                              <tr><td colSpan={7} className="text-center py-6 text-slate-400 text-sm">Tidak ada karyawan yang cocok</td></tr>
-                            ) : visibleMembers.map((user) => (
-                              <tr key={user.id} className="hover:bg-slate-50 transition-colors">
-                                <td className="px-4 py-3">
-                                  <div className="flex items-center gap-3">
-                                    <div className="w-9 h-9 bg-gradient-to-br from-slate-700 to-slate-500 rounded-lg flex items-center justify-center text-white font-bold text-sm overflow-hidden flex-shrink-0">
-                                      {user.avatar
-                                        ? <img
-                                            src={user.avatar.startsWith('http') ? user.avatar : `/uploads/avatar/${user.avatar}`}
-                                            alt=""
-                                            className="w-full h-full object-cover"
-                                            onError={(e) => { e.target.style.display = 'none'; e.target.parentNode.innerHTML = `<span class="text-white font-bold text-sm">${user.name?.[0] || '?'}</span>`; }}
-                                          />
-                                        : user.name?.[0]
-                                      }
-                                    </div>
-                                    <div className="min-w-0">
-                                      {/* Nama = link ke detail. Sengaja hanya nama,
-                                          bukan seluruh baris, supaya tidak bentrok
-                                          dengan tombol aksi & jatah cuti di kanan. */}
-                                      <Link
-                                        to={`/admin/employees/detail/${user.id}`}
-                                        className="font-medium text-slate-900 text-sm hover:text-slate-950 hover:underline"
-                                      >
-                                        {user.name}
-                                      </Link>
-                                      <div className="text-xs text-slate-500">{user.email}</div>
-                                      {user.position && (
-                                        <div className="text-xs text-slate-400 mt-0.5">{user.position}</div>
-                                      )}
-                                    </div>
-                                  </div>
-                                </td>
-                                <td className="px-4 py-3 text-sm text-slate-600">{user.employee_id || '-'}</td>
-                                <td className="px-4 py-3 text-sm text-slate-600">{user.position || '-'}</td>
-                                <td className="px-4 py-3 text-sm font-medium text-slate-600">
-                                  <span className="inline-flex items-center gap-1 text-slate-700 bg-slate-100 px-2 py-0.5 rounded text-xs border border-slate-200">
-                                    📍 {user.location_name || 'Belum di-assign'}
-                                  </span>
-                                </td>
-                                <td className="px-4 py-3">
-                                  <button onClick={() => { setQuotaModal(user); setQuotaForm({ total_days: user.total_days || 12, year: new Date().getFullYear() }); }}
-                                    className="text-sm font-medium text-slate-700 hover:text-slate-900 hover:underline">
-                                    {user.remaining_days ?? '-'} / {user.total_days ?? 12} hari
-                                  </button>
-                                </td>
-                                <td className="px-4 py-3">
-                                  <span className={user.is_active ? 'badge-success' : 'badge-danger'}>{user.is_active ? 'Aktif' : 'Nonaktif'}</span>
-                                </td>
-                                <td className="px-4 py-3">
-                                  <div className="flex items-center gap-1">
-                                    {/* Karyawan yang belum pernah membuat kata sandi
-                                        (is_verified masih false) diberi jalan kirim
-                                        ulang tautan aktivasi ke email terdaftarnya. */}
-                                    {!user.is_verified && (
-                                      <button onClick={() => handleResendActivation(user, true)}
-                                        className="p-1.5 hover:bg-blue-50 rounded-lg transition-colors"
-                                        title={`Kirim aktivasi ke ${user.email}`}>
-                                        <Send size={15} className="text-blue-500" />
-                                      </button>
-                                    )}
-                                    <button onClick={() => openEdit(user)} className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors" title="Edit">
-                                      <Edit size={15} className="text-slate-500" />
-                                    </button>
-                                    <button onClick={() => setDeleteModal(user)} className="p-1.5 hover:bg-red-50 rounded-lg transition-colors" title="Hapus">
-                                      <Trash2 size={15} className="text-red-500" />
-                                    </button>
-                                  </div>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+          <>
+            <div className="flex flex-wrap items-center gap-2 px-4 py-3 border-b border-slate-100 bg-slate-50/50">
+              <div className="text-sm font-semibold text-slate-900">
+                {deptFilter || 'Semua Departemen'}
               </div>
-            );
-          })
+              <div className="text-xs text-slate-400">{visibleUsers.length} karyawan</div>
+              <div className="ml-auto flex items-center gap-2 text-xs">
+                <span className="badge-success">{activeCount} Aktif</span>
+                {activeCount < visibleUsers.length && (
+                  <span className="badge-danger">{visibleUsers.length - activeCount} Nonaktif</span>
+                )}
+              </div>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-slate-50 border-b border-slate-200">
+                  <tr>
+                    {['Karyawan', 'ID', 'Departemen', 'Posisi', 'Penempatan', 'Jatah Cuti', 'Status', 'Aksi'].map(h => (
+                      <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {visibleUsers.map((user) => (
+                    <tr key={user.id} className="hover:bg-slate-50 transition-colors">
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 bg-gradient-to-br from-slate-700 to-slate-500 rounded-lg flex items-center justify-center text-white font-bold text-sm overflow-hidden flex-shrink-0">
+                            {user.avatar
+                              ? <img
+                                  src={user.avatar.startsWith('http') ? user.avatar : `/uploads/avatar/${user.avatar}`}
+                                  alt=""
+                                  className="w-full h-full object-cover"
+                                  onError={(e) => { e.target.style.display = 'none'; e.target.parentNode.innerHTML = `<span class="text-white font-bold text-sm">${user.name?.[0] || '?'}</span>`; }}
+                                />
+                              : user.name?.[0]
+                            }
+                          </div>
+                          <div className="min-w-0">
+                            {/* Nama = link ke detail. Sengaja hanya nama,
+                                bukan seluruh baris, supaya tidak bentrok
+                                dengan tombol aksi & jatah cuti di kanan. */}
+                            <Link
+                              to={`/admin/employees/detail/${user.id}`}
+                              className="font-medium text-slate-900 text-sm hover:text-slate-950 hover:underline"
+                            >
+                              {user.name}
+                            </Link>
+                            <div className="text-xs text-slate-500">{user.email}</div>
+                            {user.position && (
+                              <div className="text-xs text-slate-400 mt-0.5">{user.position}</div>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-slate-600">{user.employee_id || '-'}</td>
+                      {/* Kolom departemen wajib ada di daftar datar — tanpa header
+                          accordion, ini satu-satunya penanda divisi tiap baris. */}
+                      <td className="px-4 py-3 text-sm">
+                        {user.department
+                          ? <button onClick={() => setDeptFilter(user.department)}
+                              className="text-slate-600 hover:text-slate-900 hover:underline text-left">
+                              {user.department}
+                            </button>
+                          : <span className="text-slate-300">-</span>}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-slate-600">{user.position || '-'}</td>
+                      <td className="px-4 py-3 text-sm font-medium text-slate-600">
+                        <span className="inline-flex items-center gap-1 text-slate-700 bg-slate-100 px-2 py-0.5 rounded text-xs border border-slate-200">
+                          📍 {user.location_name || 'Belum di-assign'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <button onClick={() => { setQuotaModal(user); setQuotaForm({ total_days: user.total_days || 12, year: new Date().getFullYear() }); }}
+                          className="text-sm font-medium text-slate-700 hover:text-slate-900 hover:underline">
+                          {user.remaining_days ?? '-'} / {user.total_days ?? 12} hari
+                        </button>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={user.is_active ? 'badge-success' : 'badge-danger'}>{user.is_active ? 'Aktif' : 'Nonaktif'}</span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-1">
+                          {/* Karyawan yang belum pernah membuat kata sandi
+                              (is_verified masih false) diberi jalan kirim
+                              ulang tautan aktivasi ke email terdaftarnya. */}
+                          {!user.is_verified && (
+                            <button onClick={() => handleResendActivation(user, true)}
+                              className="p-1.5 hover:bg-blue-50 rounded-lg transition-colors"
+                              title={`Kirim aktivasi ke ${user.email}`}>
+                              <Send size={15} className="text-blue-500" />
+                            </button>
+                          )}
+                          <button onClick={() => openEdit(user)} className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors" title="Edit">
+                            <Edit size={15} className="text-slate-500" />
+                          </button>
+                          <button onClick={() => setDeleteModal(user)} className="p-1.5 hover:bg-red-50 rounded-lg transition-colors" title="Hapus">
+                            <Trash2 size={15} className="text-red-500" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </div>
 
