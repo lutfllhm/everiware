@@ -10,7 +10,10 @@ export default function DepartmentsAdmin() {
   const [loading, setLoading] = useState(false);
   const [expanded, setExpanded] = useState({});
   const { user } = useAuthStore();
-  const canEdit = user?.role !== 'hrd';
+  // HRD ikut mengelola master departemen & jabatan (backend sudah mengizinkan
+  // superadmin/admin/hrd di routes/departments.js). Halaman master data lain
+  // masih read-only untuk HRD.
+  const canEdit = ['superadmin', 'admin', 'hrd'].includes(user?.role);
 
   // Modal state
   const [deptModal, setDeptModal] = useState(null);   // null | 'add' | dept object (edit)
